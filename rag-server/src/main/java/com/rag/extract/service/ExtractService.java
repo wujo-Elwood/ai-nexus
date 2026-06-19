@@ -40,7 +40,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -178,7 +180,12 @@ public class ExtractService {
         String originalFileName = file.getOriginalFilename();
         String fileExtension = getFileExtension(originalFileName);
         String contentType = normalizeContentType(file.getContentType());
-        if (!allowedMimeTypes.contains(contentType) && !allowedExtensions.contains(fileExtension)) {
+        if (!allowedExtensions.contains(fileExtension)) {
+            throw new BusinessException(400, "仅支持 PDF、DOC、DOCX 文件");
+        }
+        // 第3步：内容类型为空或通用二进制时只按扩展名兼容处理
+        boolean genericContentType = contentType.isBlank() || "application/octet-stream".equals(contentType);
+        if (!genericContentType && !allowedMimeTypes.contains(contentType)) {
             throw new BusinessException(400, "仅支持 PDF、DOC、DOCX 文件");
         }
         try {
@@ -209,7 +216,6 @@ public class ExtractService {
     /**
      * 创建并同步执行抽取任务
      */
-    @Transactional
     public ExtractTask createTask(Long documentId, Long templateId, Long userId) {
         // 第1步：校验文档归属和模板存在
         ExtractDocument document = requireDocument(documentId, userId);
@@ -394,6 +400,10 @@ public class ExtractService {
         if (template == null) {
             throw new BusinessException(404, "抽取模板不存在");
         }
+        // 第3步：模板未启用时不允许创建抽取任务
+        if (!Boolean.TRUE.equals(template.getEnabled())) {
+            throw new BusinessException(400, "模板未启用");
+        }
         return template;
     }
 
@@ -407,19 +417,45 @@ public class ExtractService {
         String requestBody = buildModelRequest(template, fields, fullText, provider);
         String endpoint = buildEndpoint(provider);
         HttpURLConnection connection = openConnection(endpoint, provider);
-        connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
-        if (connection.getResponseCode() >= 400) {
+        try (OutputStream outputStream = connection.getOutputStream()) {
+            outputStream.write(requestBody.getBytes(StandardCharsets.UTF_8));
+        }
+        int responseCode = connection.getResponseCode();
+        if (responseCode >= 400) {
             String errorText = readConnectionText(connection, true);
+            String errorMessage = errorText.isBlank() ? "HTTP 状态码：" + responseCode : errorText;
             connection.disconnect();
-            throw new BusinessException(500, "模型抽取失败：" + errorText);
+            throw new BusinessException(500, "模型抽取失败：" + errorMessage);
         }
         // 第3步：解析模型响应正文
         String responseText = readConnectionText(connection, false);
         connection.disconnect();
-        JsonNode responseNode = objectMapper.readTree(responseText);
-        String content = responseNode.path("choices").path(0).path("message").path("content").asText("");
+        // 第4步：先校验模型响应本身是不是 JSON
+        JsonNode responseNode;
+        try {
+            responseNode = objectMapper.readTree(responseText);
+        } catch (Exception e) {
+            throw new BusinessException(500, "模型返回内容为空或格式不正确");
+        }
+        // 第5步：校验 OpenAI 兼容响应必须包含 choices 数组
+        JsonNode choicesNode = responseNode.path("choices");
+        if (!choicesNode.isArray() || choicesNode.isEmpty()) {
+            throw new BusinessException(500, "模型返回内容为空或格式不正确");
+        }
+        // 第6步：校验第一条消息内容不能为空
+        JsonNode contentNode = choicesNode.get(0).path("message").path("content");
+        String content = contentNode.asText("");
+        if (content.isBlank()) {
+            throw new BusinessException(500, "模型返回内容为空或格式不正确");
+        }
+        // 第7步：清理并解析模型返回的抽取 JSON
         String cleanJson = cleanModelJson(content);
-        JsonNode resultNode = objectMapper.readTree(cleanJson);
+        JsonNode resultNode;
+        try {
+            resultNode = objectMapper.readTree(cleanJson);
+        } catch (Exception e) {
+            throw new BusinessException(500, "模型抽取 JSON 解析失败");
+        }
         JsonNode fieldsNode = resultNode.path("fields");
         if (!fieldsNode.isArray()) {
             throw new BusinessException(500, "模型返回 JSON 缺少 fields 数组");
@@ -459,6 +495,7 @@ public class ExtractService {
         for (ExtractField field : fields) {
             promptBuilder.append("- fieldCode: ").append(field.getFieldCode())
                     .append(", fieldName: ").append(field.getFieldName())
+                    .append(", fieldType: ").append(field.getFieldType() == null ? "" : field.getFieldType())
                     .append(", required: ").append(Boolean.TRUE.equals(field.getRequired()))
                     .append(", prompt: ").append(field.getFieldPrompt() == null ? "" : field.getFieldPrompt())
                     .append(", example: ").append(field.getExampleValue() == null ? "" : field.getExampleValue())
@@ -508,7 +545,11 @@ public class ExtractService {
      */
     private String readConnectionText(HttpURLConnection connection, boolean errorStream) throws Exception {
         // 第1步：选择正确的响应流
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(errorStream ? connection.getErrorStream() : connection.getInputStream(), StandardCharsets.UTF_8))) {
+        InputStream inputStream = errorStream ? connection.getErrorStream() : connection.getInputStream();
+        if (inputStream == null) {
+            return "";
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             StringBuilder textBuilder = new StringBuilder();
             String line;
             // 第2步：逐行读取响应内容
