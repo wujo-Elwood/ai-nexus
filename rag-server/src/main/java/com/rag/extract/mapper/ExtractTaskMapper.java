@@ -35,15 +35,15 @@ public interface ExtractTaskMapper {
     /**
      * 更新任务状态
      */
-    int updateStatus(@Param("id") Long id, @Param("taskStatus") String taskStatus, @Param("taskMessage") String taskMessage);
+    int updateStatus(@Param("id") Long id, @Param("status") String status, @Param("message") String message);
 
     /**
      * 标记任务开始
      */
-    int markStarted(@Param("id") Long id);
+    int markStarted(@Param("id") Long id, @Param("status") String status);
 
     /**
      * 标记任务完成
      */
-    int markFinished(@Param("id") Long id, @Param("taskStatus") String taskStatus, @Param("taskMessage") String taskMessage);
+    int markFinished(@Param("id") Long id, @Param("status") String status, @Param("message") String message);
 }

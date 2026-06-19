@@ -42,8 +42,8 @@
     <!-- 第2步：标记结果已经修改并刷新更新时间 -->
     <update id="updateManualValue">
         UPDATE extract_result
-        SET field_value = #{fieldValue},
-            result_status = #{resultStatus},
+        SET field_value = #{newValue},
+            result_status = 'MODIFIED',
             is_modified = 1,
             update_time = NOW()
         WHERE id = #{id}

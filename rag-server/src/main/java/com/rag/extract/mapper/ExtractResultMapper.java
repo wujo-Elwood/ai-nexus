@@ -35,5 +35,5 @@ public interface ExtractResultMapper {
     /**
      * 更新人工修订值
      */
-    int updateManualValue(@Param("id") Long id, @Param("fieldValue") String fieldValue, @Param("resultStatus") String resultStatus);
+    int updateManualValue(@Param("id") Long id, @Param("newValue") String newValue);
 }

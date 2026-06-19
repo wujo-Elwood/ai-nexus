@@ -28,7 +28,7 @@ public interface ExtractDocumentMapper {
     /**
      * 更新文档解析结果
      */
-    int updateParsed(@Param("id") Long id, @Param("parseStatus") String parseStatus, @Param("pageCount") Integer pageCount, @Param("fullText") String fullText);
+    int updateParsed(@Param("id") Long id, @Param("fullText") String fullText, @Param("pageCount") Integer pageCount);
 
     /**
      * 更新文档解析状态

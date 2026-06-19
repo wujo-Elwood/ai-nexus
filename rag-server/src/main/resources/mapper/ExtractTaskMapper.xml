@@ -39,15 +39,15 @@
     <!-- 第1步：更新任务状态和消息 -->
     <update id="updateStatus">
         UPDATE extract_task
-        SET task_status = #{taskStatus},
-            task_message = #{taskMessage}
+        SET task_status = #{status},
+            task_message = #{message}
         WHERE id = #{id}
     </update>
 
     <!-- 第1步：标记任务开始处理 -->
     <update id="markStarted">
         UPDATE extract_task
-        SET task_status = 'RUNNING',
+        SET task_status = #{status},
             started_at = NOW()
         WHERE id = #{id}
     </update>
@@ -55,8 +55,8 @@
     <!-- 第1步：标记任务完成处理 -->
     <update id="markFinished">
         UPDATE extract_task
-        SET task_status = #{taskStatus},
-            task_message = #{taskMessage},
+        SET task_status = #{status},
+            task_message = #{message},
             finished_at = NOW()
         WHERE id = #{id}
     </update>

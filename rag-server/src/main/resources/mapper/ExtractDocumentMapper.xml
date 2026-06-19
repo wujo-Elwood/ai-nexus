@@ -28,7 +28,7 @@
     <!-- 第1步：写入解析状态、页数和全文内容 -->
     <update id="updateParsed">
         UPDATE extract_document
-        SET parse_status = #{parseStatus},
+        SET parse_status = 'PARSED',
             page_count = #{pageCount},
             full_text = #{fullText}
         WHERE id = #{id}
