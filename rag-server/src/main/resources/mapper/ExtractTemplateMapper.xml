@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.extract.mapper.ExtractTemplateMapper">
+
+    <!-- 第1步：查询所有启用模板 -->
+    <select id="findEnabled" resultType="com.rag.extract.entity.ExtractTemplate">
+        SELECT id, template_name, template_code, document_type, description, enabled, create_time
+        FROM extract_template
+        WHERE enabled = 1
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 第1步：按模板主键查询模板 -->
+    <select id="findById" resultType="com.rag.extract.entity.ExtractTemplate">
+        SELECT id, template_name, template_code, document_type, description, enabled, create_time
+        FROM extract_template
+        WHERE id = #{id}
+    </select>
+
+</mapper>

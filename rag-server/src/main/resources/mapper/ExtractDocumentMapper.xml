@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.extract.mapper.ExtractDocumentMapper">
+
+    <!-- 第1步：新增文档基础信息 -->
+    <insert id="insert" parameterType="com.rag.extract.entity.ExtractDocument" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO extract_document (file_name, file_type, file_size, file_path, parse_status, page_count, full_text, uploaded_by, create_time)
+        VALUES (#{fileName}, #{fileType}, #{fileSize}, #{filePath}, #{parseStatus}, #{pageCount}, #{fullText}, #{uploadedBy}, NOW())
+    </insert>
+
+    <!-- 第1步：按文档主键查询文档 -->
+    <select id="findById" resultType="com.rag.extract.entity.ExtractDocument">
+        SELECT id, file_name, file_type, file_size, file_path, parse_status, page_count, full_text, uploaded_by, create_time
+        FROM extract_document
+        WHERE id = #{id}
+    </select>
+
+    <!-- 第1步：按文档主键和上传用户查询文档 -->
+    <select id="findByIdAndUser" resultType="com.rag.extract.entity.ExtractDocument">
+        SELECT id, file_name, file_type, file_size, file_path, parse_status, page_count, full_text, uploaded_by, create_time
+        FROM extract_document
+        WHERE id = #{id}
+          AND uploaded_by = #{userId}
+    </select>
+
+    <!-- 第1步：写入解析状态、页数和全文内容 -->
+    <update id="updateParsed">
+        UPDATE extract_document
+        SET parse_status = #{parseStatus},
+            page_count = #{pageCount},
+            full_text = #{fullText}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：只更新文档解析状态 -->
+    <update id="updateStatus">
+        UPDATE extract_document
+        SET parse_status = #{parseStatus}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

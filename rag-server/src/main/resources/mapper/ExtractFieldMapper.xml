@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.extract.mapper.ExtractFieldMapper">
+
+    <!-- 第1步：按模板主键查询字段列表 -->
+    <select id="findByTemplateId" resultType="com.rag.extract.entity.ExtractField">
+        SELECT id, template_id, field_code, field_name, field_type, required, multiple, field_prompt, example_value, regex_rule, confidence_threshold, sort_no, create_time
+        FROM extract_field
+        WHERE template_id = #{templateId}
+        ORDER BY sort_no ASC, id ASC
+    </select>
+
+</mapper>
