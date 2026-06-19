@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 @SpringBootApplication(exclude = {
         org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration.class
 })
-@MapperScan("com.rag.mapper")
+@MapperScan({"com.rag.mapper", "com.rag.extract.mapper"})
 public class RagApplication {
 
     /**
