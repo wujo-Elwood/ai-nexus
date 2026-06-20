@@ -76,6 +76,11 @@ const menuItems = [
     icon: '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.2A8 8 0 1 1 21 12Z" stroke="currentColor" stroke-width="2"/></svg>'
   },
   {
+    path: '/extract',
+    label: '文档抽取',
+    icon: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2"/><path d="M14 3v5h5M8 13h8M8 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+  },
+  {
     path: '/settings',
     label: '模型设置',
     icon: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2 2 0 1 1-2.82 2.82l-.04-.04A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1 1.62V21a2 2 0 1 1-4 0v-.06a1.8 1.8 0 0 0-1-1.62 1.8 1.8 0 0 0-1.98.36l-.04.04a2 2 0 1 1-2.82-2.82l.04-.04A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0-1.62-1H3a2 2 0 1 1 0-4h.06A1.8 1.8 0 0 0 4.68 9a1.8 1.8 0 0 0-.36-1.98l-.04-.04A2 2 0 1 1 7.1 4.16l.04.04A1.8 1.8 0 0 0 9 4.6a1.8 1.8 0 0 0 1-1.62V3a2 2 0 1 1 4 0v.06A1.8 1.8 0 0 0 15 4.68a1.8 1.8 0 0 0 1.98-.36l.04-.04a2 2 0 1 1 2.82 2.82l-.04.04A1.8 1.8 0 0 0 19.4 9c.22.6.84 1 1.52 1H21a2 2 0 1 1 0 4h-.06A1.8 1.8 0 0 0 19.4 15Z" stroke="currentColor" stroke-width="1.5"/></svg>'

@@ -29,6 +29,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/extract',
+    name: 'Extract',
+    component: () => import('../views/extract/ExtractView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/settings',
     name: 'ModelSettings',
     component: () => import('../views/settings/ModelSettings.vue'),
