@@ -1,6 +1,5 @@
 package com.rag.ai;
 
-import com.rag.entity.ChatMessage;
 import com.rag.entity.KbChunk;
 import com.rag.entity.ModelProvider;
 import com.rag.entity.UsageLog;
@@ -10,18 +9,15 @@ import com.rag.rag.*;
 import com.rag.rag.QdrantService.SearchResult;
 import com.rag.service.ModelProviderService;
 import com.rag.service.UsageService;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.StreamingResponseHandler;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,7 +25,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -121,12 +119,12 @@ public class ChatService {
 
         // 混合检索 + 重排序，构建带来源信息的知识库上下文
         ContextResult contextResult = buildContextWithSources(message, kbId);
-        // 组装 system + 历史消息 + 当前问题的 Spring AI 消息列表
-        List<Message> chatMessages = buildChatMessages(sessionId, message, contextResult);
+        // 组装 system + 历史消息 + 当前问题的 LangChain4j 消息列表
+        List<dev.langchain4j.data.message.ChatMessage> chatMessages = buildChatMessages(sessionId, message, contextResult);
 
         long startTime = System.currentTimeMillis();
         try {
-            // 使用 Spring AI 同步调用大模型，等待完整回复
+            // 使用 LangChain4j 同步调用大模型，等待完整回复
             LlmResult llmResult = callLlmSync(chatMessages, provider);
             // 保存助手回复到数据库
             saveMessage(sessionId, "assistant", llmResult.content);
@@ -186,11 +184,11 @@ public class ChatService {
             safeSend(emitter, SseEmitter.event().name("status").data("正在检索知识库并生成内容..."));
             // 混合检索 + 重排序，构建知识库上下文
             ContextResult contextResult = buildContextWithSources(message, kbId);
-            // 组装 Spring AI 消息列表
-            List<Message> chatMessages = buildChatMessages(sessionId, message, contextResult);
+            // 组装 LangChain4j 消息列表
+            List<dev.langchain4j.data.message.ChatMessage> chatMessages = buildChatMessages(sessionId, message, contextResult);
             // 通知前端正在生成
             safeSend(emitter, SseEmitter.event().name("status").data("正在生成..."));
-            // 使用 Spring AI 流式调用大模型，逐段推送到前端
+            // 使用 LangChain4j 流式调用大模型，逐段推送到前端
             LlmResult llmResult = streamLlmResponse(sessionId, chatMessages, emitter, provider);
             // 记录 Token 用量
             recordUsage(sessionId, provider, startTime, "SUCCESS",
@@ -203,84 +201,118 @@ public class ChatService {
     }
 
     /**
-     * 使用 Spring AI 流式调用大模型
+     * 使用 LangChain4j 流式调用大模型
      *
      * @param sessionId 会话ID
-     * @param chatMessages 组装好的 Spring AI 消息列表
+     * @param chatMessages 组装好的 LangChain4j 消息列表
      * @param emitter   SSE 推送对象
      * @param provider  大模型供应商配置
      * @return LlmResult 包含完整回复内容和 Token 用量
      */
-    private LlmResult streamLlmResponse(Long sessionId, List<Message> chatMessages,
+    private LlmResult streamLlmResponse(Long sessionId, List<dev.langchain4j.data.message.ChatMessage> chatMessages,
                                         SseEmitter emitter, ModelProvider provider) {
         // 第1步：创建完整回复缓存
         StringBuilder fullResponse = new StringBuilder();
         // 第2步：创建 Token 用量缓存
         int[] tokenUsage = {0, 0};
+        // 第3步：创建回调结束等待器
+        CountDownLatch streamDoneLatch = new CountDownLatch(1);
+        // 第4步：创建回调异常缓存
+        AtomicReference<Throwable> streamError = new AtomicReference<>();
         try {
-            // 第3步：根据数据库供应商配置动态创建 Spring AI 模型
-            OpenAiChatModel chatModel = createSpringAiChatModel(provider);
-            // 第4步：把消息列表包装成 Spring AI Prompt
-            Prompt prompt = new Prompt(chatMessages);
-            // 第5步：通知前端连接已经建立
+            // 第5步：根据数据库供应商配置动态创建 LangChain4j 流式模型
+            OpenAiStreamingChatModel chatModel = createLangChain4jStreamingChatModel(provider);
+            // 第6步：通知前端连接已经建立
             safeSend(emitter, SseEmitter.event().name("open").data("connected"));
-            // 第6步：订阅 Spring AI 流式响应并逐段推送给前端
-            chatModel.stream(prompt).toIterable().forEach(response -> {
-                parseUsage(response, tokenUsage);
-                String text = extractResponseText(response);
-                if (!text.isEmpty()) {
-                    fullResponse.append(text);
-                    safeSend(emitter, SseEmitter.event().name("message").data(text));
+            // 第7步：订阅 LangChain4j 流式响应并逐段推送给前端
+            chatModel.generate(chatMessages, new StreamingResponseHandler<AiMessage>() {
+                @Override
+                public void onNext(String token) {
+                    // 第1步：过滤空 token
+                    if (token == null || token.isEmpty()) {
+                        return;
+                    }
+                    // 第2步：累积完整回复并推送给前端
+                    fullResponse.append(token);
+                    safeSend(emitter, SseEmitter.event().name("message").data(token));
+                }
+
+                @Override
+                public void onComplete(Response<AiMessage> response) {
+                    // 第1步：读取最终 Token 用量
+                    parseUsage(response, tokenUsage);
+                    // 第2步：保存完整助手回复
+                    if (!fullResponse.isEmpty()) {
+                        saveMessage(sessionId, "assistant", fullResponse.toString());
+                    }
+                    // 第3步：通知前端流式输出完成
+                    safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
+                    safeComplete(emitter);
+                    // 第4步：通知外层流式调用已经结束
+                    streamDoneLatch.countDown();
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    // 第1步：记录 LangChain4j 回调异常
+                    log.error("LangChain4j streaming callback error, provider={}, model={}", provider.getName(), provider.getModel(), error);
+                    // 第2步：如果已经生成了部分内容，就保存部分内容
+                    if (!fullResponse.isEmpty()) {
+                        saveMessage(sessionId, "assistant", fullResponse.toString());
+                    }
+                    // 第3步：向前端推送错误并关闭连接
+                    Exception exception = error instanceof Exception e ? e : new RuntimeException(error);
+                    streamError.set(exception);
+                    completeEmitterWithError(emitter, exception);
+                    // 第4步：通知外层流式调用已经结束
+                    streamDoneLatch.countDown();
                 }
             });
-            // 第7步：把完整回复保存到数据库
-            if (!fullResponse.isEmpty()) {
-                saveMessage(sessionId, "assistant", fullResponse.toString());
+            // 第8步：等待 LangChain4j 回调结束，确保用量记录发生在最终结果之后
+            streamDoneLatch.await();
+            // 第9步：如果回调中发生异常，就抛给外层记录失败状态
+            if (streamError.get() != null) {
+                throw new RuntimeException(streamError.get());
             }
-            // 第8步：通知前端流式输出完成
-            safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
-            safeComplete(emitter);
         } catch (Exception e) {
-            // 第9步：流式调用失败时记录日志
-            log.error("Spring AI streaming error, provider={}, model={}", provider.getName(), provider.getModel(), e);
-            // 第10步：如果已经生成了部分内容，就先保存部分内容
+            // 第10步：流式调用失败时记录日志
+            log.error("LangChain4j streaming error, provider={}, model={}", provider.getName(), provider.getModel(), e);
+            // 第11步：如果已经生成了部分内容，就先保存部分内容
             if (!fullResponse.isEmpty()) {
                 saveMessage(sessionId, "assistant", fullResponse.toString());
             }
-            // 第11步：把异常继续抛给外层统一处理
-            throw new RuntimeException("Failed to call LLM API by Spring AI: " + buildUserErrorMessage(e), e);
+            // 第12步：把异常继续抛给外层统一处理
+            throw new RuntimeException("Failed to call LLM API by LangChain4j: " + buildUserErrorMessage(e), e);
         }
-        // 第12步：返回完整回复和用量
+        // 第13步：返回完整回复和用量
         return new LlmResult(fullResponse.toString(), tokenUsage[0], tokenUsage[1]);
     }
 
     /**
-     * 使用 Spring AI 同步调用大模型
+     * 使用 LangChain4j 同步调用大模型
      *
-     * @param chatMessages 组装好的 Spring AI 消息列表
+     * @param chatMessages 组装好的 LangChain4j 消息列表
      * @param provider     大模型供应商配置
      * @return LlmResult 包含回复内容和 Token 用量
      */
-    private LlmResult callLlmSync(List<Message> chatMessages, ModelProvider provider) {
+    private LlmResult callLlmSync(List<dev.langchain4j.data.message.ChatMessage> chatMessages, ModelProvider provider) {
         try {
-            // 第1步：根据数据库供应商配置动态创建 Spring AI 模型
-            OpenAiChatModel chatModel = createSpringAiChatModel(provider);
-            // 第2步：把消息列表包装成 Spring AI Prompt
-            Prompt prompt = new Prompt(chatMessages);
-            // 第3步：同步调用模型
-            ChatResponse response = chatModel.call(prompt);
-            // 第4步：提取回复正文
+            // 第1步：根据数据库供应商配置动态创建 LangChain4j 模型
+            OpenAiChatModel chatModel = createLangChain4jChatModel(provider);
+            // 第2步：同步调用模型
+            Response<AiMessage> response = chatModel.generate(chatMessages);
+            // 第3步：提取回复正文
             String content = extractResponseText(response);
-            // 第5步：提取 Token 用量
+            // 第4步：提取 Token 用量
             int[] tokenUsage = {0, 0};
             parseUsage(response, tokenUsage);
-            // 第6步：返回调用结果
+            // 第5步：返回调用结果
             return new LlmResult(content, tokenUsage[0], tokenUsage[1]);
         } catch (Exception e) {
-            // 第7步：调用失败时记录日志
-            log.error("Spring AI call failed, provider={}, model={}", provider.getName(), provider.getModel(), e);
-            // 第8步：抛出统一错误信息
-            throw new RuntimeException("Failed to call LLM API by Spring AI: " + buildUserErrorMessage(e), e);
+            // 第6步：调用失败时记录日志
+            log.error("LangChain4j call failed, provider={}, model={}", provider.getName(), provider.getModel(), e);
+            // 第7步：抛出统一错误信息
+            throw new RuntimeException("Failed to call LLM API by LangChain4j: " + buildUserErrorMessage(e), e);
         }
     }
 
@@ -295,8 +327,8 @@ public class ChatService {
      * @param contextResult 知识库检索结果（含来源标注）
      * @return 消息数组，按 system → history → user 排列
      */
-    private List<Message> buildChatMessages(Long sessionId, String message, ContextResult contextResult) {
-        List<Message> messages = new ArrayList<>();
+    private List<dev.langchain4j.data.message.ChatMessage> buildChatMessages(Long sessionId, String message, ContextResult contextResult) {
+        List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
 
         // 第1步：构建系统提示词
         String systemContent = SYSTEM_PROMPT;
@@ -305,29 +337,29 @@ public class ChatService {
             String compressedContext = contextCompressor.compress(message, contextResult.getContextWithSources());
             systemContent += "\n\n以下是知识库中的相关内容：\n\n" + compressedContext;
         }
-        // 第3步：把系统提示词加入 Spring AI 消息列表
-        messages.add(new SystemMessage(systemContent));
+        // 第3步：把系统提示词加入 LangChain4j 消息列表
+        messages.add(SystemMessage.from(systemContent));
 
         // 第4步：加载最近的历史消息
-        List<ChatMessage> history = chatMessageMapper.findBySessionId(sessionId);
+        List<com.rag.entity.ChatMessage> history = chatMessageMapper.findBySessionId(sessionId);
         if (history.size() > 1) {
             // 第5步：去掉最后一条当前用户消息，避免重复发送
-            List<ChatMessage> previousMessages = history.subList(0, history.size() - 1);
+            List<com.rag.entity.ChatMessage> previousMessages = history.subList(0, history.size() - 1);
             // 第6步：只取最近若干条历史消息，避免上下文过长
             int start = Math.max(0, previousMessages.size() - MAX_HISTORY_MESSAGES);
             for (int i = start; i < previousMessages.size(); i++) {
-                ChatMessage msg = previousMessages.get(i);
-                // 第7步：按角色转换为 Spring AI 消息类型
+                com.rag.entity.ChatMessage msg = previousMessages.get(i);
+                // 第7步：按角色转换为 LangChain4j 消息类型
                 if ("assistant".equals(msg.getRole())) {
-                    messages.add(new AssistantMessage(msg.getContent()));
+                    messages.add(AiMessage.from(msg.getContent()));
                 } else {
-                    messages.add(new UserMessage(msg.getContent()));
+                    messages.add(UserMessage.from(msg.getContent()));
                 }
             }
         }
 
         // 第8步：加入当前用户消息
-        messages.add(new UserMessage(message));
+        messages.add(UserMessage.from(message));
 
         return messages;
     }
@@ -577,42 +609,51 @@ public class ChatService {
         }
     }
 
-    // ==================== Spring AI 调用辅助 ====================
+    // ==================== LangChain4j 调用辅助 ====================
 
     /**
-     * 根据数据库中的供应商配置创建 Spring AI 聊天模型
+     * 根据数据库中的供应商配置创建 LangChain4j 同步聊天模型
      *
      * @param provider 大模型供应商配置
-     * @return Spring AI OpenAiChatModel
+     * @return LangChain4j OpenAiChatModel
      */
-    private OpenAiChatModel createSpringAiChatModel(ModelProvider provider) {
-        // 第1步：规范化 baseUrl，确保交给 Spring AI 的地址只到 /v1 之前或 /v1
-        String baseUrl = normalizeSpringAiBaseUrl(provider.getBaseUrl());
-        // 第2步：使用动态 API Key 和 baseUrl 创建 OpenAiApi
-        OpenAiApi openAiApi = OpenAiApi.builder()
+    private OpenAiChatModel createLangChain4jChatModel(ModelProvider provider) {
+        // 第1步：规范化 baseUrl，兼容用户填写完整 chat completions 地址
+        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
+        // 第2步：创建 LangChain4j 同步模型
+        return OpenAiChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(provider.getApiKey())
-                .build();
-        // 第3步：设置模型名、温度和流式 usage 返回
-        OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
-                .model(provider.getModel())
+                .modelName(provider.getModel())
                 .temperature(0.3)
-                .streamUsage(true)
-                .build();
-        // 第4步：创建 Spring AI ChatModel
-        return OpenAiChatModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(chatOptions)
                 .build();
     }
 
     /**
-     * 规范化 Spring AI 使用的 baseUrl
+     * 根据数据库中的供应商配置创建 LangChain4j 流式聊天模型
+     *
+     * @param provider 大模型供应商配置
+     * @return LangChain4j OpenAiStreamingChatModel
+     */
+    private OpenAiStreamingChatModel createLangChain4jStreamingChatModel(ModelProvider provider) {
+        // 第1步：规范化 baseUrl，兼容用户填写完整 chat completions 地址
+        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
+        // 第2步：创建 LangChain4j 流式模型
+        return OpenAiStreamingChatModel.builder()
+                .baseUrl(baseUrl)
+                .apiKey(provider.getApiKey())
+                .modelName(provider.getModel())
+                .temperature(0.3)
+                .build();
+    }
+
+    /**
+     * 规范化 OpenAI 兼容接口的 baseUrl
      *
      * @param rawBaseUrl 用户配置的 API 地址
-     * @return 可以交给 Spring AI 的 baseUrl
+     * @return 可以交给 LangChain4j 的 baseUrl
      */
-    private String normalizeSpringAiBaseUrl(String rawBaseUrl) {
+    private String normalizeOpenAiBaseUrl(String rawBaseUrl) {
         // 第1步：去掉末尾多余斜杠
         String baseUrl = rawBaseUrl.replaceAll("/+$", "");
         // 第2步：如果用户填了完整 chat/completions 地址，就截断到 /v1
@@ -624,45 +665,45 @@ public class ChatService {
     }
 
     /**
-     * 从 Spring AI 响应中提取文本
+     * 从 LangChain4j 响应中提取文本
      *
-     * @param response Spring AI 聊天响应
+     * @param response LangChain4j 聊天响应
      * @return 模型返回的文本
      */
-    private String extractResponseText(ChatResponse response) {
+    private String extractResponseText(Response<AiMessage> response) {
         // 第1步：空响应直接返回空字符串
-        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+        if (response == null || response.content() == null) {
             return "";
         }
-        // 第2步：从 AssistantMessage 中读取文本
-        String text = response.getResult().getOutput().getText();
+        // 第2步：从 AiMessage 中读取文本
+        String text = response.content().text();
         // 第3步：空文本统一转为空字符串
         return text == null ? "" : text;
     }
 
     /**
-     * 从 Spring AI 响应中提取 Token 用量
+     * 从 LangChain4j 响应中提取 Token 用量
      *
-     * @param response Spring AI 聊天响应
+     * @param response LangChain4j 聊天响应
      * @param tokenUsage Token 用量数组，[0] 输入 Token，[1] 输出 Token
      */
-    private void parseUsage(ChatResponse response, int[] tokenUsage) {
-        // 第1步：响应元数据为空时直接返回
-        if (response == null || response.getMetadata() == null) {
+    private void parseUsage(Response<AiMessage> response, int[] tokenUsage) {
+        // 第1步：响应为空时直接返回
+        if (response == null) {
             return;
         }
-        // 第2步：读取 Spring AI 统一用量对象
-        Usage usage = response.getMetadata().getUsage();
+        // 第2步：读取 LangChain4j 统一用量对象
+        TokenUsage usage = response.tokenUsage();
         if (usage == null) {
             return;
         }
         // 第3步：输入 Token 存在时写入缓存
-        if (usage.getPromptTokens() != null) {
-            tokenUsage[0] = usage.getPromptTokens();
+        if (usage.inputTokenCount() != null) {
+            tokenUsage[0] = usage.inputTokenCount();
         }
         // 第4步：输出 Token 存在时写入缓存
-        if (usage.getCompletionTokens() != null) {
-            tokenUsage[1] = usage.getCompletionTokens();
+        if (usage.outputTokenCount() != null) {
+            tokenUsage[1] = usage.outputTokenCount();
         }
     }
 
@@ -743,7 +784,7 @@ public class ChatService {
      */
     private void saveMessage(Long sessionId, String role, String content) {
         try {
-            ChatMessage msg = new ChatMessage();
+            com.rag.entity.ChatMessage msg = new com.rag.entity.ChatMessage();
             msg.setSessionId(sessionId);
             msg.setRole(role);
             msg.setContent(content);
@@ -759,7 +800,7 @@ public class ChatService {
      * @param sessionId 会话ID
      * @return 消息列表
      */
-    public List<ChatMessage> getSessionMessages(Long sessionId) {
+    public List<com.rag.entity.ChatMessage> getSessionMessages(Long sessionId) {
         return chatMessageMapper.findBySessionId(sessionId);
     }
 

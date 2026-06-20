@@ -11,13 +11,8 @@ import java.util.concurrent.Executors;
 /**
  * RAG 知识库系统启动类
  * 配置 MyBatis Mapper 扫描路径和异步任务线程池
- *
- * 排除 OpenAI 自动配置：项目通过自定义 ModelProvider 数据库配置管理多个供应商，
- * 不依赖 Spring AI 的 OpenAI 自动装配
  */
-@SpringBootApplication(exclude = {
-        org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration.class
-})
+@SpringBootApplication
 @MapperScan({"com.rag.mapper", "com.rag.extract.mapper"})
 public class RagApplication {
 
