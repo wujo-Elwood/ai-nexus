@@ -44,6 +44,9 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - SSE 流式问答、会话历史、回答反馈和用量统计。
 - 可信回答控制：没有有效知识证据时拒答，避免脱离知识库自由编造。
 - 回答引用校验和来源展示，可追溯文件、切片、匹配方式及分数。
+- 回答置信度：结合引用分数、引用数量和证据覆盖率输出 HIGH、MEDIUM、LOW 或 NONE。
+- 证据覆盖率：统计回答句子与有效知识引用的覆盖比例，并在聊天界面展示。
+- 知识摘要：在知识库洞察页按当前版本已完成切片生成、查看和刷新知识库摘要。
 
 ### 企业管理能力
 
@@ -61,6 +64,7 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 智能体管理：知识库质检智能体、运行记录、风险项、质量报告和历史报告。
 
 > 当前不包含图片 OCR、图片语义理解或流程图理解。AI 生图是独立功能，不参与知识库文档检索。
+> 自动生成业务报告不在当前范围；智能体质量报告属于既有质检功能。
 
 ## 技术栈
 
@@ -276,6 +280,7 @@ npm run dev
 | 9 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
 | 10 | `system_health_upgrade.sql` | 系统健康面板菜单和管理员授权 |
 | 11 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心、RAG 评测表和菜单 |
+| 12 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
 
 普通终端示例：
 
@@ -306,7 +311,8 @@ $scripts = @(
   'kb_multipart_upload_upgrade.sql',
   'kb_capabilities_upgrade.sql',
   'system_health_upgrade.sql',
-  'kb_second_priority_upgrade.sql'
+  'kb_second_priority_upgrade.sql',
+  'kb_summary_upgrade.sql'
 )
 
 foreach ($script in $scripts) {
@@ -324,7 +330,7 @@ foreach ($script in $scripts) {
 | `/login` | 登录/注册 | 登录、注册、双密码一致性校验 |
 | `/kb` | 知识库 | 创建、编辑、删除和进入知识库 |
 | `/file/:kbId` | 文件管理 | 上传、分片续传、版本、目录、标签、分类、备份恢复和健康评分 |
-| `/kb/:kbId/insights` | 知识库洞察 | 策略配置、统计和检索诊断 |
+| `/kb/:kbId/insights` | 知识库洞察 | 策略配置、统计、检索诊断和知识摘要 |
 | `/chat` | AI 聊天 | RAG 流式问答、引用和历史记录 |
 | `/tasks` | 任务中心 | 任务状态、重试和取消 |
 | `/eval` | RAG 评测 | 测试集和评测运行 |
@@ -346,7 +352,7 @@ foreach ($script in $scripts) {
 | 模块 | 主要接口 |
 | --- | --- |
 | 认证与用户 | `POST /auth/register`、`POST /auth/login`、`GET/PUT /user/profile`、`PUT /user/password` |
-| 知识库 | `GET/POST /kb`、`GET/PUT/DELETE /kb/{id}`、`GET/PUT /kb/{id}/strategy` |
+| 知识库 | `GET/POST /kb`、`GET/PUT/DELETE /kb/{id}`、`GET/PUT /kb/{id}/strategy`、`GET/POST /kb/{id}/summary` |
 | 文件 | `POST /file/upload`、`GET /file/list/{kbId}`、`GET /file/{id}`、`POST /file/{id}/reprocess`、`DELETE /file/{id}`、预览和下载 |
 | 分片上传 | `POST /file/multipart/init`、`PUT /file/multipart/{uploadId}/chunks/{chunkIndex}`、状态、完成和取消 |
 | 版本与分类 | `GET /file/{id}/versions`、`POST /file/{id}/rollback`、`PUT /file/{id}/catalog`、文件标签查询和更新 |

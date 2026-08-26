@@ -145,6 +145,13 @@
               {{ msg.content }}
             </div>
             <div v-else class="message-text" v-html="renderMarkdown(msg.content)" />
+            <div v-if="msg.role === 'assistant' && !msg._streaming && msg._answerMeta" class="answer-evidence-meta">
+              <span :class="['evidence-pill', `confidence-${String(msg._answerMeta.confidenceLevel || 'NONE').toLowerCase()}`]">
+                置信度 {{ Number(msg._answerMeta.confidence ?? 0) }}%
+              </span>
+              <span class="evidence-pill">证据覆盖率 {{ Number(msg._answerMeta.evidenceCoverage ?? 0) }}%</span>
+              <span class="evidence-pill">{{ Number(msg._answerMeta.citationCount ?? 0) }} 条引用</span>
+            </div>
             <div v-if="msg.role === 'assistant' && !msg._streaming && msg._grounded && msg._citations?.length" class="citation-list">
               <div class="citation-title">参考资料</div>
               <div v-for="citation in msg._citations" :key="`${msg.id}-${citation.chunkId}`" class="citation-item">
@@ -1241,6 +1248,29 @@ function exportChat() {
   gap: 8px;
   margin-top: 10px;
 }
+
+.answer-evidence-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.evidence-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line-color);
+  border-radius: 999px;
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+.confidence-high { color: #72d7a3; border-color: rgba(114, 215, 163, 0.4); }
+.confidence-medium { color: #e5b56a; border-color: rgba(229, 181, 106, 0.4); }
+.confidence-low { color: #ee8b78; border-color: rgba(238, 139, 120, 0.4); }
+.confidence-none { color: var(--muted-color); }
 
 .citation-title {
   color: var(--muted-color);

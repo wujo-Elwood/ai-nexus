@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS kb_knowledge_base (
     keyword_weight DECIMAL(6,4) NULL COMMENT '知识库关键词权重',
     heading_split_enabled TINYINT NULL COMMENT '是否启用标题层级切片',
     table_keep_strategy VARCHAR(20) NULL COMMENT '表格保留策略',
+    summary LONGTEXT NULL COMMENT '知识库文档摘要',
+    summary_updated_at DATETIME NULL COMMENT '摘要生成时间',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_create_user (create_user)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

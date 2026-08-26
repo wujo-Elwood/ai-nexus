@@ -222,7 +222,11 @@ public class ChatService {
                     String refusal = trustedAnswerGuard.validate("", context).getContent();
                     saveMessage(sessionId, "assistant", refusal);
                     safeSend(emitter, SseEmitter.event().name("message").data(refusal));
-                    safeSendJson(emitter, "answer-meta", Map.of("grounded", false, "reason", "NO_EVIDENCE", "citationCount", 0));
+                    // 计算无证据拒答的回答指标并保持指标归零
+                    Map<String, Object> noEvidenceMeta = new LinkedHashMap<>(AnswerEvidenceMetrics.calculate(refusal, false, List.of()));
+                    noEvidenceMeta.put("grounded", false);
+                    noEvidenceMeta.put("reason", "NO_EVIDENCE");
+                    safeSendJson(emitter, "answer-meta", noEvidenceMeta);
                     safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
                     safeComplete(emitter);
                     recordUsage(sessionId, provider, startTime, "SUCCESS", 0, 0);
@@ -295,10 +299,12 @@ public class ChatService {
                         answer = trusted.getContent();
                         saveMessage(sessionId, "assistant", answer);
                         safeSend(emitter, SseEmitter.event().name("message").data(answer));
-                        safeSendJson(emitter, "answer-meta", Map.of(
-                                "grounded", trusted.isGrounded(),
-                                "reason", trusted.getReason(),
-                                "citationCount", trusted.getCitations().size()));
+                        // 计算可信回答的置信度、证据覆盖率和引用数量
+                        Map<String, Object> answerMeta = new LinkedHashMap<>(AnswerEvidenceMetrics.calculate(
+                                answer, trusted.isGrounded(), trusted.getCitations()));
+                        answerMeta.put("grounded", trusted.isGrounded());
+                        answerMeta.put("reason", trusted.getReason());
+                        safeSendJson(emitter, "answer-meta", answerMeta);
                     } else if (!fullResponse.isEmpty()) {
                         //普通聊天保持原有保存逻辑
                         saveMessage(sessionId, "assistant", answer);

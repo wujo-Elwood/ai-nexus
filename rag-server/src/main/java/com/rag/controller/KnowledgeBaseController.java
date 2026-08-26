@@ -2,6 +2,7 @@ package com.rag.controller;
 
 import com.rag.entity.KnowledgeBase;
 import com.rag.service.KnowledgeBaseService;
+import com.rag.kb.KnowledgeSummaryService;
 import com.rag.vo.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,10 @@ public class KnowledgeBaseController {
 
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
+
+    /** 知识库摘要服务 */
+    @Autowired
+    private KnowledgeSummaryService knowledgeSummaryService;
 
     /** 创建知识库（默认私有） */
     @PostMapping
@@ -80,5 +85,19 @@ public class KnowledgeBaseController {
     public Result<KnowledgeBase> updateStrategy(@PathVariable Long id, @RequestBody KnowledgeBase body, HttpServletRequest request) {
         // 调用知识库服务校验管理权限并保存策略
         return Result.success(knowledgeBaseService.updateStrategy(id, body, (Long) request.getAttribute("userId")));
+    }
+
+    /** 查询已保存的知识库摘要 */
+    @GetMapping("/{id}/summary")
+    public Result<KnowledgeBase> getSummary(@PathVariable Long id, HttpServletRequest request) {
+        // 调用摘要服务校验访问权限并读取已保存摘要
+        return Result.success(knowledgeSummaryService.getSummary(id, (Long) request.getAttribute("userId")));
+    }
+
+    /** 生成并保存知识库摘要 */
+    @PostMapping("/{id}/summary")
+    public Result<KnowledgeBase> generateSummary(@PathVariable Long id, HttpServletRequest request) {
+        // 调用摘要服务校验管理权限、生成摘要并返回最新知识库
+        return Result.success(knowledgeSummaryService.generateSummary(id, (Long) request.getAttribute("userId")));
     }
 }

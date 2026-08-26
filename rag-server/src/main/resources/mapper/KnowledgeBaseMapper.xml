@@ -90,4 +90,11 @@
         GROUP BY f.id, f.file_name ORDER BY chunkCount DESC LIMIT #{limit}
     </select>
 
+    <!-- 保存知识库摘要，只有完整生成后才会调用 -->
+    <update id="updateSummary">
+        UPDATE kb_knowledge_base
+        SET summary = #{summary}, summary_updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
 </mapper>

@@ -37,4 +37,8 @@ public class KnowledgeBase {
     private Integer headingSplitEnabled;
     /** 表格保留策略 */
     private String tableKeepStrategy;
+    /** 当前知识库的文档摘要 */
+    private String summary;
+    /** 摘要最后生成时间 */
+    private LocalDateTime summaryUpdatedAt;
 }

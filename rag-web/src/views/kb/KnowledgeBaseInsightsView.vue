@@ -39,6 +39,16 @@
       </article>
     </section>
 
+    <section class="glass-panel summary-panel">
+      <div class="panel-head">
+        <div><h2>知识摘要</h2><p class="summary-note">基于当前知识库已完成文档生成，内容由当前激活模型整理。</p></div>
+        <el-button type="primary" :loading="summaryLoading" @click="generateSummary">刷新摘要</el-button>
+      </div>
+      <div v-if="summary" class="summary-content">{{ summary }}</div>
+      <div v-else class="summary-empty">暂无摘要，点击“刷新摘要”生成。</div>
+      <div v-if="summaryUpdatedAt" class="summary-time">最后生成：{{ formatSummaryTime(summaryUpdatedAt) }}</div>
+    </section>
+
     <section class="activity-grid">
       <article class="glass-panel activity-panel"><h2>最近文件</h2><el-table :data="stats.recentFiles || []"><el-table-column prop="fileName" label="文件" min-width="180" /><el-table-column prop="status" label="状态" width="110" /><el-table-column prop="progress" label="进度" width="90" /></el-table></article>
       <article class="glass-panel activity-panel"><h2>文档规模</h2><el-table :data="stats.popularFiles || []"><el-table-column prop="fileName" label="文件" min-width="180" /><el-table-column prop="chunkCount" label="切片数" width="100" /></el-table></article>
@@ -51,14 +61,17 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { getKbStrategy, getKbStats, updateKbStrategy } from '../../api/kbInsights'
+import { generateKbSummary, getKbStats, getKbStrategy, getKbSummary, updateKbStrategy } from '../../api/kbInsights'
 
 const route = useRoute()
 const router = useRouter()
 const kbId = Number(route.params.kbId)
 const loading = ref(false)
 const saving = ref(false)
+const summaryLoading = ref(false)
 const stats = ref({})
+const summary = ref('')
+const summaryUpdatedAt = ref(null)
 const form = reactive({ chunkSize: null, chunkOverlap: null, topK: null, similarityThreshold: null, vectorWeight: null, keywordWeight: null, headingSplitEnabled: 0, tableKeepStrategy: 'FULL' })
 const headingEnabled = computed({ get: () => form.headingSplitEnabled === 1, set: value => { form.headingSplitEnabled = value ? 1 : 0 } })
 const metrics = [
@@ -72,10 +85,28 @@ onMounted(loadData)
 async function loadData() {
   loading.value = true
   try {
-    const [strategy, summary] = await Promise.all([getKbStrategy(kbId), getKbStats(kbId)])
+    const [strategy, statsResponse, summaryResponse] = await Promise.all([getKbStrategy(kbId), getKbStats(kbId), getKbSummary(kbId)])
     Object.assign(form, strategy.data || {})
-    stats.value = summary.data || {}
+    stats.value = statsResponse.data || {}
+    summary.value = summaryResponse.data?.summary || ''
+    summaryUpdatedAt.value = summaryResponse.data?.summaryUpdatedAt || null
   } catch (error) { console.error(error) } finally { loading.value = false }
+}
+
+// 生成知识库摘要并保留已有内容直到新摘要成功返回
+async function generateSummary() {
+  summaryLoading.value = true
+  try {
+    const response = await generateKbSummary(kbId)
+    summary.value = response.data?.summary || ''
+    summaryUpdatedAt.value = response.data?.summaryUpdatedAt || null
+    ElMessage.success('知识摘要已更新')
+  } catch (error) { console.error(error) } finally { summaryLoading.value = false }
+}
+
+// 格式化摘要生成时间
+function formatSummaryTime(value) {
+  return value ? String(value).replace('T', ' ').slice(0, 19) : ''
 }
 
 // 保存知识库策略
@@ -89,5 +120,5 @@ function goBack() { router.push('/kb') }
 </script>
 
 <style scoped>
-.insights-grid,.activity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.strategy-panel,.score-panel,.activity-panel{padding:22px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.panel-head h2,.activity-panel h2{font-size:20px}.strategy-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}.strategy-form :deep(.el-input-number),.strategy-form :deep(.el-select){width:100%}.strategy-note,.score-label{color:var(--muted-color);font-size:12px}.score-value{text-align:center;color:var(--primary-color);font-size:72px;font-weight:900;line-height:1.1}.score-label{text-align:center;margin-bottom:20px}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.metric{padding:12px;border:1px solid var(--line-color);border-radius:10px}.metric span,.metric strong{display:block}.metric span{color:var(--muted-color);font-size:12px}.metric strong{margin-top:6px;font-size:22px}.activity-grid{margin-top:18px}.activity-panel h2{margin-bottom:16px}@media(max-width:760px){.insights-grid,.activity-grid{grid-template-columns:1fr}.strategy-form{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.insights-grid,.activity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.strategy-panel,.score-panel,.activity-panel{padding:22px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.panel-head h2,.activity-panel h2{font-size:20px}.strategy-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}.strategy-form :deep(.el-input-number),.strategy-form :deep(.el-select){width:100%}.strategy-note,.score-label,.summary-note,.summary-time{color:var(--muted-color);font-size:12px}.score-value{text-align:center;color:var(--primary-color);font-size:72px;font-weight:900;line-height:1.1}.score-label{text-align:center;margin-bottom:20px}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.metric{padding:12px;border:1px solid var(--line-color);border-radius:10px}.metric span,.metric strong{display:block}.metric span{color:var(--muted-color);font-size:12px}.metric strong{margin-top:6px;font-size:22px}.summary-panel{margin-top:18px;padding:22px}.summary-panel .panel-head{margin-bottom:14px}.summary-content{white-space:pre-wrap;line-height:1.8;color:var(--ink-color);font-size:14px}.summary-empty{padding:28px 0;color:var(--muted-color);font-size:13px}.summary-time{margin-top:14px}.activity-grid{margin-top:18px}.activity-panel h2{margin-bottom:16px}@media(max-width:760px){.insights-grid,.activity-grid{grid-template-columns:1fr}.strategy-form{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>

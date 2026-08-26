@@ -26,6 +26,16 @@
         WHERE f.kb_id = #{kbId}
     </select>
 
+    <select id="findCompletedCurrentByKbId" resultType="com.rag.entity.KbChunk">
+        SELECT c.*, f.file_name AS file_name
+        FROM kb_chunk c
+        INNER JOIN kb_file f ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId}
+          AND f.status = 'COMPLETED'
+          AND (f.is_current = 1 OR f.is_current IS NULL)
+        ORDER BY f.id, c.chunk_index
+    </select>
+
     <select id="findByIdAndKbId" resultType="com.rag.entity.KbChunk">
         SELECT c.*, f.file_name AS file_name FROM kb_chunk c
         INNER JOIN kb_file f ON c.file_id = f.id
