@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8888
 
 spring:
   application:
@@ -18,9 +18,15 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
+# 默认允许任意主机通过前端开发端口访问，生产环境可通过环境变量覆盖，多个规则使用逗号分隔
+security:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://*:5173}
+
 # Embedding 模型（Ollama）
 embedding:
   api-url: ${EMBEDDING_API_URL:http://localhost:11434/api/embeddings}
+  health-url: ${EMBEDDING_HEALTH_URL:}
   model: ${EMBEDDING_MODEL:bge-m3}
 
 # 日志
@@ -38,9 +44,19 @@ mybatis:
 # 文件存储目录
 file:
   upload-dir: ${FILE_UPLOAD_DIR:D:/workspace/wujo_rag/uploads}
+  process:
+    max-attempts: ${FILE_PROCESS_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${FILE_PROCESS_RETRY_DELAY_SECONDS:60}
+    retry-interval-ms: ${FILE_PROCESS_RETRY_INTERVAL_MS:60000}
+  multipart:
+    max-file-size: ${FILE_MULTIPART_MAX_SIZE:2147483648}
+    chunk-size: ${FILE_MULTIPART_CHUNK_SIZE:10485760}
+    expire-hours: ${FILE_MULTIPART_EXPIRE_HOURS:24}
+    cleanup-interval-ms: ${FILE_MULTIPART_CLEANUP_INTERVAL_MS:3600000}
 
 # Qdrant 向量数据库
 qdrant:
+  base-url: ${QDRANT_BASE_URL:http://${QDRANT_HOST:localhost}:${QDRANT_PORT:6333}}
   host: ${QDRANT_HOST:localhost}
   port: ${QDRANT_PORT:6333}
   collection: ${QDRANT_COLLECTION:rag_chunks}
@@ -51,6 +67,16 @@ rag:
   chunk-size: 500
   chunk-overlap: 100
   top-k: 5
+  candidate-k: ${RAG_CANDIDATE_K:10}
+  similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.25}
+  vector-weight: ${RAG_VECTOR_WEIGHT:0.6}
+  keyword-weight: ${RAG_KEYWORD_WEIGHT:0.4}
+  diversity-threshold: ${RAG_DIVERSITY_THRESHOLD:0.85}
+
+# 系统健康检查参数
+health:
+  timeout-ms: ${HEALTH_TIMEOUT_MS:3000}
+  disk-warning-percent: ${HEALTH_DISK_WARNING_PERCENT:85}
 
 # JWT
 jwt:

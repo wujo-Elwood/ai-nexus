@@ -16,12 +16,78 @@
     </select>
 
     <insert id="insert" parameterType="com.rag.entity.KnowledgeBase" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO kb_knowledge_base (name, description, create_user, visibility, create_time)
-        VALUES (#{name}, #{description}, #{createUser}, #{visibility}, NOW())
+        INSERT INTO kb_knowledge_base (name, description, create_user, visibility, chunk_size, chunk_overlap,
+            top_k, similarity_threshold, vector_weight, keyword_weight, heading_split_enabled, table_keep_strategy, create_time)
+        VALUES (#{name}, #{description}, #{createUser}, #{visibility}, #{chunkSize}, #{chunkOverlap},
+            #{topK}, #{similarityThreshold}, #{vectorWeight}, #{keywordWeight}, #{headingSplitEnabled}, #{tableKeepStrategy}, NOW())
     </insert>
+
+    <!-- 修改知识库名称、描述和可见范围 -->
+    <update id="update" parameterType="com.rag.entity.KnowledgeBase">
+        UPDATE kb_knowledge_base
+        SET name = #{name},
+            description = #{description},
+            visibility = #{visibility},
+            chunk_size = #{chunkSize},
+            chunk_overlap = #{chunkOverlap},
+            top_k = #{topK},
+            similarity_threshold = #{similarityThreshold},
+            vector_weight = #{vectorWeight},
+            keyword_weight = #{keywordWeight},
+            heading_split_enabled = #{headingSplitEnabled},
+            table_keep_strategy = #{tableKeepStrategy}
+        WHERE id = #{id}
+    </update>
 
     <delete id="deleteById">
         DELETE FROM kb_knowledge_base WHERE id = #{id}
     </delete>
+
+    <select id="countCurrentFiles" resultType="int">
+        SELECT COUNT(*) FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL)
+    </select>
+
+    <select id="sumCurrentFileBytes" resultType="long">
+        SELECT COALESCE(SUM(file_size), 0) FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL)
+    </select>
+
+    <select id="countChunks" resultType="int">
+        SELECT COUNT(*) FROM kb_chunk c INNER JOIN kb_file f ON f.id = c.file_id
+        WHERE f.kb_id = #{kbId} AND (f.is_current = 1 OR f.is_current IS NULL)
+    </select>
+
+    <select id="countVectorReadyFiles" resultType="int">
+        SELECT COUNT(*) FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL) AND vector_status = 'READY'
+    </select>
+
+    <select id="countFailedFiles" resultType="int">
+        SELECT COUNT(*) FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL) AND status = 'FAILED'
+    </select>
+
+    <select id="countDuplicateFiles" resultType="int">
+        SELECT COALESCE(SUM(duplicate_count), 0) FROM (
+            SELECT file_sha256, COUNT(*) - 1 AS duplicate_count FROM kb_file
+            WHERE kb_id = #{kbId} AND file_sha256 IS NOT NULL GROUP BY file_sha256 HAVING COUNT(*) &gt; 1
+        ) duplicate_files
+    </select>
+
+    <select id="countLowQualityChunks" resultType="int">
+        SELECT COUNT(*) FROM kb_chunk c INNER JOIN kb_file f ON f.id = c.file_id
+        WHERE f.kb_id = #{kbId} AND (f.is_current = 1 OR f.is_current IS NULL)
+          AND (c.content IS NULL OR CHAR_LENGTH(TRIM(c.content)) &lt; 30)
+    </select>
+
+    <select id="findRecentFiles" resultType="map">
+        SELECT id, file_name AS fileName, status, process_stage AS processStage, progress, create_time AS createTime
+        FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL)
+        ORDER BY create_time DESC LIMIT #{limit}
+    </select>
+
+    <select id="findPopularFiles" resultType="map">
+        SELECT f.id, f.file_name AS fileName, COUNT(c.id) AS chunkCount
+        FROM kb_file f LEFT JOIN kb_chunk c ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId} AND (f.is_current = 1 OR f.is_current IS NULL)
+        GROUP BY f.id, f.file_name ORDER BY chunkCount DESC LIMIT #{limit}
+    </select>
 
 </mapper>

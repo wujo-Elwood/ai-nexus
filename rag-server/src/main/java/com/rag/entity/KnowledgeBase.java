@@ -21,4 +21,20 @@ public class KnowledgeBase {
     private String visibility;
     /** 创建时间 */
     private LocalDateTime createTime;
+    /** 知识库切片大小 */
+    private Integer chunkSize;
+    /** 知识库切片重叠长度 */
+    private Integer chunkOverlap;
+    /** 最终召回数量 */
+    private Integer topK;
+    /** 向量相似度阈值 */
+    private java.math.BigDecimal similarityThreshold;
+    /** 向量检索权重 */
+    private java.math.BigDecimal vectorWeight;
+    /** 关键词检索权重 */
+    private java.math.BigDecimal keywordWeight;
+    /** 是否启用标题层级切片 */
+    private Integer headingSplitEnabled;
+    /** 表格保留策略 */
+    private String tableKeepStrategy;
 }

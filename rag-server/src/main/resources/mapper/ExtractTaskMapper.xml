@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.extract.mapper.ExtractTaskMapper">
+
+    <!-- 第1步：新增抽取任务 -->
+    <insert id="insert" parameterType="com.rag.extract.entity.ExtractTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO extract_task (document_id, template_id, task_status, task_message, progress, error_message, started_at, finished_at, created_by, create_time)
+        VALUES (#{documentId}, #{templateId}, #{taskStatus}, #{taskMessage}, #{progress}, #{errorMessage}, #{startedAt}, #{finishedAt}, #{createdBy}, NOW())
+    </insert>
+
+    <!-- 第1步：按任务主键查询任务 -->
+    <select id="findById" resultType="com.rag.extract.entity.ExtractTask">
+        SELECT id, document_id, template_id, task_status, task_message, progress, error_message, started_at, finished_at, created_by, create_time
+        FROM extract_task
+        WHERE id = #{id}
+    </select>
+
+    <!-- 第1步：按任务主键和创建用户查询任务 -->
+    <select id="findByIdAndUser" resultType="com.rag.extract.entity.ExtractTask">
+        SELECT id, document_id, template_id, task_status, task_message, progress, error_message, started_at, finished_at, created_by, create_time
+        FROM extract_task
+        WHERE id = #{id}
+          AND created_by = #{userId}
+    </select>
+
+    <!-- 第1步：联表限定用户任务范围 -->
+    <!-- 第2步：只返回任务基础字段给 ExtractTask -->
+    <select id="findByUser" resultType="com.rag.extract.entity.ExtractTask">
+        SELECT t.id, t.document_id, t.template_id, t.task_status, t.task_message, t.progress, t.error_message, t.started_at, t.finished_at, t.created_by, t.create_time
+        FROM extract_task t
+        INNER JOIN extract_document d ON d.id = t.document_id
+        INNER JOIN extract_template et ON et.id = t.template_id
+        WHERE t.created_by = #{userId}
+        ORDER BY t.create_time DESC
+    </select>
+
+    <!-- 第1步：更新任务状态和消息 -->
+    <update id="updateStatus">
+        UPDATE extract_task
+        SET task_status = #{status},
+            task_message = #{message}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：更新任务状态、消息和进度 -->
+    <update id="updateProgress">
+        UPDATE extract_task
+        SET task_status = #{status},
+            task_message = #{message},
+            progress = #{progress}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：标记任务开始处理 -->
+    <update id="markStarted">
+        UPDATE extract_task
+        SET task_status = #{status},
+            task_message = '任务开始处理',
+            progress = 5,
+            started_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：标记任务完成处理 -->
+    <update id="markFinished">
+        UPDATE extract_task
+        SET task_status = #{status},
+            task_message = #{message},
+            progress = 100,
+            finished_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：标记任务失败并记录失败原因 -->
+    <update id="markFailed">
+        UPDATE extract_task
+        SET task_status = 'FAILED',
+            task_message = #{message},
+            error_message = #{errorMessage},
+            progress = 100,
+            finished_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

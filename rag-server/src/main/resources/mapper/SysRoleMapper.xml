@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.rbac.mapper.SysRoleMapper">
+
+    <!-- 查询全部角色 -->
+    <select id="findAll" resultType="com.rag.rbac.entity.SysRole">
+        SELECT *
+        FROM sys_role
+        ORDER BY id
+    </select>
+
+    <!-- 查询用户拥有的角色 -->
+    <select id="findByUserId" resultType="com.rag.rbac.entity.SysRole">
+        SELECT r.*
+        FROM sys_role r
+        INNER JOIN sys_user_role ur ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId}
+        ORDER BY r.id
+    </select>
+
+    <!-- 根据编号查询角色 -->
+    <select id="findById" resultType="com.rag.rbac.entity.SysRole">
+        SELECT *
+        FROM sys_role
+        WHERE id = #{id}
+    </select>
+
+    <!-- 新增角色 -->
+    <insert id="insert" parameterType="com.rag.rbac.entity.SysRole" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_role (
+            role_name, role_code, description, enabled, create_time, update_time
+        )
+        VALUES (
+            #{roleName}, #{roleCode}, #{description}, #{enabled}, NOW(), NOW()
+        )
+    </insert>
+
+    <!-- 修改角色 -->
+    <update id="update" parameterType="com.rag.rbac.entity.SysRole">
+        UPDATE sys_role
+        SET role_name = #{roleName},
+            role_code = #{roleCode},
+            description = #{description},
+            enabled = #{enabled},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除角色 -->
+    <delete id="deleteById">
+        DELETE FROM sys_role
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 查询角色菜单编号 -->
+    <select id="findMenuIdsByRoleId" resultType="long">
+        SELECT menu_id
+        FROM sys_role_menu
+        WHERE role_id = #{roleId}
+        ORDER BY menu_id
+    </select>
+
+    <!-- 删除角色菜单授权 -->
+    <delete id="deleteRoleMenus">
+        DELETE FROM sys_role_menu
+        WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- 新增角色菜单授权 -->
+    <insert id="insertRoleMenu">
+        INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
+        VALUES (#{roleId}, #{menuId})
+    </insert>
+
+    <!-- 删除用户角色授权 -->
+    <delete id="deleteUserRoles">
+        DELETE FROM sys_user_role
+        WHERE user_id = #{userId}
+    </delete>
+
+    <!-- 新增用户角色授权 -->
+    <insert id="insertUserRole">
+        INSERT IGNORE INTO sys_user_role (user_id, role_id)
+        VALUES (#{userId}, #{roleId})
+    </insert>
+
+    <!-- 删除指定角色下的用户关联 -->
+    <delete id="deleteUserRoleByRoleId">
+        DELETE FROM sys_user_role
+        WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- 删除指定角色下的菜单关联 -->
+    <delete id="deleteRoleMenuByRoleId">
+        DELETE FROM sys_role_menu
+        WHERE role_id = #{roleId}
+    </delete>
+
+</mapper>

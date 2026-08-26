@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.task.TaskCenterMapper">
+    <select id="findTasks" resultType="com.rag.task.TaskCenterItem">
+        SELECT * FROM (
+            SELECT 'FILE' task_type, CAST(f.id AS CHAR) task_id, f.file_name task_name, f.status,
+                   COALESCE(f.progress, 0) progress, COALESCE(f.error_message, f.process_stage) message, f.create_time,
+                   IF(f.status IN ('FAILED','UPLOADED'), TRUE, FALSE) retryable,
+                   IF(f.status IN ('UPLOADED','PROCESSING','FAILED'), TRUE, FALSE) cancellable
+            FROM kb_file f INNER JOIN kb_knowledge_base kb ON kb.id = f.kb_id
+            WHERE kb.create_user = #{userId} OR kb.visibility = 'PUBLIC'
+            UNION ALL
+            SELECT 'UPLOAD', upload_id, file_name, status, ROUND(uploaded_bytes * 100 / GREATEST(file_size, 1)),
+                   COALESCE(error_message, '分片上传'), create_time,
+                   IF(status = 'FAILED', TRUE, FALSE), IF(status IN ('UPLOADING','FAILED'), TRUE, FALSE)
+            FROM kb_upload_session WHERE create_user = #{userId}
+            UNION ALL
+            SELECT 'EXTRACT', CAST(id AS CHAR), CONCAT('文档抽取任务 #', id), task_status, COALESCE(progress, 0),
+                   COALESCE(error_message, task_message), create_time, IF(task_status = 'FAILED', TRUE, FALSE),
+                   IF(task_status IN ('PENDING','RUNNING'), TRUE, FALSE)
+            FROM extract_task WHERE created_by = #{userId}
+            UNION ALL
+            SELECT 'AGENT', CAST(id AS CHAR), agent_name, run_status, IF(run_status = 'SUCCESS', 100, 0),
+                   COALESCE(error_message, summary), create_time, IF(run_status = 'FAILED', TRUE, FALSE), FALSE
+            FROM agent_run WHERE created_by = #{userId}
+            UNION ALL
+            SELECT 'IMAGE', CAST(id AS CHAR), prompt, task_status, COALESCE(progress, 0),
+                   COALESCE(error_message, task_message), create_time, IF(task_status = 'FAILED', TRUE, FALSE),
+                   IF(task_status IN ('PENDING','RUNNING'), TRUE, FALSE)
+            FROM ai_image_task WHERE created_by = #{userId}
+        ) task_items
+        WHERE (#{status} IS NULL OR #{status} = '' OR status = #{status})
+          AND (#{taskType} IS NULL OR #{taskType} = '' OR task_type = #{taskType})
+        ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

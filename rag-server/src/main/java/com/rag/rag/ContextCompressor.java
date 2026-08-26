@@ -54,6 +54,7 @@ public class ContextCompressor {
             + "3. 保留原文中的关键数据、步骤、规则等\n"
             + "4. 保持原文表述，不要改写\n"
             + "5. 如果内容中包含表格数据，请保留表格结构\n\n"
+            + "6. 必须原样保留每段内容前的 [来源: 文件名, 第N段] 标记\n\n"
             + "用户问题：{question}\n\n"
             + "知识库内容：\n{context}\n\n"
             + "请输出精炼后的相关内容：";
@@ -127,6 +128,11 @@ public class ContextCompressor {
             // 第7步：校验压缩结果（不能为空，不能比原文更长）
             if (compressed.isEmpty() || compressed.length() >= context.length()) {
                 log.debug("Compression result not better, using original");
+                return context;
+            }
+            //原文包含来源标记时，压缩结果丢失来源就退回原文，保证引用可以校验
+            if (context.contains("[来源:") && !compressed.contains("[来源:")) {
+                log.warn("Compression removed source markers, using original context");
                 return context;
             }
 

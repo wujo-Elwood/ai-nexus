@@ -260,6 +260,8 @@ public class QdrantService {
             restTemplate.postForEntity(url, entity, String.class);
         } catch (Exception e) {
             log.error("Failed to delete points by file_id", e);
+            //向量删除失败时必须阻断数据库删除，等待上层重试以避免孤立向量
+            throw new RuntimeException("Failed to delete vectors by file_id", e);
         }
     }
 }

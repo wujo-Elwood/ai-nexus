@@ -20,7 +20,7 @@
 
     <properties>
         <java.version>17</java.version>
-        <spring-ai.version>1.0.0-M6</spring-ai.version>
+        <langchain4j.version>0.36.2</langchain4j.version>
         <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
         <jjwt.version>0.12.5</jjwt.version>
         <tika.version>2.9.1</tika.version>
@@ -65,11 +65,11 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!-- Spring AI OpenAI (compatible with Mimo API) -->
+        <!-- LangChain4j OpenAI Compatible Model -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
-            <version>${spring-ai.version}</version>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
 
         <!-- Apache Tika -->
@@ -82,6 +82,11 @@
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
             <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version>
         </dependency>
 
         <!-- JWT -->

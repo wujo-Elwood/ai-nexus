@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.MultipartUploadSessionMapper">
+    <select id="findByUploadId" resultType="com.rag.entity.MultipartUploadSession">
+        SELECT * FROM kb_upload_session WHERE upload_id = #{uploadId}
+    </select>
+
+    <insert id="insert" parameterType="com.rag.entity.MultipartUploadSession">
+        INSERT INTO kb_upload_session (
+            upload_id, kb_id, create_user, file_name, file_type, file_size, file_sha256,
+            chunk_size, total_chunks, uploaded_chunks, uploaded_bytes, status,
+            error_message, expire_time, create_time, update_time
+        ) VALUES (
+            #{uploadId}, #{kbId}, #{createUser}, #{fileName}, #{fileType}, #{fileSize}, #{fileSha256},
+            #{chunkSize}, #{totalChunks}, #{uploadedChunks}, #{uploadedBytes}, #{status},
+            #{errorMessage}, #{expireTime}, NOW(), NOW()
+        )
+    </insert>
+
+    <update id="updateProgress">
+        UPDATE kb_upload_session
+        SET uploaded_chunks = #{uploadedChunks}, uploaded_bytes = #{uploadedBytes}, update_time = NOW()
+        WHERE upload_id = #{uploadId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE kb_upload_session
+        SET status = #{status}, error_message = #{errorMessage}, update_time = NOW()
+        WHERE upload_id = #{uploadId}
+    </update>
+
+    <update id="markMerging">
+        UPDATE kb_upload_session
+        SET status = 'MERGING', error_message = NULL, update_time = NOW()
+        WHERE upload_id = #{uploadId}
+          AND status IN ('UPLOADING', 'FAILED')
+    </update>
+
+    <select id="findExpired" resultType="com.rag.entity.MultipartUploadSession">
+        SELECT * FROM kb_upload_session
+        WHERE expire_time &lt; #{expireTime}
+          AND status IN ('UPLOADING', 'FAILED')
+    </select>
+
+    <delete id="deleteByUploadId">
+        DELETE FROM kb_upload_session WHERE upload_id = #{uploadId}
+    </delete>
+</mapper>

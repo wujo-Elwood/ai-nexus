@@ -68,6 +68,10 @@ RAG知识库完整流程.md
 
 # 上传的文件目录
 uploads/
+pic/
+
+# Codex 本地临时文件
+.codex-temp/
 
 # 数据库文件（如果有本地 SQLite）
 *.db

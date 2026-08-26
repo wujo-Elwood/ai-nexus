@@ -8,7 +8,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -40,10 +42,19 @@ public class KeywordSearchService {
         if (keywords.isEmpty()) {
             return Collections.emptyList();
         }
-        // 第2步：用第一个关键词做 LIKE 搜索（避免多个 LIKE 导致性能问题）
-        String primaryKeyword = keywords.iterator().next();
+        // 第2步：分别搜索多个关键词，再按 chunk 编号合并去重
         try {
-            return chunkMapper.searchByKeyword(kbId, primaryKeyword, limit);
+            Map<Long, KbChunk> uniqueChunks = new LinkedHashMap<>();
+            for (String keyword : keywords) {
+                List<KbChunk> matches = chunkMapper.searchByKeyword(kbId, keyword, limit);
+                for (KbChunk chunk : matches) {
+                    uniqueChunks.putIfAbsent(chunk.getId(), chunk);
+                    if (uniqueChunks.size() >= limit) {
+                        return List.copyOf(uniqueChunks.values());
+                    }
+                }
+            }
+            return List.copyOf(uniqueChunks.values());
         } catch (Exception e) {
             log.warn("Keyword search failed: {}", e.getMessage());
             return Collections.emptyList();

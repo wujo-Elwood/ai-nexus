@@ -19,16 +19,107 @@
         ORDER BY create_time DESC
     </select>
 
+    <!-- 只查询知识库当前版本，聊天和文件列表默认使用此范围 -->
+    <select id="findCurrentByKbId" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file WHERE kb_id = #{kbId} AND (is_current = 1 OR is_current IS NULL)
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 按 SHA-256 查询重复文件 -->
+    <select id="findBySha256" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file WHERE kb_id = #{kbId} AND file_sha256 = #{fileSha256} LIMIT 1
+    </select>
+
+    <!-- 查询同名当前版本 -->
+    <select id="findCurrentByName" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file
+        WHERE kb_id = #{kbId} AND file_name = #{fileName} AND (is_current = 1 OR is_current IS NULL)
+        ORDER BY version_no DESC, create_time DESC LIMIT 1
+    </select>
+
+    <select id="findVersions" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file WHERE version_group_id = #{versionGroupId} ORDER BY version_no DESC, create_time DESC
+    </select>
+
     <!-- 新增文件信息 -->
     <insert id="insert" parameterType="com.rag.entity.KbFile" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO kb_file (kb_id, file_name, file_type, file_size, file_path, status, create_time)
-        VALUES (#{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{filePath}, #{status}, NOW())
+        INSERT INTO kb_file (kb_id, file_name, file_type, file_size, file_path, version_no,
+                             version_group_id, parent_version_id, file_sha256, folder_id, category,
+                             is_current, quality_status, quality_score, vector_status, image_context,
+                             status, process_stage, progress, error_message, process_attempts, next_retry_time, create_time)
+        VALUES (#{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{filePath}, #{versionNo},
+                #{versionGroupId}, #{parentVersionId}, #{fileSha256}, #{folderId}, #{category},
+                #{isCurrent}, #{qualityStatus}, #{qualityScore}, #{vectorStatus}, #{imageContext},
+                #{status}, #{processStage}, #{progress}, #{errorMessage}, #{processAttempts}, #{nextRetryTime}, NOW())
     </insert>
 
-    <!-- 更新文件处理状态 -->
-    <update id="updateStatus">
+    <update id="updateVersionGroup">
+        UPDATE kb_file SET version_group_id = #{versionGroupId} WHERE id = #{id}
+    </update>
+
+    <insert id="insertVersion">
+        INSERT INTO kb_file_version(file_id,version_no,file_sha256,file_path,is_current,create_user,create_time)
+        VALUES(#{fileId},#{versionNo},#{fileSha256},#{filePath},#{isCurrent},#{createUser},NOW())
+    </insert>
+
+    <update id="setCurrentVersion">
+        UPDATE kb_file SET is_current = CASE WHEN id = #{id} THEN 1 ELSE 0 END
+        WHERE version_group_id = #{versionGroupId}
+    </update>
+
+    <update id="clearCurrentVersion">
+        UPDATE kb_file SET is_current = 0 WHERE version_group_id = #{versionGroupId}
+    </update>
+
+    <update id="updateCatalog">
+        UPDATE kb_file SET folder_id = #{folderId}, category = #{category} WHERE id = #{id}
+    </update>
+
+    <update id="updateQuality">
+        UPDATE kb_file SET quality_status = #{qualityStatus}, quality_score = #{qualityScore}, vector_status = #{vectorStatus}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新文件处理状态、阶段、进度和失败原因 -->
+    <update id="updateProcessInfo">
         UPDATE kb_file
-        SET status = #{status}
+        SET status = #{status},
+            process_stage = #{processStage},
+            progress = #{progress},
+            error_message = #{errorMessage}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateProcessFailure">
+        UPDATE kb_file
+        SET status = 'FAILED',
+            process_stage = #{processStage},
+            progress = #{progress},
+            error_message = #{errorMessage},
+            process_attempts = #{processAttempts},
+            next_retry_time = #{nextRetryTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="findRetryableFiles" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file
+        WHERE status = 'FAILED'
+          AND process_attempts &lt; #{maxAttempts}
+          AND next_retry_time IS NOT NULL
+          AND next_retry_time &lt;= #{now}
+        ORDER BY next_retry_time ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimRetry">
+        UPDATE kb_file
+        SET status = 'PROCESSING', process_stage = 'PARSING'
+        WHERE id = #{id} AND status = 'FAILED'
+    </update>
+
+    <update id="resetProcessRetry">
+        UPDATE kb_file
+        SET process_attempts = 0, next_retry_time = NULL
         WHERE id = #{id}
     </update>
 

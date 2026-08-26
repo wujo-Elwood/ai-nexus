@@ -6,6 +6,7 @@ import com.rag.entity.KbChunk;
 import com.rag.entity.KbFile;
 import com.rag.mapper.ChunkMapper;
 import com.rag.mapper.FileMapper;
+import com.rag.mapper.KnowledgeBaseMapper;
 import com.rag.rag.DocumentParser;
 import com.rag.rag.QdrantService;
 import com.rag.rag.TextSplitter;
@@ -21,10 +22,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.time.LocalDateTime;
 import java.util.concurrent.Executor;
 
 /**
@@ -38,6 +42,8 @@ public class FileService {
 
     @Autowired
     private FileMapper fileMapper;
+    @Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
     @Autowired
     private ChunkMapper chunkMapper;
     @Autowired
@@ -56,6 +62,10 @@ public class FileService {
     private String uploadDir;
     @Value("${qdrant.upsert-batch-size:100}")
     private int qdrantUpsertBatchSize;
+    @Value("${file.process.max-attempts:3}")
+    private int maxProcessAttempts;
+    @Value("${file.process.retry-delay-seconds:60}")
+    private long retryDelaySeconds;
 
     private static final Set<String> allowedTypes = Set.of(
             "application/pdf",
@@ -64,7 +74,11 @@ public class FileService {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "text/plain",
             "text/markdown",
-            "text/x-markdown"
+            "text/x-markdown",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
     );
 
     /**
@@ -74,7 +88,7 @@ public class FileService {
     @Transactional
     public KbFile upload(Long kbId, MultipartFile file) {
         String contentType = file.getContentType();
-        if (!allowedTypes.contains(contentType)) {
+        if (!isAllowedType(contentType, file.getOriginalFilename())) {
             throw new BusinessException(400, "Unsupported file type. Allowed: PDF, DOCX, TXT");
         }
 
@@ -88,20 +102,77 @@ public class FileService {
             //上传的文件保存到磁盘上的指定位置
             file.transferTo(filePath.toFile());
 
-            KbFile kbFile = new KbFile();
-            kbFile.setKbId(kbId);
-            kbFile.setFileName(file.getOriginalFilename());
-            kbFile.setFileType(contentType != null ? contentType.split(";")[0] : "unknown");
-            kbFile.setFileSize(file.getSize());
-            kbFile.setFilePath(filePath.toString());
-            kbFile.setStatus("UPLOADED");
-            fileMapper.insert(kbFile);
-            //提交后台异步任务
-            submitProcessTask(kbFile);
-            return kbFile;
+            //调用统一的已落盘文件登记方法，保持普通上传和分片上传字段一致
+            return registerSavedFile(kbId, file.getOriginalFilename(), contentType, file.getSize(), filePath);
         } catch (IOException e) {
             throw new BusinessException("Failed to save file: " + e.getMessage());
         }
+    }
+
+    /** 兼容部分客户端未填写 MIME 的情况，按安全扩展名兜底判断。 */
+    private boolean isAllowedType(String contentType, String originalName) {
+        if (contentType != null && allowedTypes.contains(contentType.split(";")[0])) return true;
+        if (originalName == null) return false;
+        String name = originalName.toLowerCase(Locale.ROOT);
+        return name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx")
+                || name.endsWith(".xlsx") || name.endsWith(".txt") || name.endsWith(".md")
+                || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg")
+                || name.endsWith(".gif") || name.endsWith(".webp");
+    }
+
+    /**
+     * 登记已经保存到磁盘的文件并提交后台处理任务
+     * 分片上传合并完成后复用此方法，避免产生第二套文件处理流程
+     */
+    @Transactional
+    public KbFile registerSavedFile(Long kbId, String originalFileName, String contentType,
+                                    long fileSize, Path filePath) {
+        String fileSha256 = calculateSha256(filePath);
+        //同一知识库同一摘要直接拒绝，避免重复切片和向量写入
+        KbFile duplicate = fileMapper.findBySha256(kbId, fileSha256);
+        if (duplicate != null) {
+            try {
+                Files.deleteIfExists(filePath);
+            } catch (IOException ignored) {
+                log.warn("Failed to delete duplicate file {}", filePath);
+            }
+            throw new BusinessException(409, "文件内容已存在，不能重复上传");
+        }
+        KbFile previous = fileMapper.findCurrentByName(kbId, originalFileName);
+        KbFile kbFile = new KbFile();
+        kbFile.setKbId(kbId);
+        kbFile.setFileName(originalFileName);
+        kbFile.setFileType(contentType != null ? contentType.split(";")[0] : "unknown");
+        kbFile.setFileSize(fileSize);
+        kbFile.setFilePath(filePath.toString());
+        kbFile.setVersionNo(previous == null ? 1 : (previous.getVersionNo() == null ? 1 : previous.getVersionNo() + 1));
+        kbFile.setVersionGroupId(previous == null ? null : (previous.getVersionGroupId() == null ? previous.getId() : previous.getVersionGroupId()));
+        kbFile.setParentVersionId(previous == null ? null : previous.getId());
+        kbFile.setFileSha256(fileSha256);
+        kbFile.setIsCurrent(1);
+        kbFile.setQualityStatus("UNKNOWN");
+        kbFile.setVectorStatus("PENDING");
+        kbFile.setStatus("UPLOADED");
+        kbFile.setProcessStage("UPLOADED");
+        kbFile.setProgress(0);
+        kbFile.setErrorMessage(null);
+        kbFile.setProcessAttempts(0);
+        kbFile.setNextRetryTime(null);
+        //保存文件记录，后续处理线程只读取已提交的文件记录
+        if (previous != null) {
+            //同名新内容进入新版本，旧版本保留但不再参与默认检索
+            fileMapper.clearCurrentVersion(kbFile.getVersionGroupId());
+        }
+        fileMapper.insert(kbFile);
+        if (previous == null) {
+            fileMapper.updateVersionGroup(kbFile.getId(), kbFile.getId());
+            kbFile.setVersionGroupId(kbFile.getId());
+        }
+        fileMapper.insertVersion(kbFile.getId(), kbFile.getVersionNo(), kbFile.getFileSha256(),
+                kbFile.getFilePath(), 1, null);
+        //提交后台异步任务
+        submitProcessTask(kbFile);
+        return kbFile;
     }
 
     /**
@@ -129,25 +200,82 @@ public class FileService {
      */
     private void processFile(KbFile kbFile) {
         try {
-            fileMapper.updateStatus(kbFile.getId(), "PROCESSING");
+            //记录本次处理尝试次数，失败后由定时任务按次数和时间自动重试
+            int processAttempts = kbFile.getProcessAttempts() == null ? 0 : kbFile.getProcessAttempts();
+            kbFile.setProcessAttempts(processAttempts + 1);
+            // 第1步：进入文档解析阶段
+            kbFile.setStatus("PROCESSING");
+            kbFile.setProcessStage("PARSING");
+            kbFile.setProgress(20);
+            kbFile.setErrorMessage(null);
+            fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
+                    kbFile.getProgress(), kbFile.getErrorMessage());
             File file = new File(kbFile.getFilePath());
             //提取文件内容为字符串
             String content = documentParser.parse(file);
             log.info("Parsed document, content length: {}", content.length());
+            // 第2步：进入文本切片阶段
+            kbFile.setProcessStage("SPLITTING");
+            kbFile.setProgress(40);
+            fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
+                    kbFile.getProgress(), null);
             //按自适应策略分割文本
-            List<String> chunkTexts = textSplitter.split(content);
+            // 按知识库独立策略切片，未配置时继续使用系统默认值
+            com.rag.entity.KnowledgeBase strategy = knowledgeBaseMapper.findById(kbFile.getKbId());
+            int configuredChunkSize = strategy != null && strategy.getChunkSize() != null ? strategy.getChunkSize() : 500;
+            int configuredOverlap = strategy != null && strategy.getChunkOverlap() != null ? strategy.getChunkOverlap() : 100;
+            boolean headingSplit = strategy != null && Integer.valueOf(1).equals(strategy.getHeadingSplitEnabled());
+            List<String> chunkTexts = textSplitter.split(content, configuredChunkSize, configuredOverlap, headingSplit);
             log.info("Split into {} chunks", chunkTexts.size());
             //存储文件拆分后的文本片段
             List<KbChunk> chunkBuffer = buildChunkBuffer(kbFile, chunkTexts);
             saveChunksBatch(chunkBuffer);
             List<KbChunk> savedChunks = chunkMapper.findByFileId(kbFile.getId());
+            // 第3步：进入向量化和向量入库阶段
+            kbFile.setProcessStage("VECTORIZING");
+            kbFile.setProgress(60);
+            fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
+                    kbFile.getProgress(), null);
             //批量插入向量库
             saveVectorsBatch(kbFile, savedChunks);
-            fileMapper.updateStatus(kbFile.getId(), "COMPLETED");
+            kbFile.setVectorStatus("READY");
+            fileMapper.updateQuality(kbFile.getId(), "PASSED", java.math.BigDecimal.valueOf(100), "READY");
+            // 第4步：所有文本切片和向量成功入库后标记完成
+            kbFile.setStatus("COMPLETED");
+            kbFile.setProcessStage("COMPLETED");
+            kbFile.setProgress(100);
+            kbFile.setErrorMessage(null);
+            kbFile.setNextRetryTime(null);
+            fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
+                    kbFile.getProgress(), kbFile.getErrorMessage());
             log.info("File processed successfully: {}", kbFile.getFileName());
         } catch (Exception e) {
             log.error("Failed to process file", e);
-            fileMapper.updateStatus(kbFile.getId(), "FAILED");
+            // 第5步：保留失败时已完成的进度，并记录可展示的失败原因
+            kbFile.setStatus("FAILED");
+            kbFile.setProcessStage("FAILED");
+            kbFile.setErrorMessage(e.getMessage() == null ? "文件处理失败" : e.getMessage());
+            int attempts = kbFile.getProcessAttempts() == null ? 1 : kbFile.getProcessAttempts();
+            LocalDateTime nextRetryTime = attempts < maxProcessAttempts
+                    ? LocalDateTime.now().plusSeconds(retryDelaySeconds * attempts)
+                    : null;
+            kbFile.setNextRetryTime(nextRetryTime);
+            fileMapper.updateProcessFailure(kbFile.getId(), kbFile.getProcessStage(), kbFile.getProgress(),
+                    kbFile.getErrorMessage(), attempts, nextRetryTime);
+        }
+    }
+
+    /**
+     * 定时提交到期的失败文件，避免外部模型短暂不可用导致人工介入
+     */
+    @org.springframework.scheduling.annotation.Scheduled(
+            fixedDelayString = "${file.process.retry-interval-ms:60000}")
+    public void retryFailedFiles() {
+        List<KbFile> retryableFiles = fileMapper.findRetryableFiles(LocalDateTime.now(), maxProcessAttempts, 20);
+        for (KbFile file : retryableFiles) {
+            if (fileMapper.claimRetry(file.getId()) == 1) {
+                fileProcessExecutor.execute(() -> processFile(file));
+            }
         }
     }
 
@@ -184,18 +312,16 @@ public class FileService {
     }
 
     private void addVectorPoint(List<QdrantService.VectorPoint> vectorPoints, KbFile kbFile, KbChunk chunk) {
-        try {
-            String chunkText = chunk.getContent();
-            float[] embedding = embeddingService.embed(chunkText);
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("kb_id", kbFile.getKbId());
-            payload.put("file_id", kbFile.getId());
-            payload.put("chunk_id", chunk.getId());
-            payload.put("content", chunkText);
-            vectorPoints.add(new QdrantService.VectorPoint(chunk.getId(), embedding, payload));
-        } catch (Exception e) {
-            log.warn("Embedding failed for chunk {}, skipping vector storage: {}", chunk.getChunkIndex(), e.getMessage());
-        }
+        // 第1步：生成文本切片向量，失败时中止本次文件处理
+        String chunkText = chunk.getContent();
+        float[] embedding = embeddingService.embed(chunkText);
+        // 第2步：准备向量检索需要的来源字段
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("kb_id", kbFile.getKbId());
+        payload.put("file_id", kbFile.getId());
+        payload.put("chunk_id", chunk.getId());
+        payload.put("content", chunkText);
+        vectorPoints.add(new QdrantService.VectorPoint(chunk.getId(), embedding, payload));
     }
 
     private void flushVectorPointsIfNeeded(List<QdrantService.VectorPoint> vectorPoints) {
@@ -211,21 +337,63 @@ public class FileService {
         if (vectorPoints.isEmpty()) {
             return;
         }
-        try {
-            List<QdrantService.VectorPoint> currentBatch = new ArrayList<>(vectorPoints);
-            qdrantService.upsertBatch(currentBatch);
-            vectorPoints.clear();
-        } catch (Exception e) {
-            log.warn("Batch upsert to Qdrant failed, size={}, skipping vector storage: {}", vectorPoints.size(), e.getMessage());
-            vectorPoints.clear();
-        }
+        // 第1步：复制当前批次并写入向量库
+        List<QdrantService.VectorPoint> currentBatch = new ArrayList<>(vectorPoints);
+        qdrantService.upsertBatch(currentBatch);
+        // 第2步：写入成功后清空缓冲区
+        vectorPoints.clear();
     }
 
     /**
      * 查询知识库下的所有文件
      */
     public List<KbFile> getByKbId(Long kbId) {
-        return fileMapper.findByKbId(kbId);
+        return fileMapper.findCurrentByKbId(kbId);
+    }
+
+    /** 查询文件的全部历史版本 */
+    public List<KbFile> getVersions(Long id) {
+        KbFile file = getById(id);
+        Long groupId = file.getVersionGroupId() == null ? file.getId() : file.getVersionGroupId();
+        return fileMapper.findVersions(groupId);
+    }
+
+    /** 回滚到指定历史版本并重新建立其向量 */
+    @Transactional
+    public KbFile rollback(Long id) {
+        KbFile target = getById(id);
+        Long groupId = target.getVersionGroupId() == null ? target.getId() : target.getVersionGroupId();
+        fileMapper.setCurrentVersion(target.getId(), groupId);
+        //旧版本通常已有向量，只有缺失时才重建，避免无谓删除和重复调用模型
+        if (!"READY".equalsIgnoreCase(target.getVectorStatus()) && "COMPLETED".equalsIgnoreCase(target.getStatus())) {
+            reprocess(id);
+        }
+        return fileMapper.findById(id);
+    }
+
+    /** 更新文件目录和分类 */
+    public void updateCatalog(Long id, Long folderId, String category) {
+        getById(id);
+        fileMapper.updateCatalog(id, folderId, category == null ? null : category.trim());
+    }
+
+    /** 计算文件 SHA-256，用于去重和备份校验 */
+    private String calculateSha256(Path path) {
+        try (InputStream input = Files.newInputStream(path)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            StringBuilder result = new StringBuilder(64);
+            for (byte value : digest.digest()) {
+                result.append(String.format("%02x", value));
+            }
+            return result.toString();
+        } catch (Exception e) {
+            throw new BusinessException("无法计算文件摘要");
+        }
     }
 
     /**
@@ -253,8 +421,25 @@ public class FileService {
         qdrantService.deleteByFileId(id);
         chunkMapper.deleteByFileId(id);
         // 重新走处理流程
-        fileMapper.updateStatus(id, "UPLOADED");
+        file.setStatus("UPLOADED");
+        file.setProcessStage("UPLOADED");
+        file.setProgress(0);
+        file.setErrorMessage(null);
+        file.setProcessAttempts(0);
+        file.setNextRetryTime(null);
+        fileMapper.resetProcessRetry(id);
+        fileMapper.updateProcessInfo(id, file.getStatus(), file.getProcessStage(), file.getProgress(), null);
         submitProcessTask(file);
+    }
+
+    /** 校验文件归属后重新处理，供任务中心调用 */
+    public void reprocessOwned(Long id, Long userId) {
+        KbFile file = getById(id);
+        com.rag.entity.KnowledgeBase kb = knowledgeBaseMapper.findById(file.getKbId());
+        if (kb == null || !kb.getCreateUser().equals(userId)) {
+            throw new BusinessException(403, "无权重新处理该文件");
+        }
+        reprocess(id);
     }
 
     /**

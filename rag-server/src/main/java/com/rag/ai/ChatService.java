@@ -1,27 +1,25 @@
 package com.rag.ai;
 
-import com.rag.entity.ChatMessage;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rag.entity.KbChunk;
 import com.rag.entity.ModelProvider;
 import com.rag.entity.UsageLog;
 import com.rag.mapper.ChatMessageMapper;
 import com.rag.mapper.ChunkMapper;
+import com.rag.mapper.KnowledgeBaseMapper;
 import com.rag.rag.*;
 import com.rag.rag.QdrantService.SearchResult;
 import com.rag.service.ModelProviderService;
 import com.rag.service.UsageService;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.StreamingResponseHandler;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,7 +27,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +52,10 @@ public class ChatService {
     @Value("${rag.top-k}")
     private int topK;
 
+    /** 检索候选数量 */
+    @Value("${rag.candidate-k:10}")
+    private int candidateK = 10;
+
     /** 多轮对话：最多加载的历史消息条数 */
     private static final int MAX_HISTORY_MESSAGES = 10;
 
@@ -68,6 +72,17 @@ public class ChatService {
     private final RetrievalCache retrievalCache;
     private final ContextCompressor contextCompressor;
     private final Executor chatStreamExecutor;
+    /** 检索候选选择器 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private RetrievalSelector retrievalSelector;
+    /** 知识库级检索策略读取器 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+    /** 可信回答校验器 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private TrustedAnswerGuard trustedAnswerGuard;
+    /** SSE 结构化事件序列化器 */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 系统提示词：要求模型基于知识库上下文回答并标注来源 */
     private static final String SYSTEM_PROMPT = "你是一个智能 AI 助手。\n\n"
@@ -98,6 +113,8 @@ public class ChatService {
         this.retrievalCache = retrievalCache;
         this.contextCompressor = contextCompressor;
         this.chatStreamExecutor = chatStreamExecutor;
+        this.retrievalSelector = new RetrievalSelector();
+        this.trustedAnswerGuard = new TrustedAnswerGuard();
     }
 
     // ==================== 同步聊天 ====================
@@ -120,20 +137,32 @@ public class ChatService {
         saveMessage(sessionId, "user", message);
 
         // 混合检索 + 重排序，构建带来源信息的知识库上下文
-        ContextResult contextResult = buildContextWithSources(message, kbId);
-        // 组装 system + 历史消息 + 当前问题的 Spring AI 消息列表
-        List<Message> chatMessages = buildChatMessages(sessionId, message, contextResult);
+        KnowledgeContext context = buildContextWithSources(message, kbId);
+        //知识库模式没有证据时直接拒答，不调用大模型
+        if (kbId != null && !context.hasContext()) {
+            String refusal = trustedAnswerGuard.validate("", context).getContent();
+            saveMessage(sessionId, "assistant", refusal);
+            recordUsage(sessionId, provider, System.currentTimeMillis(), "SUCCESS", 0, 0);
+            return refusal;
+        }
+        // 组装 system + 历史消息 + 当前问题的 LangChain4j 消息列表
+        List<dev.langchain4j.data.message.ChatMessage> chatMessages = buildChatMessages(sessionId, message, context);
 
         long startTime = System.currentTimeMillis();
         try {
-            // 使用 Spring AI 同步调用大模型，等待完整回复
+            // 使用 LangChain4j 同步调用大模型，等待完整回复
             LlmResult llmResult = callLlmSync(chatMessages, provider);
+            String answer = llmResult.content;
+            if (kbId != null) {
+                //知识库模式只保存经过来源校验的回答
+                answer = trustedAnswerGuard.validate(answer, context).getContent();
+            }
             // 保存助手回复到数据库
-            saveMessage(sessionId, "assistant", llmResult.content);
+            saveMessage(sessionId, "assistant", answer);
             // 记录本次调用的 Token 用量和耗时
             recordUsage(sessionId, provider, startTime, "SUCCESS",
                     llmResult.promptTokens, llmResult.completionTokens);
-            return llmResult.content;
+            return answer;
         } catch (Exception e) {
             // 调用失败也记录用量（状态为 FAILED）
             recordUsage(sessionId, provider, startTime, "FAILED", 0, 0);
@@ -185,13 +214,27 @@ public class ChatService {
             // 通知前端正在检索知识库
             safeSend(emitter, SseEmitter.event().name("status").data("正在检索知识库并生成内容..."));
             // 混合检索 + 重排序，构建知识库上下文
-            ContextResult contextResult = buildContextWithSources(message, kbId);
-            // 组装 Spring AI 消息列表
-            List<Message> chatMessages = buildChatMessages(sessionId, message, contextResult);
+            KnowledgeContext context = buildContextWithSources(message, kbId);
+            if (kbId != null) {
+                //先发送引用元数据，前端可以在回答下方展示参考资料
+                safeSendJson(emitter, "citation", context.getCitations());
+                if (!context.hasContext()) {
+                    String refusal = trustedAnswerGuard.validate("", context).getContent();
+                    saveMessage(sessionId, "assistant", refusal);
+                    safeSend(emitter, SseEmitter.event().name("message").data(refusal));
+                    safeSendJson(emitter, "answer-meta", Map.of("grounded", false, "reason", "NO_EVIDENCE", "citationCount", 0));
+                    safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
+                    safeComplete(emitter);
+                    recordUsage(sessionId, provider, startTime, "SUCCESS", 0, 0);
+                    return;
+                }
+            }
+            // 组装 LangChain4j 消息列表
+            List<dev.langchain4j.data.message.ChatMessage> chatMessages = buildChatMessages(sessionId, message, context);
             // 通知前端正在生成
             safeSend(emitter, SseEmitter.event().name("status").data("正在生成..."));
-            // 使用 Spring AI 流式调用大模型，逐段推送到前端
-            LlmResult llmResult = streamLlmResponse(sessionId, chatMessages, emitter, provider);
+            // 使用 LangChain4j 流式调用大模型，逐段推送到前端
+            LlmResult llmResult = streamLlmResponse(sessionId, chatMessages, emitter, provider, context);
             // 记录 Token 用量
             recordUsage(sessionId, provider, startTime, "SUCCESS",
                     llmResult.promptTokens, llmResult.completionTokens);
@@ -203,84 +246,131 @@ public class ChatService {
     }
 
     /**
-     * 使用 Spring AI 流式调用大模型
+     * 使用 LangChain4j 流式调用大模型
      *
      * @param sessionId 会话ID
-     * @param chatMessages 组装好的 Spring AI 消息列表
+     * @param chatMessages 组装好的 LangChain4j 消息列表
      * @param emitter   SSE 推送对象
      * @param provider  大模型供应商配置
      * @return LlmResult 包含完整回复内容和 Token 用量
      */
-    private LlmResult streamLlmResponse(Long sessionId, List<Message> chatMessages,
-                                        SseEmitter emitter, ModelProvider provider) {
+    private LlmResult streamLlmResponse(Long sessionId, List<dev.langchain4j.data.message.ChatMessage> chatMessages,
+                                        SseEmitter emitter, ModelProvider provider, KnowledgeContext context) {
         // 第1步：创建完整回复缓存
         StringBuilder fullResponse = new StringBuilder();
         // 第2步：创建 Token 用量缓存
         int[] tokenUsage = {0, 0};
+        // 第3步：创建回调结束等待器
+        CountDownLatch streamDoneLatch = new CountDownLatch(1);
+        // 第4步：创建回调异常缓存
+        AtomicReference<Throwable> streamError = new AtomicReference<>();
         try {
-            // 第3步：根据数据库供应商配置动态创建 Spring AI 模型
-            OpenAiChatModel chatModel = createSpringAiChatModel(provider);
-            // 第4步：把消息列表包装成 Spring AI Prompt
-            Prompt prompt = new Prompt(chatMessages);
-            // 第5步：通知前端连接已经建立
+            // 第5步：根据数据库供应商配置动态创建 LangChain4j 流式模型
+            OpenAiStreamingChatModel chatModel = createLangChain4jStreamingChatModel(provider);
+            // 第6步：通知前端连接已经建立
             safeSend(emitter, SseEmitter.event().name("open").data("connected"));
-            // 第6步：订阅 Spring AI 流式响应并逐段推送给前端
-            chatModel.stream(prompt).toIterable().forEach(response -> {
-                parseUsage(response, tokenUsage);
-                String text = extractResponseText(response);
-                if (!text.isEmpty()) {
-                    fullResponse.append(text);
-                    safeSend(emitter, SseEmitter.event().name("message").data(text));
+            // 第7步：订阅 LangChain4j 流式响应并逐段推送给前端
+            chatModel.generate(chatMessages, new StreamingResponseHandler<AiMessage>() {
+                @Override
+                public void onNext(String token) {
+                    // 第1步：过滤空 token
+                    if (token == null || token.isEmpty()) {
+                        return;
+                    }
+                    // 第2步：累积完整回复，知识库模式在校验前不推送正文
+                    fullResponse.append(token);
+                    if (!context.hasContext()) {
+                        safeSend(emitter, SseEmitter.event().name("message").data(token));
+                    }
+                }
+
+                @Override
+                public void onComplete(Response<AiMessage> response) {
+                    // 第1步：读取最终 Token 用量
+                    parseUsage(response, tokenUsage);
+                    String answer = fullResponse.toString();
+                    if (context.hasContext()) {
+                        //知识库模式在完整回答生成后校验来源，再一次性发送可信回答
+                        TrustedAnswerResult trusted = trustedAnswerGuard.validate(answer, context);
+                        answer = trusted.getContent();
+                        saveMessage(sessionId, "assistant", answer);
+                        safeSend(emitter, SseEmitter.event().name("message").data(answer));
+                        safeSendJson(emitter, "answer-meta", Map.of(
+                                "grounded", trusted.isGrounded(),
+                                "reason", trusted.getReason(),
+                                "citationCount", trusted.getCitations().size()));
+                    } else if (!fullResponse.isEmpty()) {
+                        //普通聊天保持原有保存逻辑
+                        saveMessage(sessionId, "assistant", answer);
+                    }
+                    // 第3步：通知前端流式输出完成
+                    safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
+                    safeComplete(emitter);
+                    // 第4步：通知外层流式调用已经结束
+                    streamDoneLatch.countDown();
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    // 第1步：记录 LangChain4j 回调异常
+                    log.error("LangChain4j streaming callback error, provider={}, model={}", provider.getName(), provider.getModel(), error);
+                    // 第2步：如果已经生成了部分内容，就保存部分内容
+                    if (!fullResponse.isEmpty() && !context.hasContext()) {
+                        saveMessage(sessionId, "assistant", fullResponse.toString());
+                    }
+                    // 第3步：向前端推送错误并关闭连接
+                    Exception exception = error instanceof Exception e ? e : new RuntimeException(error);
+                    streamError.set(exception);
+                    completeEmitterWithError(emitter, exception);
+                    // 第4步：通知外层流式调用已经结束
+                    streamDoneLatch.countDown();
                 }
             });
-            // 第7步：把完整回复保存到数据库
-            if (!fullResponse.isEmpty()) {
-                saveMessage(sessionId, "assistant", fullResponse.toString());
+            // 第8步：等待 LangChain4j 回调结束，确保用量记录发生在最终结果之后
+            streamDoneLatch.await();
+            // 第9步：如果回调中发生异常，就抛给外层记录失败状态
+            if (streamError.get() != null) {
+                throw new RuntimeException(streamError.get());
             }
-            // 第8步：通知前端流式输出完成
-            safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
-            safeComplete(emitter);
         } catch (Exception e) {
-            // 第9步：流式调用失败时记录日志
-            log.error("Spring AI streaming error, provider={}, model={}", provider.getName(), provider.getModel(), e);
-            // 第10步：如果已经生成了部分内容，就先保存部分内容
-            if (!fullResponse.isEmpty()) {
+            // 第10步：流式调用失败时记录日志
+            log.error("LangChain4j streaming error, provider={}, model={}", provider.getName(), provider.getModel(), e);
+            // 第11步：如果已经生成了部分内容，就先保存部分内容
+            if (!fullResponse.isEmpty() && !context.hasContext()) {
                 saveMessage(sessionId, "assistant", fullResponse.toString());
             }
-            // 第11步：把异常继续抛给外层统一处理
-            throw new RuntimeException("Failed to call LLM API by Spring AI: " + buildUserErrorMessage(e), e);
+            // 第12步：把异常继续抛给外层统一处理
+            throw new RuntimeException("Failed to call LLM API by LangChain4j: " + buildUserErrorMessage(e), e);
         }
-        // 第12步：返回完整回复和用量
+        // 第13步：返回完整回复和用量
         return new LlmResult(fullResponse.toString(), tokenUsage[0], tokenUsage[1]);
     }
 
     /**
-     * 使用 Spring AI 同步调用大模型
+     * 使用 LangChain4j 同步调用大模型
      *
-     * @param chatMessages 组装好的 Spring AI 消息列表
+     * @param chatMessages 组装好的 LangChain4j 消息列表
      * @param provider     大模型供应商配置
      * @return LlmResult 包含回复内容和 Token 用量
      */
-    private LlmResult callLlmSync(List<Message> chatMessages, ModelProvider provider) {
+    private LlmResult callLlmSync(List<dev.langchain4j.data.message.ChatMessage> chatMessages, ModelProvider provider) {
         try {
-            // 第1步：根据数据库供应商配置动态创建 Spring AI 模型
-            OpenAiChatModel chatModel = createSpringAiChatModel(provider);
-            // 第2步：把消息列表包装成 Spring AI Prompt
-            Prompt prompt = new Prompt(chatMessages);
-            // 第3步：同步调用模型
-            ChatResponse response = chatModel.call(prompt);
-            // 第4步：提取回复正文
+            // 第1步：根据数据库供应商配置动态创建 LangChain4j 模型
+            OpenAiChatModel chatModel = createLangChain4jChatModel(provider);
+            // 第2步：同步调用模型
+            Response<AiMessage> response = chatModel.generate(chatMessages);
+            // 第3步：提取回复正文
             String content = extractResponseText(response);
-            // 第5步：提取 Token 用量
+            // 第4步：提取 Token 用量
             int[] tokenUsage = {0, 0};
             parseUsage(response, tokenUsage);
-            // 第6步：返回调用结果
+            // 第5步：返回调用结果
             return new LlmResult(content, tokenUsage[0], tokenUsage[1]);
         } catch (Exception e) {
-            // 第7步：调用失败时记录日志
-            log.error("Spring AI call failed, provider={}, model={}", provider.getName(), provider.getModel(), e);
-            // 第8步：抛出统一错误信息
-            throw new RuntimeException("Failed to call LLM API by Spring AI: " + buildUserErrorMessage(e), e);
+            // 第6步：调用失败时记录日志
+            log.error("LangChain4j call failed, provider={}, model={}", provider.getName(), provider.getModel(), e);
+            // 第7步：抛出统一错误信息
+            throw new RuntimeException("Failed to call LLM API by LangChain4j: " + buildUserErrorMessage(e), e);
         }
     }
 
@@ -292,42 +382,43 @@ public class ChatService {
      *
      * @param sessionId    会话ID（用于加载历史消息）
      * @param message      当前用户问题
-     * @param contextResult 知识库检索结果（含来源标注）
+     * @param context 知识库检索结果（含来源标注）
      * @return 消息数组，按 system → history → user 排列
      */
-    private List<Message> buildChatMessages(Long sessionId, String message, ContextResult contextResult) {
-        List<Message> messages = new ArrayList<>();
+    private List<dev.langchain4j.data.message.ChatMessage> buildChatMessages(Long sessionId, String message, KnowledgeContext context) {
+        List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
 
         // 第1步：构建系统提示词
         String systemContent = SYSTEM_PROMPT;
-        if (contextResult.hasContext()) {
+        if (context.hasContext()) {
             // 第2步：对检索到的上下文进行压缩，减少 token 消耗
-            String compressedContext = contextCompressor.compress(message, contextResult.getContextWithSources());
-            systemContent += "\n\n以下是知识库中的相关内容：\n\n" + compressedContext;
+            String compressedContext = contextCompressor.compress(message, context.getContextWithSources());
+            systemContent += "\n\n以下是知识库中的相关内容：\n\n" + compressedContext
+                    + "\n\n只能依据以上内容回答，并且必须在相关语句后使用准确的 [来源: 文件名, 第N段] 引用。没有依据时不要补充外部知识。";
         }
-        // 第3步：把系统提示词加入 Spring AI 消息列表
-        messages.add(new SystemMessage(systemContent));
+        // 第3步：把系统提示词加入 LangChain4j 消息列表
+        messages.add(SystemMessage.from(systemContent));
 
         // 第4步：加载最近的历史消息
-        List<ChatMessage> history = chatMessageMapper.findBySessionId(sessionId);
+        List<com.rag.entity.ChatMessage> history = chatMessageMapper.findBySessionId(sessionId);
         if (history.size() > 1) {
             // 第5步：去掉最后一条当前用户消息，避免重复发送
-            List<ChatMessage> previousMessages = history.subList(0, history.size() - 1);
+            List<com.rag.entity.ChatMessage> previousMessages = history.subList(0, history.size() - 1);
             // 第6步：只取最近若干条历史消息，避免上下文过长
             int start = Math.max(0, previousMessages.size() - MAX_HISTORY_MESSAGES);
             for (int i = start; i < previousMessages.size(); i++) {
-                ChatMessage msg = previousMessages.get(i);
-                // 第7步：按角色转换为 Spring AI 消息类型
+                com.rag.entity.ChatMessage msg = previousMessages.get(i);
+                // 第7步：按角色转换为 LangChain4j 消息类型
                 if ("assistant".equals(msg.getRole())) {
-                    messages.add(new AssistantMessage(msg.getContent()));
+                    messages.add(AiMessage.from(msg.getContent()));
                 } else {
-                    messages.add(new UserMessage(msg.getContent()));
+                    messages.add(UserMessage.from(msg.getContent()));
                 }
             }
         }
 
         // 第8步：加入当前用户消息
-        messages.add(new UserMessage(message));
+        messages.add(UserMessage.from(message));
 
         return messages;
     }
@@ -342,12 +433,17 @@ public class ChatService {
      * @param kbId    知识库ID（为空时不检索，返回空结果）
      * @return ContextResult 包含纯文本上下文和带来源标注的上下文
      */
-    private ContextResult buildContextWithSources(String message, Long kbId) {
+    private KnowledgeContext buildContextWithSources(String message, Long kbId) {
         if (kbId == null) {
-            return ContextResult.empty();
+            return KnowledgeContext.empty();
         }
         try {
-            // 第1步：查询改写（口语化问题 → 适合向量检索的独立查询）
+            // 第1步：读取知识库策略并改写查询；单元测试或非 Spring 调用未注入 Mapper 时使用默认策略
+            com.rag.entity.KnowledgeBase strategy = knowledgeBaseMapper == null ? null : knowledgeBaseMapper.findById(kbId);
+            int effectiveTopK = strategy != null && strategy.getTopK() != null ? strategy.getTopK() : topK;
+            float threshold = strategy != null && strategy.getSimilarityThreshold() != null ? strategy.getSimilarityThreshold().floatValue() : 0.25f;
+            float vectorWeight = strategy != null && strategy.getVectorWeight() != null ? strategy.getVectorWeight().floatValue() : 0.6f;
+            float keywordWeight = strategy != null && strategy.getKeywordWeight() != null ? strategy.getKeywordWeight().floatValue() : 0.4f;
             String rewrittenQuery = queryRewriter.rewrite(message);
             String searchQuery = rewrittenQuery.isEmpty() ? message : rewrittenQuery;
 
@@ -356,18 +452,22 @@ public class ChatService {
             if (cachedIds != null && !cachedIds.isEmpty()) {
                 List<KbChunk> cachedChunks = findKbChunks(cachedIds, kbId);
                 if (!cachedChunks.isEmpty()) {
-                    return buildContextResult(cachedChunks);
+                    return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(), Collections.emptySet());
                 }
             }
 
-            // 第3步：向量检索（语义相似度匹配，多取一些用于后续重排序）
+            // 第3步：向量检索（语义相似度匹配，多取一些用于后续筛选）
             float[] queryEmbedding = embeddingService.embed(searchQuery);
-            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, topK * 2, kbId);
+            int effectiveCandidateK = Math.max(candidateK, effectiveTopK * 2);
+            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, effectiveCandidateK, kbId);
             List<Long> vectorIds = vectorResults.stream().map(r -> r.id).collect(Collectors.toList());
-            List<Float> vectorScores = vectorResults.stream().map(r -> r.score).collect(Collectors.toList());
+            Set<Long> vectorIdSet = new HashSet<>(vectorIds);
+            Map<Long, Float> vectorScoreById = vectorResults.stream()
+                    .collect(Collectors.toMap(result -> result.id, result -> result.score, Math::max));
 
-            // 第4步：关键词检索（MySQL LIKE 精确匹配）
-            List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, topK);
+            // 第4步：关键词检索（多个关键词分别查询后合并）
+            List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, effectiveCandidateK);
+            Set<Long> keywordIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
 
             // 第5步：合并去重（向量结果 + 关键词结果，去掉重复的 chunk）
             Set<Long> allIds = new LinkedHashSet<>(vectorIds);
@@ -376,30 +476,45 @@ public class ChatService {
                 if (allIds.add(chunk.getId())) {
                     // 关键词检索命中但向量检索没命中的，补充进来
                     vectorChunks.add(chunk);
-                    vectorScores.add(0.3f); // 给关键词命中的一个基础分数
+                    vectorScoreById.put(chunk.getId(), 0.3f); // 给关键词命中的一个基础分数
                 }
             }
 
             // 兼容旧数据：如果带 kb_id 过滤没命中，去掉过滤再搜一次
             if (vectorChunks.isEmpty()) {
-                List<Long> legacyIds = qdrantService.search(queryEmbedding, topK);
+                List<Long> legacyIds = qdrantService.search(queryEmbedding, effectiveTopK);
                 vectorChunks = findKbChunks(legacyIds, kbId);
             }
             if (vectorChunks.isEmpty()) {
-                return ContextResult.empty();
+                return KnowledgeContext.empty();
             }
 
-            // 第6步：重排序（融合向量分数和关键词分数，选出最相关的 topK 个）
-            List<KbChunk> reranked = reranker.rerank(searchQuery, vectorChunks, vectorScores, topK);
+            // 第6步：融合分数、过滤低分结果并去除高度重复片段
+            List<RetrievalCandidate> candidates = new ArrayList<>();
+            for (KbChunk chunk : vectorChunks) {
+                boolean keywordMatched = keywordIds.contains(chunk.getId());
+                boolean vectorMatched = vectorIdSet.contains(chunk.getId());
+                RetrievalCandidate candidate = new RetrievalCandidate(chunk);
+                candidate.setVectorScore(vectorScoreById.getOrDefault(chunk.getId(), 0.3f));
+                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID"
+                        : keywordMatched ? "KEYWORD" : "VECTOR");
+                candidates.add(candidate);
+            }
+            List<RetrievalCandidate> selected = retrievalSelector.select(candidates, effectiveTopK,
+                    threshold, vectorWeight, keywordWeight, 0.85f);
+            if (selected.isEmpty()) {
+                return KnowledgeContext.empty();
+            }
 
             // 第7步：写入缓存（下次相同问题直接命中）
-            List<Long> rerankedIds = reranked.stream().map(KbChunk::getId).collect(Collectors.toList());
-            retrievalCache.put(kbId, searchQuery, rerankedIds);
+            List<Long> selectedIds = selected.stream().map(candidate -> candidate.getChunk().getId()).collect(Collectors.toList());
+            retrievalCache.put(kbId, searchQuery, selectedIds);
 
-            return buildContextResult(reranked);
+            return buildKnowledgeContext(selected, searchQuery);
         } catch (Exception e) {
-            log.warn("Failed to build context: {}", e.getMessage());
-            return ContextResult.empty();
+            log.error("Failed to build knowledge context", e);
+            throw new RuntimeException("Knowledge retrieval failed", e);
         }
     }
 
@@ -410,9 +525,11 @@ public class ChatService {
      * @param chunks 重排序后的 chunk 列表
      * @return ContextResult 包含两种格式的上下文文本
      */
-    private ContextResult buildContextResult(List<KbChunk> chunks) {
+    private KnowledgeContext buildKnowledgeContext(List<KbChunk> chunks, String rewrittenQuery,
+                                                   Map<Long, Float> vectorScores, Set<Long> keywordIds) {
         StringBuilder contextText = new StringBuilder();
         StringBuilder contextWithSources = new StringBuilder();
+        List<KnowledgeCitation> citations = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             KbChunk chunk = chunks.get(i);
             if (i > 0) {
@@ -424,8 +541,54 @@ public class ChatService {
             // 带来源标注的版本：[来源: 文件名, 第N段]
             String source = chunk.getSourceInfo() != null ? chunk.getSourceInfo() : "文档";
             contextWithSources.append("[来源: ").append(source).append("]\n").append(chunk.getContent());
+            KnowledgeCitation citation = new KnowledgeCitation();
+            citation.setFileId(chunk.getFileId());
+            citation.setFileName(chunk.getFileName() == null ? "文档" : chunk.getFileName());
+            citation.setChunkId(chunk.getId());
+            citation.setChunkIndex(chunk.getChunkIndex());
+            citation.setSource(source);
+            citation.setContentPreview(buildContentPreview(chunk.getContent()));
+            citation.setVectorScore(vectorScores.getOrDefault(chunk.getId(), 0f));
+            citation.setKeywordScore(keywordIds.contains(chunk.getId()) ? 1f : 0f);
+            citation.setMatchType(keywordIds.contains(chunk.getId()) ? "KEYWORD" : "VECTOR");
+            citations.add(citation);
         }
-        return new ContextResult(contextText.toString(), contextWithSources.toString());
+        return new KnowledgeContext(contextText.toString(), contextWithSources.toString(), citations, rewrittenQuery);
+    }
+
+    /**
+     * 从带分数的检索候选构建知识库上下文
+     */
+    private KnowledgeContext buildKnowledgeContext(List<RetrievalCandidate> candidates, String rewrittenQuery) {
+        List<KbChunk> chunks = candidates.stream().map(RetrievalCandidate::getChunk).toList();
+        Map<Long, Float> vectorScores = new HashMap<>();
+        Set<Long> keywordIds = new HashSet<>();
+        for (RetrievalCandidate candidate : candidates) {
+            vectorScores.put(candidate.getChunk().getId(), candidate.getVectorScore());
+            if (candidate.getKeywordScore() > 0) {
+                keywordIds.add(candidate.getChunk().getId());
+            }
+        }
+        KnowledgeContext context = buildKnowledgeContext(chunks, rewrittenQuery, vectorScores, keywordIds);
+        for (int index = 0; index < candidates.size() && index < context.getCitations().size(); index++) {
+            KnowledgeCitation citation = context.getCitations().get(index);
+            RetrievalCandidate candidate = candidates.get(index);
+            citation.setKeywordScore(candidate.getKeywordScore());
+            citation.setFinalScore(candidate.getFinalScore());
+            citation.setMatchType(candidate.getMatchType());
+        }
+        return context;
+    }
+
+    /**
+     * 生成引用内容预览
+     */
+    private String buildContentPreview(String content) {
+        if (content == null) {
+            return "";
+        }
+        String normalized = content.replace("\r", " ").replace("\n", " ").trim();
+        return normalized.length() <= 160 ? normalized : normalized.substring(0, 160) + "...";
     }
 
     /**
@@ -441,31 +604,6 @@ public class ChatService {
                 .map(chunkId -> chunkMapper.findByIdAndKbId(chunkId, kbId))
                 .filter(chunk -> chunk != null)
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * 上下文结果内部类
-     * 包含纯文本版本和带来源标注的版本，供不同场景使用
-     */
-    static class ContextResult {
-        /** 纯文本上下文（用于缓存） */
-        final String context;
-        /** 带来源标注的上下文（用于 system prompt，支持引用溯源） */
-        final String contextWithSources;
-
-        ContextResult(String context, String contextWithSources) {
-            this.context = context;
-            this.contextWithSources = contextWithSources;
-        }
-
-        /** 创建空的上下文结果（未选择知识库或检索失败时使用） */
-        static ContextResult empty() { return new ContextResult("", ""); }
-
-        /** 是否有上下文内容 */
-        boolean hasContext() { return !context.isEmpty(); }
-
-        /** 获取带来源标注的上下文文本 */
-        String getContextWithSources() { return contextWithSources; }
     }
 
     /**
@@ -488,12 +626,15 @@ public class ChatService {
 
             // 向量检索
             float[] queryEmbedding = embeddingService.embed(searchQuery);
-            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, topK * 2, kbId);
+            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, candidateK, kbId);
             List<Long> vectorIds = vectorResults.stream().map(r -> r.id).collect(Collectors.toList());
             List<Float> vectorScores = vectorResults.stream().map(r -> r.score).collect(Collectors.toList());
+            Map<Long, Float> vectorScoreByChunkId = vectorResults.stream()
+                    .collect(Collectors.toMap(result -> result.id, result -> result.score, Math::max));
 
             // 关键词检索
             List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, topK);
+            Set<Long> keywordChunkIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
 
             // 合并去重
             Set<Long> allIds = new LinkedHashSet<>(vectorIds);
@@ -507,6 +648,22 @@ public class ChatService {
 
             // 重排序
             List<KbChunk> reranked = reranker.rerank(searchQuery, vectorChunks, vectorScores, topK);
+            List<RetrievalCandidate> diagnostics = new ArrayList<>();
+            for (KbChunk chunk : reranked) {
+                boolean vectorMatched = vectorScoreByChunkId.containsKey(chunk.getId());
+                boolean keywordMatched = keywordChunkIds.contains(chunk.getId());
+                RetrievalCandidate candidate = new RetrievalCandidate(chunk);
+                candidate.setVectorScore(vectorScoreByChunkId.getOrDefault(chunk.getId(), 0.3f));
+                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID"
+                        : keywordMatched ? "KEYWORD" : "VECTOR");
+                diagnostics.add(candidate);
+            }
+            List<RetrievalCandidate> selectedDiagnostics = retrievalSelector.select(diagnostics, topK);
+            Set<Long> selectedIds = selectedDiagnostics.stream()
+                    .map(candidate -> candidate.getChunk().getId()).collect(Collectors.toSet());
+            Map<Long, RetrievalCandidate> diagnosticById = diagnostics.stream()
+                    .collect(Collectors.toMap(candidate -> candidate.getChunk().getId(), candidate -> candidate));
 
             // 构建返回结果
             List<Map<String, Object>> results = new ArrayList<>();
@@ -515,8 +672,22 @@ public class ChatService {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("rank", i + 1);
                 item.put("chunkId", chunk.getId());
+                item.put("fileId", chunk.getFileId());
+                item.put("fileName", chunk.getFileName());
+                item.put("chunkIndex", chunk.getChunkIndex());
                 item.put("source", chunk.getSourceInfo() != null ? chunk.getSourceInfo() : "未知来源");
                 item.put("content", chunk.getContent());
+                item.put("rewrittenQuery", searchQuery);
+                item.put("vectorScore", vectorScoreByChunkId.get(chunk.getId()));
+                boolean vectorMatched = vectorScoreByChunkId.containsKey(chunk.getId());
+                boolean keywordMatched = keywordChunkIds.contains(chunk.getId());
+                item.put("matchType", vectorMatched && keywordMatched ? "HYBRID"
+                        : keywordMatched ? "KEYWORD" : "VECTOR");
+                RetrievalCandidate diagnostic = diagnosticById.get(chunk.getId());
+                item.put("keywordScore", diagnostic == null ? 0f : diagnostic.getKeywordScore());
+                item.put("finalScore", diagnostic == null ? 0f : diagnostic.getFinalScore());
+                item.put("selected", selectedIds.contains(chunk.getId()));
+                item.put("filterReason", diagnostic == null ? null : diagnostic.getFilterReason());
                 results.add(item);
             }
             return results;
@@ -524,6 +695,75 @@ public class ChatService {
             log.warn("Recall test failed: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /** 使用临时参数执行完整检索诊断，不调用大模型 */
+    public Map<String, Object> diagnoseRecall(String message, Long kbId, Map<String, Object> request) {
+        if (message == null || message.isBlank() || kbId == null) {
+            return Map.of("originalQuery", message == null ? "" : message, "candidates", List.of());
+        }
+        try {
+            int debugTopK = readInt(request.get("topK"), topK, 1, 50);
+            int debugCandidateK = readInt(request.get("candidateK"), Math.max(candidateK, debugTopK * 2), debugTopK, 100);
+            float threshold = readFloat(request.get("similarityThreshold"), 0.25f, 0f, 1f);
+            float vectorWeight = readFloat(request.get("vectorWeight"), 0.6f, 0f, 1f);
+            float keywordWeight = readFloat(request.get("keywordWeight"), 0.4f, 0f, 1f);
+            String rewritten = queryRewriter.rewrite(message);
+            String searchQuery = rewritten == null || rewritten.isBlank() ? message : rewritten;
+            float[] queryEmbedding = embeddingService.embed(searchQuery);
+            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, debugCandidateK, kbId);
+            Map<Long, Float> vectorScores = vectorResults.stream().collect(Collectors.toMap(result -> result.id, result -> result.score, Math::max));
+            List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, debugCandidateK);
+            Set<Long> keywordIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
+            LinkedHashMap<Long, KbChunk> chunks = new LinkedHashMap<>();
+            for (KbChunk chunk : findKbChunks(vectorResults.stream().map(result -> result.id).toList(), kbId)) chunks.put(chunk.getId(), chunk);
+            for (KbChunk chunk : keywordChunks) chunks.putIfAbsent(chunk.getId(), chunk);
+            List<RetrievalCandidate> candidates = new ArrayList<>();
+            for (KbChunk chunk : chunks.values()) {
+                RetrievalCandidate candidate = new RetrievalCandidate(chunk);
+                boolean vectorMatched = vectorScores.containsKey(chunk.getId());
+                boolean keywordMatched = keywordIds.contains(chunk.getId());
+                candidate.setVectorScore(vectorScores.getOrDefault(chunk.getId(), 0.3f));
+                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID" : keywordMatched ? "KEYWORD" : "VECTOR");
+                candidates.add(candidate);
+            }
+            retrievalSelector.select(candidates, debugTopK, threshold, vectorWeight, keywordWeight, 0.85f);
+            candidates.sort(Comparator.comparing(RetrievalCandidate::getFinalScore).reversed());
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (RetrievalCandidate candidate : candidates) {
+                KbChunk chunk = candidate.getChunk();
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("chunkId", chunk.getId()); item.put("fileId", chunk.getFileId()); item.put("fileName", chunk.getFileName());
+                item.put("chunkIndex", chunk.getChunkIndex()); item.put("source", chunk.getSourceInfo()); item.put("content", chunk.getContent());
+                item.put("vectorScore", candidate.getVectorScore()); item.put("keywordScore", candidate.getKeywordScore());
+                item.put("finalScore", candidate.getFinalScore()); item.put("matchType", candidate.getMatchType());
+                item.put("selected", candidate.isSelected()); item.put("filterReason", candidate.getFilterReason()); items.add(item);
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("originalQuery", message); result.put("rewrittenQuery", searchQuery);
+            result.put("parameters", Map.of("topK", debugTopK, "candidateK", debugCandidateK, "similarityThreshold", threshold,
+                    "vectorWeight", vectorWeight, "keywordWeight", keywordWeight));
+            result.put("candidateCount", items.size()); result.put("selectedCount", items.stream().filter(item -> Boolean.TRUE.equals(item.get("selected"))).count());
+            result.put("candidates", items); return result;
+        } catch (Exception e) {
+            log.warn("Retrieval diagnosis failed: {}", e.getMessage());
+            throw new RuntimeException("检索诊断失败", e);
+        }
+    }
+
+    /** 读取带范围限制的整数参数 */
+    private int readInt(Object value, int defaultValue, int min, int max) {
+        if (value == null) return defaultValue;
+        int parsed = value instanceof Number number ? number.intValue() : Integer.parseInt(value.toString());
+        return Math.max(min, Math.min(max, parsed));
+    }
+
+    /** 读取带范围限制的小数参数 */
+    private float readFloat(Object value, float defaultValue, float min, float max) {
+        if (value == null) return defaultValue;
+        float parsed = value instanceof Number number ? number.floatValue() : Float.parseFloat(value.toString());
+        return Math.max(min, Math.min(max, parsed));
     }
 
     // ==================== 用量记录 ====================
@@ -577,92 +817,109 @@ public class ChatService {
         }
     }
 
-    // ==================== Spring AI 调用辅助 ====================
+    // ==================== LangChain4j 调用辅助 ====================
 
     /**
-     * 根据数据库中的供应商配置创建 Spring AI 聊天模型
+     * 根据数据库中的供应商配置创建 LangChain4j 同步聊天模型
      *
      * @param provider 大模型供应商配置
-     * @return Spring AI OpenAiChatModel
+     * @return LangChain4j OpenAiChatModel
      */
-    private OpenAiChatModel createSpringAiChatModel(ModelProvider provider) {
-        // 第1步：规范化 baseUrl，确保交给 Spring AI 的地址只到 /v1 之前或 /v1
-        String baseUrl = normalizeSpringAiBaseUrl(provider.getBaseUrl());
-        // 第2步：使用动态 API Key 和 baseUrl 创建 OpenAiApi
-        OpenAiApi openAiApi = OpenAiApi.builder()
+    private OpenAiChatModel createLangChain4jChatModel(ModelProvider provider) {
+        // 第1步：规范化 baseUrl，兼容用户填写完整 chat completions 地址
+        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
+        // 第2步：创建 LangChain4j 同步模型
+        return OpenAiChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(provider.getApiKey())
-                .build();
-        // 第3步：设置模型名、温度和流式 usage 返回
-        OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
-                .model(provider.getModel())
+                .modelName(provider.getModel())
                 .temperature(0.3)
-                .streamUsage(true)
-                .build();
-        // 第4步：创建 Spring AI ChatModel
-        return OpenAiChatModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(chatOptions)
                 .build();
     }
 
     /**
-     * 规范化 Spring AI 使用的 baseUrl
+     * 根据数据库中的供应商配置创建 LangChain4j 流式聊天模型
+     *
+     * @param provider 大模型供应商配置
+     * @return LangChain4j OpenAiStreamingChatModel
+     */
+    private OpenAiStreamingChatModel createLangChain4jStreamingChatModel(ModelProvider provider) {
+        // 第1步：规范化 baseUrl，兼容用户填写完整 chat completions 地址
+        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
+        // 第2步：创建 LangChain4j 流式模型
+        return OpenAiStreamingChatModel.builder()
+                .baseUrl(baseUrl)
+                .apiKey(provider.getApiKey())
+                .modelName(provider.getModel())
+                .temperature(0.3)
+                .build();
+    }
+
+    /**
+     * 规范化 OpenAI 兼容接口的 baseUrl
      *
      * @param rawBaseUrl 用户配置的 API 地址
-     * @return 可以交给 Spring AI 的 baseUrl
+     * @return 可以交给 LangChain4j 的 baseUrl
      */
-    private String normalizeSpringAiBaseUrl(String rawBaseUrl) {
+    private String normalizeOpenAiBaseUrl(String rawBaseUrl) {
         // 第1步：去掉末尾多余斜杠
         String baseUrl = rawBaseUrl.replaceAll("/+$", "");
-        // 第2步：如果用户填了完整 chat/completions 地址，就截断到 /v1
+        // 第2步：如果用户填了完整 chat/completions 地址，就截断到模型服务基础路径
         if (baseUrl.endsWith("/chat/completions")) {
             return baseUrl.substring(0, baseUrl.length() - "/chat/completions".length());
         }
-        // 第3步：其他情况保持原样，兼容填到域名或填到 /v1
+        // 第3步：如果用户已经填到 /v1，就直接交给 LangChain4j
+        if (baseUrl.endsWith("/v1")) {
+            return baseUrl;
+        }
+        // 第4步：裸域名默认补齐 /v1，和系统里手写 HTTP 模型调用规则保持一致
+        if (!baseUrl.matches(".*/v\\d+(?:/.*)?$")) {
+            return baseUrl + "/v1";
+        }
+        // 第5步：其他带版本路径的地址保持原样
         return baseUrl;
     }
 
     /**
-     * 从 Spring AI 响应中提取文本
+     * 从 LangChain4j 响应中提取文本
      *
-     * @param response Spring AI 聊天响应
+     * @param response LangChain4j 聊天响应
      * @return 模型返回的文本
      */
-    private String extractResponseText(ChatResponse response) {
+    private String extractResponseText(Response<AiMessage> response) {
         // 第1步：空响应直接返回空字符串
-        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+        if (response == null || response.content() == null) {
             return "";
         }
-        // 第2步：从 AssistantMessage 中读取文本
-        String text = response.getResult().getOutput().getText();
+        // 第2步：从 AiMessage 中读取文本
+        String text = response.content().text();
         // 第3步：空文本统一转为空字符串
         return text == null ? "" : text;
     }
 
     /**
-     * 从 Spring AI 响应中提取 Token 用量
+     * 从 LangChain4j 响应中提取 Token 用量
      *
-     * @param response Spring AI 聊天响应
+     * @param response LangChain4j 聊天响应
      * @param tokenUsage Token 用量数组，[0] 输入 Token，[1] 输出 Token
      */
-    private void parseUsage(ChatResponse response, int[] tokenUsage) {
-        // 第1步：响应元数据为空时直接返回
-        if (response == null || response.getMetadata() == null) {
+    private void parseUsage(Response<AiMessage> response, int[] tokenUsage) {
+        // 第1步：响应为空时直接返回
+        if (response == null) {
             return;
         }
-        // 第2步：读取 Spring AI 统一用量对象
-        Usage usage = response.getMetadata().getUsage();
+        // 第2步：读取 LangChain4j 统一用量对象
+        TokenUsage usage = response.tokenUsage();
         if (usage == null) {
             return;
         }
         // 第3步：输入 Token 存在时写入缓存
-        if (usage.getPromptTokens() != null) {
-            tokenUsage[0] = usage.getPromptTokens();
+        if (usage.inputTokenCount() != null) {
+            tokenUsage[0] = usage.inputTokenCount();
         }
         // 第4步：输出 Token 存在时写入缓存
-        if (usage.getCompletionTokens() != null) {
-            tokenUsage[1] = usage.getCompletionTokens();
+        if (usage.outputTokenCount() != null) {
+            tokenUsage[1] = usage.outputTokenCount();
         }
     }
 
@@ -685,6 +942,17 @@ public class ChatService {
      */
     private void safeSend(SseEmitter emitter, SseEmitter.SseEventBuilder event) {
         try { emitter.send(event); } catch (Exception e) { log.debug("SseEmitter already closed"); }
+    }
+
+    /**
+     * 安全发送 JSON 格式 SSE 事件
+     */
+    private void safeSendJson(SseEmitter emitter, String eventName, Object data) {
+        try {
+            safeSend(emitter, SseEmitter.event().name(eventName).data(objectMapper.writeValueAsString(data)));
+        } catch (Exception e) {
+            log.warn("Failed to serialize SSE event {}", eventName);
+        }
     }
 
     /**
@@ -743,7 +1011,7 @@ public class ChatService {
      */
     private void saveMessage(Long sessionId, String role, String content) {
         try {
-            ChatMessage msg = new ChatMessage();
+            com.rag.entity.ChatMessage msg = new com.rag.entity.ChatMessage();
             msg.setSessionId(sessionId);
             msg.setRole(role);
             msg.setContent(content);
@@ -759,7 +1027,7 @@ public class ChatService {
      * @param sessionId 会话ID
      * @return 消息列表
      */
-    public List<ChatMessage> getSessionMessages(Long sessionId) {
+    public List<com.rag.entity.ChatMessage> getSessionMessages(Long sessionId) {
         return chatMessageMapper.findBySessionId(sessionId);
     }
 

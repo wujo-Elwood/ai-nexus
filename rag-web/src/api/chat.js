@@ -17,6 +17,11 @@ export function recallTest(message, kbId) {
   return request.post('/api/chat/recall-test', { message, kbId })
 }
 
+// 按临时参数执行检索诊断
+export function diagnoseRecall(data) {
+  return request.post('/api/chat/diagnose', data)
+}
+
 /** 提交答案质量反馈 */
 export function submitFeedback(messageId, helpful) {
   return request.post('/api/chat/feedback', { messageId, helpful })

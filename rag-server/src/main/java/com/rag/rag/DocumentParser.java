@@ -55,6 +55,12 @@ public class DocumentParser {
     public String parse(File file) throws IOException {
         String fileName = file.getName().toLowerCase();
 
+        //图片不做 OCR 或视觉解析，只保留文件名作为可检索上下文
+        if (fileName.endsWith(".png") || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")
+                || fileName.endsWith(".gif") || fileName.endsWith(".webp")) {
+            return "[图片引用: " + file.getName() + "]";
+        }
+
         // XLSX 文件使用 POI 精确解析，保留表格结构
         if (fileName.endsWith(".xlsx")) {
             return parseExcel(file);
@@ -134,7 +140,7 @@ public class DocumentParser {
                 if (sheetIdx > 0) {
                     result.append("\n\n");
                 }
-                result.append("# ").append(sheetName).append("\n\n");
+                result.append("# Sheet: ").append(sheetName).append("\n");
 
                 // 读取所有行数据
                 List<List<String>> allRows = new ArrayList<>();
@@ -170,10 +176,11 @@ public class DocumentParser {
                 // 生成 Markdown 表格
                 // 第一行作为表头
                 List<String> header = allRows.get(0);
+                result.append("表格范围: A1:").append(columnName(Math.max(1, maxCols))).append(allRows.size()).append("\n");
                 result.append("| ");
                 for (int i = 0; i < maxCols; i++) {
                     String val = i < header.size() ? header.get(i) : "";
-                    result.append(val).append(" | ");
+                    result.append(escapeTableCell(val)).append(" | ");
                 }
                 result.append("\n");
 
@@ -190,7 +197,7 @@ public class DocumentParser {
                     result.append("| ");
                     for (int i = 0; i < maxCols; i++) {
                         String val = i < row.size() ? row.get(i) : "";
-                        result.append(val).append(" | ");
+                        result.append(escapeTableCell(val)).append(" | ");
                     }
                     result.append("\n");
                 }
@@ -256,5 +263,22 @@ public class DocumentParser {
             default:
                 return "";
         }
+    }
+
+    /** 转义 Markdown 表格中的分隔符，避免单元格破坏结构。 */
+    private String escapeTableCell(String value) {
+        return value == null ? "" : value.replace("|", "\\|").replace("\r", " ").replace("\n", " ");
+    }
+
+    /** 将列号转换为 Excel 字母。 */
+    private String columnName(int column) {
+        StringBuilder result = new StringBuilder();
+        int value = column;
+        while (value > 0) {
+            int remainder = (value - 1) % 26;
+            result.append((char) ('A' + remainder));
+            value = (value - 1) / 26;
+        }
+        return result.reverse().toString();
     }
 }

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.image.mapper.ImageHistoryMapper">
+
+    <insert id="insert" parameterType="com.rag.image.entity.ImageHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_image_history (
+            prompt,
+            provider_name,
+            model_name,
+            image_size,
+            file_name,
+            file_path,
+            mime_type,
+            file_size,
+            created_by,
+            create_time
+        )
+        VALUES (
+            #{prompt},
+            #{providerName},
+            #{modelName},
+            #{imageSize},
+            #{fileName},
+            #{filePath},
+            #{mimeType},
+            #{fileSize},
+            #{createdBy},
+            NOW()
+        )
+    </insert>
+
+    <select id="findByUserId" resultType="com.rag.image.entity.ImageHistory">
+        SELECT *
+        FROM ai_image_history
+        WHERE created_by = #{userId}
+        ORDER BY create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findByIdAndUserId" resultType="com.rag.image.entity.ImageHistory">
+        SELECT *
+        FROM ai_image_history
+        WHERE id = #{id}
+          AND created_by = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="findById" resultType="com.rag.image.entity.ImageHistory">
+        SELECT *
+        FROM ai_image_history
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM ai_image_history
+        WHERE id = #{id}
+          AND created_by = #{userId}
+    </delete>
+</mapper>

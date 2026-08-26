@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.extract.mapper.ExtractReviewRecordMapper">
+
+    <!-- 第1步：新增抽取复核记录 -->
+    <insert id="insert" parameterType="com.rag.extract.entity.ExtractReviewRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO extract_review_record (result_id, old_value, new_value, review_by, review_at, remark)
+        VALUES (#{resultId}, #{oldValue}, #{newValue}, #{reviewBy}, NOW(), #{remark})
+    </insert>
+
+</mapper>

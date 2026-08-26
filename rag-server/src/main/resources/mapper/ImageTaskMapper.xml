@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.image.mapper.ImageTaskMapper">
+
+    <!-- 第1步：新增生图任务 -->
+    <insert id="insert" parameterType="com.rag.image.entity.ImageTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_image_task (
+            prompt,
+            image_size,
+            image_count,
+            task_status,
+            task_message,
+            progress,
+            provider_name,
+            model_name,
+            request_json,
+            response_json,
+            error_message,
+            started_at,
+            finished_at,
+            created_by,
+            create_time
+        )
+        VALUES (
+            #{prompt},
+            #{imageSize},
+            #{imageCount},
+            #{taskStatus},
+            #{taskMessage},
+            #{progress},
+            #{providerName},
+            #{modelName},
+            #{requestJson},
+            #{responseJson},
+            #{errorMessage},
+            #{startedAt},
+            #{finishedAt},
+            #{createdBy},
+            NOW()
+        )
+    </insert>
+
+    <!-- 第1步：在数据库侧原子抢占用户并发名额，避免多个请求同时通过 count 判断 -->
+    <insert id="insertIfRunningSlotAvailable" parameterType="com.rag.image.entity.ImageTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_image_task (
+            prompt,
+            image_size,
+            image_count,
+            task_status,
+            task_message,
+            progress,
+            provider_name,
+            model_name,
+            request_json,
+            response_json,
+            error_message,
+            started_at,
+            finished_at,
+            created_by,
+            create_time
+        )
+        SELECT
+            #{prompt},
+            #{imageSize},
+            #{imageCount},
+            #{taskStatus},
+            #{taskMessage},
+            #{progress},
+            #{providerName},
+            #{modelName},
+            #{requestJson},
+            #{responseJson},
+            #{errorMessage},
+            #{startedAt},
+            #{finishedAt},
+            #{createdBy},
+            NOW()
+        FROM DUAL
+        WHERE (
+            SELECT COUNT(1)
+            FROM ai_image_task
+            WHERE created_by = #{createdBy}
+              AND task_status IN ('PENDING', 'RUNNING')
+        ) &lt; 6
+    </insert>
+
+    <!-- 第1步：按任务编号和用户查询任务 -->
+    <select id="findByIdAndUserId" resultType="com.rag.image.entity.ImageTask">
+        SELECT id, prompt, image_size, image_count, task_status, task_message, progress,
+               provider_name, model_name, request_json, response_json, error_message,
+               started_at, finished_at, created_by, create_time
+        FROM ai_image_task
+        WHERE id = #{id}
+          AND created_by = #{userId}
+        LIMIT 1
+    </select>
+
+    <!-- 第1步：查询用户最近的生图任务 -->
+    <select id="findByUserId" resultType="com.rag.image.entity.ImageTask">
+        SELECT id, prompt, image_size, image_count, task_status, task_message, progress,
+               provider_name, model_name, request_json, response_json, error_message,
+               started_at, finished_at, created_by, create_time
+        FROM ai_image_task
+        WHERE created_by = #{userId}
+        ORDER BY create_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 第1步：统计用户正在执行的生图任务数量 -->
+    <select id="countRunningByUserId" resultType="int">
+        SELECT COUNT(1)
+        FROM ai_image_task
+        WHERE created_by = #{userId}
+          AND task_status IN ('PENDING', 'RUNNING')
+    </select>
+
+    <!-- 第1步：标记任务开始执行 -->
+    <update id="markStarted">
+        UPDATE ai_image_task
+        SET task_status = 'RUNNING',
+            task_message = '正在调用生图模型',
+            progress = 10,
+            provider_name = #{providerName},
+            model_name = #{modelName},
+            started_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：更新任务进度和消息 -->
+    <update id="updateProgress">
+        UPDATE ai_image_task
+        SET task_message = #{message},
+            progress = #{progress}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：标记任务成功 -->
+    <update id="markSuccess">
+        UPDATE ai_image_task
+        SET task_status = 'SUCCESS',
+            task_message = #{message},
+            progress = 100,
+            provider_name = #{providerName},
+            model_name = #{modelName},
+            response_json = #{responseJson},
+            finished_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 第1步：标记任务失败 -->
+    <update id="markFailed">
+        UPDATE ai_image_task
+        SET task_status = 'FAILED',
+            task_message = #{message},
+            error_message = #{errorMessage},
+            progress = 100,
+            finished_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 标记服务中断遗留的运行中任务，避免前端一直显示生成中 -->
+    <update id="markInterruptedTasksFailed">
+        UPDATE ai_image_task
+        SET task_status = 'FAILED',
+            task_message = #{message},
+            error_message = #{errorMessage},
+            progress = 100,
+            finished_at = NOW()
+        WHERE task_status IN ('PENDING', 'RUNNING')
+    </update>
+</mapper>

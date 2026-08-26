@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.MultipartUploadChunkMapper">
+    <select id="findByUploadId" resultType="com.rag.entity.MultipartUploadChunk">
+        SELECT * FROM kb_upload_chunk WHERE upload_id = #{uploadId} ORDER BY chunk_index
+    </select>
+
+    <select id="findByUploadIdAndIndex" resultType="com.rag.entity.MultipartUploadChunk">
+        SELECT * FROM kb_upload_chunk
+        WHERE upload_id = #{uploadId} AND chunk_index = #{chunkIndex}
+    </select>
+
+    <insert id="insert" parameterType="com.rag.entity.MultipartUploadChunk">
+        INSERT INTO kb_upload_chunk (
+            upload_id, chunk_index, chunk_size, chunk_sha256, file_path, create_time
+        ) VALUES (
+            #{uploadId}, #{chunkIndex}, #{chunkSize}, #{chunkSha256}, #{filePath}, NOW()
+        )
+    </insert>
+
+    <delete id="deleteByUploadIdAndIndex">
+        DELETE FROM kb_upload_chunk
+        WHERE upload_id = #{uploadId} AND chunk_index = #{chunkIndex}
+    </delete>
+
+    <delete id="deleteByUploadId">
+        DELETE FROM kb_upload_chunk WHERE upload_id = #{uploadId}
+    </delete>
+</mapper>

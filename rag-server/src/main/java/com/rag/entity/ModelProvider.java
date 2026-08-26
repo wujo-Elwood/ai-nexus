@@ -19,6 +19,12 @@ public class ModelProvider {
     private String apiKey;
     /** 模型名称 */
     private String model;
+    /** 生图 API 地址，为空时沿用普通 API 基础地址 */
+    private String imageBaseUrl;
+    /** 生图 API 密钥，为空时沿用普通 API 密钥 */
+    private String imageApiKey;
+    /** 生图模型名称，为空时沿用普通模型名称 */
+    private String imageModel;
     /** 是否激活：1=激活，0=未激活 */
     private Integer isActive;
     /** 创建时间 */

@@ -13,6 +13,8 @@ public class KbChunk {
     private Long id;
     /** 所属文件ID，关联 kb_file 表 */
     private Long fileId;
+    /** 所属文件名称，由文本块查询关联文件表返回 */
+    private String fileName;
     /** 文本块在文件中的序号，从0开始 */
     private Integer chunkIndex;
     /** 文本块内容 */

@@ -22,10 +22,17 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   response => {
+    // 第1步：二进制下载接口直接返回完整响应
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+    // 第2步：普通接口继续读取统一响应体
     const { data } = response
+    // 第3步：业务成功时返回统一响应体
     if (data.code === 200) {
       return data
     }
+    // 第4步：业务失败时提示后端错误信息
     ElMessage.error(data.message || 'Request failed')
     return Promise.reject(data)
   },

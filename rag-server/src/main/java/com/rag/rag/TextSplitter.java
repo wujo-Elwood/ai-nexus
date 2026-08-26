@@ -25,12 +25,19 @@ public class TextSplitter {
      * 优先按段落边界切分，超长段落再按句子切分
      */
     public List<String> split(String text) {
+        // 调用支持知识库级参数的切片方法
+        return split(text, chunkSize, chunkOverlap, false);
+    }
+
+    /** 按知识库独立参数切分文本 */
+    public List<String> split(String text, int targetChunkSize, int targetChunkOverlap, boolean headingSplitEnabled) {
         List<String> chunks = new ArrayList<>();
         if (text == null || text.isEmpty()) {
             return chunks;
         }
         // 第1步：按段落（双换行）分割
-        String[] paragraphs = text.split("\\n\\n+");
+        String splitPattern = headingSplitEnabled ? "(?m)(?=^#{1,6}\\s)|\\n\\n+" : "\\n\\n+";
+        String[] paragraphs = text.split(splitPattern);
         StringBuilder buffer = new StringBuilder();
         for (String paragraph : paragraphs) {
             paragraph = paragraph.trim();
@@ -38,7 +45,7 @@ public class TextSplitter {
                 continue;
             }
             // 如果当前 buffer 加上新段落不超限，合并
-            if (buffer.length() + paragraph.length() + 2 <= chunkSize) {
+            if (buffer.length() + paragraph.length() + 2 <= targetChunkSize) {
                 if (buffer.length() > 0) {
                     buffer.append("\n\n");
                 }
@@ -50,8 +57,8 @@ public class TextSplitter {
                     buffer = new StringBuilder();
                 }
                 // 段落本身超长，按句子切分
-                if (paragraph.length() > chunkSize) {
-                    List<String> subChunks = splitBySentence(paragraph);
+                if (paragraph.length() > targetChunkSize) {
+                    List<String> subChunks = splitBySentence(paragraph, targetChunkSize, targetChunkOverlap);
                     chunks.addAll(subChunks);
                 } else {
                     buffer.append(paragraph);
@@ -69,7 +76,7 @@ public class TextSplitter {
      * 按句子切分超长段落
      * 先按句号/问号/感叹号分句，再合并到 chunkSize 以内
      */
-    private List<String> splitBySentence(String text) {
+    private List<String> splitBySentence(String text, int targetChunkSize, int targetChunkOverlap) {
         List<String> chunks = new ArrayList<>();
         // 按中英文句号、问号、感叹号、分号分句
         String[] sentences = text.split("(?<=[。！？；.!?;])\\s*");
@@ -80,7 +87,7 @@ public class TextSplitter {
                 continue; // 跳过空句子
             }
             // 判断能否合并到当前块
-            if (buffer.length() + sentence.length() + 1 <= chunkSize) {
+            if (buffer.length() + sentence.length() + 1 <= targetChunkSize) {
                 // 可以合并
                 if (buffer.length() > 0) {
                     buffer.append(" ");// 句子之间加空格（不是换行）
@@ -92,9 +99,9 @@ public class TextSplitter {
                     chunks.add(buffer.toString());
                 }
                 // 单句超长时按固定大小切割
-                if (sentence.length() > chunkSize) {
+                if (sentence.length() > targetChunkSize) {
                     // 单句超长：按固定大小暴力切割
-                    chunks.addAll(splitFixed(sentence));
+                    chunks.addAll(splitFixed(sentence, targetChunkSize, targetChunkOverlap));
                     buffer = new StringBuilder();
                 } else {
                     // 句子不超长，作为新块的开始
@@ -111,13 +118,13 @@ public class TextSplitter {
     /**
      * 按固定大小切分（最后的兜底策略）
      */
-    private List<String> splitFixed(String text) {
+    private List<String> splitFixed(String text, int targetChunkSize, int targetChunkOverlap) {
         List<String> chunks = new ArrayList<>();
         int start = 0;
         while (start < text.length()) {
-            int end = Math.min(start + chunkSize, text.length());
+            int end = Math.min(start + targetChunkSize, text.length());
             chunks.add(text.substring(start, end));
-            start += chunkSize - chunkOverlap;
+            start += Math.max(1, targetChunkSize - targetChunkOverlap);
         }
         return chunks;
     }
