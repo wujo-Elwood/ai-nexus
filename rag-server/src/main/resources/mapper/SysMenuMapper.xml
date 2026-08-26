@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.rbac.mapper.SysMenuMapper">
+
+    <!-- 查询当前用户通过角色授权后可见的菜单 -->
+    <select id="findByUserId" resultType="com.rag.rbac.entity.SysMenu">
+        SELECT DISTINCT m.*
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        INNER JOIN sys_role r ON r.id = rm.role_id
+        INNER JOIN sys_user_role ur ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId}
+          AND r.enabled = 1
+          AND m.enabled = 1
+          AND m.visible = 1
+        ORDER BY m.sort_no, m.id
+    </select>
+
+    <!-- 查询全部菜单，供菜单管理页面使用 -->
+    <select id="findAll" resultType="com.rag.rbac.entity.SysMenu">
+        SELECT *
+        FROM sys_menu
+        ORDER BY sort_no, id
+    </select>
+
+    <!-- 根据编号查询菜单 -->
+    <select id="findById" resultType="com.rag.rbac.entity.SysMenu">
+        SELECT *
+        FROM sys_menu
+        WHERE id = #{id}
+    </select>
+
+    <!-- 新增菜单 -->
+    <insert id="insert" parameterType="com.rag.rbac.entity.SysMenu" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_menu (
+            parent_id, menu_name, path, route_name, component, icon,
+            menu_type, permission_code, sort_no, visible, enabled,
+            create_time, update_time
+        )
+        VALUES (
+            #{parentId}, #{menuName}, #{path}, #{routeName}, #{component}, #{icon},
+            #{menuType}, #{permissionCode}, #{sortNo}, #{visible}, #{enabled},
+            NOW(), NOW()
+        )
+    </insert>
+
+    <!-- 修改菜单 -->
+    <update id="update" parameterType="com.rag.rbac.entity.SysMenu">
+        UPDATE sys_menu
+        SET parent_id = #{parentId},
+            menu_name = #{menuName},
+            path = #{path},
+            route_name = #{routeName},
+            component = #{component},
+            icon = #{icon},
+            menu_type = #{menuType},
+            permission_code = #{permissionCode},
+            sort_no = #{sortNo},
+            visible = #{visible},
+            enabled = #{enabled},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除菜单 -->
+    <delete id="deleteById">
+        DELETE FROM sys_menu
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 删除菜单对应的角色授权 -->
+    <delete id="deleteRoleMenuByMenuId">
+        DELETE FROM sys_role_menu
+        WHERE menu_id = #{menuId}
+    </delete>
+
+</mapper>

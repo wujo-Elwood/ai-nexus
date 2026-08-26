@@ -6,9 +6,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    hmr: {
+      host: '127.0.0.1',
+      port: 5173
+    },
     proxy: {
       '/api/chat/stream': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8888',
         changeOrigin: true,
         selfHandleResponse: false,
         configure: (proxy) => {
@@ -22,7 +26,7 @@ export default defineConfig({
         }
       },
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8888',
         changeOrigin: true
       }
     }

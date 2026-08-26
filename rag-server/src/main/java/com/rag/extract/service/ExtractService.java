@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.rag.common.BusinessException;
 import com.rag.entity.ModelProvider;
+import com.rag.extract.dto.SaveExtractTemplateRequest;
 import com.rag.extract.entity.ExtractDocument;
 import com.rag.extract.entity.ExtractExportRecord;
 import com.rag.extract.entity.ExtractField;
@@ -55,6 +56,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -148,9 +150,9 @@ public class ExtractService {
     /**
      * 查询启用模板列表
      */
-    public List<Map<String, Object>> getTemplates() {
-        // 第1步：查询所有启用模板
-        List<ExtractTemplate> templates = extractTemplateMapper.findEnabled();
+    public List<Map<String, Object>> getTemplates(Long userId) {
+        // 第1步：查询系统模板和当前用户模板
+        List<ExtractTemplate> templates = extractTemplateMapper.findVisible(userId);
         // 第2步：组装前端友好的 Map 结果
         List<Map<String, Object>> templateMaps = new ArrayList<>();
         for (ExtractTemplate template : templates) {
@@ -161,10 +163,52 @@ public class ExtractService {
             templateMap.put("documentType", template.getDocumentType());
             templateMap.put("description", template.getDescription());
             templateMap.put("enabled", template.getEnabled());
+            templateMap.put("createdBy", template.getCreatedBy());
             templateMap.put("createTime", template.getCreateTime());
+            templateMap.put("fields", extractFieldMapper.findByTemplateId(template.getId()));
             templateMaps.add(templateMap);
         }
         return templateMaps;
+    }
+
+    /**
+     * 保存抽取模板
+     */
+    @Transactional
+    public ExtractTemplate saveTemplate(SaveExtractTemplateRequest request, Long userId) {
+        // 第1步：校验模板基础信息
+        validateTemplateRequest(request);
+        // 第2步：新增或更新模板基础数据
+        ExtractTemplate template = buildTemplateEntity(request, userId);
+        if (request.getId() == null) {
+            ExtractTemplate existing = extractTemplateMapper.findByCode(request.getTemplateCode());
+            if (existing != null) {
+                throw new BusinessException(400, "模板编码已存在");
+            }
+            extractTemplateMapper.insert(template);
+        } else {
+            ExtractTemplate oldTemplate = requireEditableTemplate(request.getId(), userId);
+            template.setId(oldTemplate.getId());
+            template.setTemplateCode(oldTemplate.getTemplateCode());
+            extractTemplateMapper.update(template);
+        }
+        // 第3步：保存字段列表
+        saveTemplateFields(template.getId(), request.getFields());
+        // 第4步：返回保存后的模板
+        return extractTemplateMapper.findById(template.getId());
+    }
+
+    /**
+     * 删除抽取模板
+     */
+    @Transactional
+    public void deleteTemplate(Long templateId, Long userId) {
+        // 第1步：校验模板必须属于当前用户
+        ExtractTemplate template = requireEditableTemplate(templateId, userId);
+        // 第2步：删除模板字段
+        extractFieldMapper.deleteByTemplateId(template.getId());
+        // 第3步：删除模板基础记录
+        extractTemplateMapper.delete(template.getId(), userId);
     }
 
     /**
@@ -214,8 +258,9 @@ public class ExtractService {
     }
 
     /**
-     * 创建并同步执行抽取任务
+     * 创建并异步执行抽取任务
      */
+    @Transactional
     public ExtractTask createTask(Long documentId, Long templateId, Long userId) {
         // 第1步：校验文档归属和模板存在
         ExtractDocument document = requireDocument(documentId, userId);
@@ -230,38 +275,63 @@ public class ExtractService {
         task.setTemplateId(template.getId());
         task.setTaskStatus("PENDING");
         task.setTaskMessage("任务已创建");
+        task.setProgress(0);
+        task.setErrorMessage("");
         task.setCreatedBy(userId);
         extractTaskMapper.insert(task);
+        // 第3步：启动后台线程执行抽取，前端通过任务状态轮询进度
+        startAsyncExtractTask(task.getId(), document.getId(), template.getId(), userId);
+        return task;
+    }
+
+    /**
+     * 启动后台抽取线程
+     */
+    private void startAsyncExtractTask(Long taskId, Long documentId, Long templateId, Long userId) {
+        // 第1步：创建后台线程执行耗时抽取
+        Thread workerThread = new Thread(() -> runExtractTask(taskId, documentId, templateId, userId));
+        // 第2步：设置线程名称方便日志定位
+        workerThread.setName("extract-task-" + taskId);
+        // 第3步：启动线程
+        workerThread.start();
+    }
+
+    /**
+     * 执行抽取任务主流程
+     */
+    public void runExtractTask(Long taskId, Long documentId, Long templateId, Long userId) {
         try {
-            // 第3步：解析文档内容
+            // 第1步：重新读取任务、文档、模板和字段，避免异步线程复用旧状态
+            ExtractTask task = extractTaskMapper.findById(taskId);
+            ExtractDocument document = requireDocument(documentId, userId);
+            ExtractTemplate template = requireTemplate(templateId);
+            List<ExtractField> fields = extractFieldMapper.findByTemplateId(template.getId());
+            // 第2步：解析文档内容
             extractTaskMapper.markStarted(task.getId(), "PARSING");
+            extractTaskMapper.updateProgress(task.getId(), "PARSING", "正在解析文档", 20);
             File sourceFile = new File(document.getFilePath());
             String fullText = documentParser.parse(sourceFile);
             extractDocumentMapper.updateParsed(document.getId(), fullText, 1);
             document.setFullText(fullText);
             document.setPageCount(1);
-            // 第4步：调用模型抽取字段
-            extractTaskMapper.updateStatus(task.getId(), "EXTRACTING", "正在抽取字段");
+            // 第3步：调用模型抽取字段
+            extractTaskMapper.updateProgress(task.getId(), "EXTRACTING", "正在调用模型抽取字段", 55);
             JsonNode fieldValues = callModelForExtraction(template, fields, fullText);
             List<ExtractResult> results = buildResults(task, document, fields, fieldValues);
             if (results.isEmpty()) {
                 throw new BusinessException(500, "抽取结果不能为空");
             }
+            // 第4步：保存抽取结果
+            extractTaskMapper.updateProgress(task.getId(), "SAVING", "正在保存抽取结果", 82);
+            extractResultMapper.deleteByTaskId(task.getId());
             extractResultMapper.insertBatch(results);
             // 第5步：标记任务进入复核状态
             extractTaskMapper.markFinished(task.getId(), "REVIEWING", "抽取完成，等待复核");
-            task.setTaskStatus("REVIEWING");
-            task.setTaskMessage("抽取完成，等待复核");
-            return task;
         } catch (Exception e) {
             // 第6步：失败时标记任务和文档状态
             log.error("文档抽取任务失败", e);
-            extractTaskMapper.markFinished(task.getId(), "FAILED", e.getMessage());
-            extractDocumentMapper.updateStatus(document.getId(), "FAILED");
-            if (e instanceof BusinessException businessException) {
-                throw businessException;
-            }
-            throw new BusinessException(500, "文档抽取失败：" + e.getMessage());
+            extractTaskMapper.markFailed(taskId, "文档抽取失败", e.getMessage());
+            extractDocumentMapper.updateStatus(documentId, "FAILED");
         }
     }
 
@@ -388,6 +458,110 @@ public class ExtractService {
             throw new BusinessException(404, "抽取文档不存在");
         }
         return document;
+    }
+
+    /**
+     * 校验模板保存请求
+     */
+    private void validateTemplateRequest(SaveExtractTemplateRequest request) {
+        // 第1步：校验模板名称和编码
+        if (request == null || request.getTemplateName() == null || request.getTemplateName().isBlank()) {
+            throw new BusinessException(400, "模板名称不能为空");
+        }
+        if (request.getId() == null && (request.getTemplateCode() == null || request.getTemplateCode().isBlank())) {
+            throw new BusinessException(400, "模板编码不能为空");
+        }
+        // 第2步：校验字段列表不能为空
+        if (request.getFields() == null || request.getFields().isEmpty()) {
+            throw new BusinessException(400, "模板字段不能为空");
+        }
+        // 第3步：校验每个字段的编码和名称
+        for (SaveExtractTemplateRequest.FieldItem field : request.getFields()) {
+            if (field.getFieldCode() == null || field.getFieldCode().isBlank()) {
+                throw new BusinessException(400, "字段编码不能为空");
+            }
+            if (field.getFieldName() == null || field.getFieldName().isBlank()) {
+                throw new BusinessException(400, "字段名称不能为空");
+            }
+        }
+    }
+
+    /**
+     * 构造模板实体
+     */
+    private ExtractTemplate buildTemplateEntity(SaveExtractTemplateRequest request, Long userId) {
+        // 第1步：把请求字段复制到模板实体
+        ExtractTemplate template = new ExtractTemplate();
+        template.setId(request.getId());
+        template.setTemplateName(request.getTemplateName().trim());
+        template.setTemplateCode(request.getTemplateCode() == null ? null : request.getTemplateCode().trim());
+        template.setDocumentType(request.getDocumentType());
+        template.setDescription(request.getDescription());
+        template.setEnabled(request.getEnabled() == null || request.getEnabled());
+        template.setCreatedBy(userId);
+        // 第2步：返回模板实体
+        return template;
+    }
+
+    /**
+     * 校验并获取可编辑模板
+     */
+    private ExtractTemplate requireEditableTemplate(Long templateId, Long userId) {
+        // 第1步：按主键查询模板
+        ExtractTemplate template = extractTemplateMapper.findById(templateId);
+        // 第2步：不存在时提示错误
+        if (template == null) {
+            throw new BusinessException(404, "抽取模板不存在");
+        }
+        // 第3步：系统内置模板不允许直接编辑
+        if (!Objects.equals(template.getCreatedBy(), userId)) {
+            throw new BusinessException(403, "只能编辑自己创建的模板");
+        }
+        return template;
+    }
+
+    /**
+     * 保存模板字段列表
+     */
+    private void saveTemplateFields(Long templateId, List<SaveExtractTemplateRequest.FieldItem> fieldItems) {
+        // 第1步：逐个新增或更新字段
+        List<Long> savedFieldIds = new ArrayList<>();
+        for (int i = 0; i < fieldItems.size(); i++) {
+            SaveExtractTemplateRequest.FieldItem fieldItem = fieldItems.get(i);
+            ExtractField field = buildFieldEntity(templateId, fieldItem, i);
+            if (field.getId() == null) {
+                extractFieldMapper.insert(field);
+            } else {
+                extractFieldMapper.update(field);
+            }
+            if (field.getId() != null) {
+                savedFieldIds.add(field.getId());
+            }
+        }
+        // 第2步：删除前端已经移除的字段
+        extractFieldMapper.deleteMissing(templateId, savedFieldIds);
+    }
+
+    /**
+     * 构造字段实体
+     */
+    private ExtractField buildFieldEntity(Long templateId, SaveExtractTemplateRequest.FieldItem fieldItem, int index) {
+        // 第1步：把请求字段复制到字段实体
+        ExtractField field = new ExtractField();
+        field.setId(fieldItem.getId());
+        field.setTemplateId(templateId);
+        field.setFieldCode(fieldItem.getFieldCode().trim());
+        field.setFieldName(fieldItem.getFieldName().trim());
+        field.setFieldType(fieldItem.getFieldType() == null || fieldItem.getFieldType().isBlank() ? "TEXT" : fieldItem.getFieldType());
+        field.setRequired(Boolean.TRUE.equals(fieldItem.getRequired()));
+        field.setMultiple(Boolean.TRUE.equals(fieldItem.getMultiple()));
+        field.setFieldPrompt(fieldItem.getFieldPrompt());
+        field.setExampleValue(fieldItem.getExampleValue());
+        field.setRegexRule(fieldItem.getRegexRule());
+        field.setConfidenceThreshold(fieldItem.getConfidenceThreshold() == null ? BigDecimal.valueOf(0.8) : fieldItem.getConfidenceThreshold());
+        field.setSortNo(fieldItem.getSortNo() == null ? (index + 1) * 10 : fieldItem.getSortNo());
+        // 第2步：返回字段实体
+        return field;
     }
 
     /**
@@ -607,7 +781,11 @@ public class ExtractService {
             result.setFieldId(field.getId());
             result.setFieldCode(field.getFieldCode());
             result.setFieldName(field.getFieldName());
-            result.setFieldValue(valueNode == null ? "" : valueNode.path("fieldValue").asText(""));
+            String extractedValue = valueNode == null ? "" : valueNode.path("fieldValue").asText("");
+            result.setFieldValue(extractedValue);
+            result.setOriginalValue(extractedValue);
+            result.setManualValue("");
+            result.setFinalValue(extractedValue);
             result.setRawText(valueNode == null ? "" : valueNode.path("rawText").asText(""));
             result.setPageNo(valueNode == null ? 1 : valueNode.path("pageNo").asInt(1));
             result.setConfidence(readConfidence(valueNode));
@@ -674,7 +852,7 @@ public class ExtractService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("抽取结果");
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"字段编码", "字段名称", "字段值", "原文片段", "页码", "置信度", "状态"};
+            String[] headers = {"字段编码", "字段名称", "最终值", "模型原始值", "人工修正值", "原文片段", "页码", "置信度", "状态"};
             for (int i = 0; i < headers.length; i++) {
                 headerRow.createCell(i).setCellValue(headers[i]);
             }
@@ -684,11 +862,13 @@ public class ExtractService {
                 Row row = sheet.createRow(i + 1);
                 row.createCell(0).setCellValue(nullToEmpty(result.getFieldCode()));
                 row.createCell(1).setCellValue(nullToEmpty(result.getFieldName()));
-                row.createCell(2).setCellValue(nullToEmpty(result.getFieldValue()));
-                row.createCell(3).setCellValue(nullToEmpty(result.getRawText()));
-                row.createCell(4).setCellValue(result.getPageNo() == null ? 1 : result.getPageNo());
-                row.createCell(5).setCellValue(result.getConfidence() == null ? "0" : result.getConfidence().toPlainString());
-                row.createCell(6).setCellValue(nullToEmpty(result.getResultStatus()));
+                row.createCell(2).setCellValue(nullToEmpty(result.getFinalValue()));
+                row.createCell(3).setCellValue(nullToEmpty(result.getOriginalValue()));
+                row.createCell(4).setCellValue(nullToEmpty(result.getManualValue()));
+                row.createCell(5).setCellValue(nullToEmpty(result.getRawText()));
+                row.createCell(6).setCellValue(result.getPageNo() == null ? 1 : result.getPageNo());
+                row.createCell(7).setCellValue(result.getConfidence() == null ? "0" : result.getConfidence().toPlainString());
+                row.createCell(8).setCellValue(nullToEmpty(result.getResultStatus()));
             }
             // 第3步：自动调整列宽并输出字节
             for (int i = 0; i < headers.length; i++) {

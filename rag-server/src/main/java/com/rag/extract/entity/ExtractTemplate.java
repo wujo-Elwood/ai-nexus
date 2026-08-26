@@ -41,6 +41,11 @@ public class ExtractTemplate {
     private Boolean enabled;
 
     /**
+     * 创建用户
+     */
+    private Long createdBy;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

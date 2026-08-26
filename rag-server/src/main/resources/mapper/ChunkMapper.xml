@@ -11,8 +11,23 @@
         SELECT * FROM kb_chunk WHERE file_id = #{fileId} ORDER BY chunk_index
     </select>
 
+    <select id="findByKbId" resultType="com.rag.entity.KbChunk">
+        SELECT c.*
+        FROM kb_chunk c
+        INNER JOIN kb_file f ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId} AND (f.is_current = 1 OR f.is_current IS NULL)
+        ORDER BY c.file_id, c.chunk_index
+    </select>
+
+    <select id="countByKbId" resultType="int">
+        SELECT COUNT(*)
+        FROM kb_chunk c
+        INNER JOIN kb_file f ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId}
+    </select>
+
     <select id="findByIdAndKbId" resultType="com.rag.entity.KbChunk">
-        SELECT c.* FROM kb_chunk c
+        SELECT c.*, f.file_name AS file_name FROM kb_chunk c
         INNER JOIN kb_file f ON c.file_id = f.id
         WHERE c.id = #{id} AND f.kb_id = #{kbId}
     </select>
@@ -35,9 +50,10 @@
     </delete>
 
     <select id="searchByKeyword" resultType="com.rag.entity.KbChunk">
-        SELECT c.* FROM kb_chunk c
+        SELECT c.*, f.file_name AS file_name FROM kb_chunk c
         INNER JOIN kb_file f ON c.file_id = f.id
-        WHERE f.kb_id = #{kbId} AND c.content LIKE CONCAT('%', #{keyword}, '%')
+        WHERE f.kb_id = #{kbId} AND (f.is_current = 1 OR f.is_current IS NULL)
+          AND c.content LIKE CONCAT('%', #{keyword}, '%')
         LIMIT #{limit}
     </select>
 

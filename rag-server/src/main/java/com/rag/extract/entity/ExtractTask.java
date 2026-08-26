@@ -36,6 +36,16 @@ public class ExtractTask {
     private String taskMessage;
 
     /**
+     * 任务进度
+     */
+    private Integer progress;
+
+    /**
+     * 失败原因
+     */
+    private String errorMessage;
+
+    /**
      * 开始时间
      */
     private LocalDateTime startedAt;

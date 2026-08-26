@@ -36,6 +36,7 @@ public class ModelProviderService {
     }
 
     public ModelProvider create(ModelProvider provider) {
+        cleanImageConfig(provider);
         provider.setIsActive(0);
         modelProviderMapper.insert(provider);
         return provider;
@@ -47,6 +48,9 @@ public class ModelProviderService {
         existing.setBaseUrl(provider.getBaseUrl());
         existing.setApiKey(provider.getApiKey());
         existing.setModel(provider.getModel());
+        existing.setImageBaseUrl(cleanBlank(provider.getImageBaseUrl()));
+        existing.setImageApiKey(cleanBlank(provider.getImageApiKey()));
+        existing.setImageModel(cleanBlank(provider.getImageModel()));
         modelProviderMapper.update(existing);
         return existing;
     }
@@ -61,5 +65,27 @@ public class ModelProviderService {
         getById(id);
         modelProviderMapper.deactivateAll();
         modelProviderMapper.activate(id);
+    }
+
+    /**
+     * 清理生图配置中的空字符串
+     */
+    private void cleanImageConfig(ModelProvider provider) {
+        // 第1步：空字符串统一转成 null，后续生图时才能正确走默认配置
+        provider.setImageBaseUrl(cleanBlank(provider.getImageBaseUrl()));
+        provider.setImageApiKey(cleanBlank(provider.getImageApiKey()));
+        provider.setImageModel(cleanBlank(provider.getImageModel()));
+    }
+
+    /**
+     * 清理空白字符串
+     */
+    private String cleanBlank(String value) {
+        // 第1步：为空或全空格时返回 null
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        // 第2步：返回去除首尾空格后的内容
+        return value.trim();
     }
 }

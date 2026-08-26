@@ -4,16 +4,19 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * RAG 知识库系统启动类
  * 配置 MyBatis Mapper 扫描路径和异步任务线程池
  */
 @SpringBootApplication
-@MapperScan({"com.rag.mapper", "com.rag.extract.mapper"})
+@EnableScheduling
+@MapperScan({"com.rag.mapper", "com.rag.extract.mapper", "com.rag.agent.mapper", "com.rag.image.mapper", "com.rag.rbac.mapper", "com.rag.catalog", "com.rag.task", "com.rag.eval"})
 public class RagApplication {
 
     /**
@@ -22,8 +25,8 @@ public class RagApplication {
      * 固定 2 个线程，避免文件上传请求被阻塞
      */
     @Bean("fileProcessExecutor")
-    public Executor fileProcessExecutor() {
-        return Executors.newFixedThreadPool(2);
+    public ThreadPoolExecutor fileProcessExecutor() {
+        return new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     }
 
     /**
@@ -32,8 +35,17 @@ public class RagApplication {
      * 固定 4 个线程，支持多个用户同时进行流式对话
      */
     @Bean("chatStreamExecutor")
-    public Executor chatStreamExecutor() {
-        return Executors.newFixedThreadPool(4);
+    public ThreadPoolExecutor chatStreamExecutor() {
+        return new ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    }
+
+    /**
+     * AI 生图任务线程池
+     * 用于后台执行图片生成任务，让页面切换后仍然可以继续查询任务状态
+     */
+    @Bean("imageGenerateExecutor")
+    public ThreadPoolExecutor imageGenerateExecutor() {
+        return new ThreadPoolExecutor(6, 6, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     }
 
     /**

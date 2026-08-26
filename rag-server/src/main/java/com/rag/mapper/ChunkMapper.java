@@ -19,6 +19,12 @@ public interface ChunkMapper {
     /** 根据文件 ID 查询所有文本块（按顺序） */
     List<KbChunk> findByFileId(@Param("fileId") Long fileId);
 
+    /** 根据知识库ID查询所有文本块 */
+    List<KbChunk> findByKbId(@Param("kbId") Long kbId);
+
+    /** 根据知识库ID统计文本块数量 */
+    int countByKbId(@Param("kbId") Long kbId);
+
     /** 根据 ID 和知识库 ID 查询文本块（通过 kb_file 表关联，确保知识库隔离） */
     KbChunk findByIdAndKbId(@Param("id") Long id, @Param("kbId") Long kbId);
 

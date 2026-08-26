@@ -1,5 +1,4 @@
 <template>
-  <MainLayout>
     <div class="stats-page page-shell">
       <section class="page-hero">
         <div>
@@ -46,13 +45,11 @@
         </div>
       </section>
     </div>
-  </MainLayout>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import { getUsageStats } from '../../api/usage'
-import MainLayout from '../../layouts/MainLayout.vue'
 
 const today = ref({})
 const dailyStats = ref([])

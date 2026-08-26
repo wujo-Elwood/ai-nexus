@@ -47,6 +47,21 @@ public class ExtractResult {
     private String fieldValue;
 
     /**
+     * 模型原始值
+     */
+    private String originalValue;
+
+    /**
+     * 人工修正值
+     */
+    private String manualValue;
+
+    /**
+     * 最终值
+     */
+    private String finalValue;
+
+    /**
      * 原始文本
      */
     private String rawText;

@@ -6,16 +6,16 @@
 
     <!-- 第1步：批量新增抽取结果 -->
     <insert id="insertBatch">
-        INSERT INTO extract_result (task_id, document_id, field_id, field_code, field_name, field_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time)
+        INSERT INTO extract_result (task_id, document_id, field_id, field_code, field_name, field_value, original_value, manual_value, final_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time)
         VALUES
         <foreach collection="results" item="result" separator=",">
-            (#{result.taskId}, #{result.documentId}, #{result.fieldId}, #{result.fieldCode}, #{result.fieldName}, #{result.fieldValue}, #{result.rawText}, #{result.pageNo}, #{result.confidence}, #{result.resultStatus}, #{result.isModified}, NOW(), NOW())
+            (#{result.taskId}, #{result.documentId}, #{result.fieldId}, #{result.fieldCode}, #{result.fieldName}, #{result.fieldValue}, #{result.originalValue}, #{result.manualValue}, #{result.finalValue}, #{result.rawText}, #{result.pageNo}, #{result.confidence}, #{result.resultStatus}, #{result.isModified}, NOW(), NOW())
         </foreach>
     </insert>
 
     <!-- 第1步：按结果主键查询结果 -->
     <select id="findById" resultType="com.rag.extract.entity.ExtractResult">
-        SELECT id, task_id, document_id, field_id, field_code, field_name, field_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time
+        SELECT id, task_id, document_id, field_id, field_code, field_name, field_value, original_value, manual_value, final_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time
         FROM extract_result
         WHERE id = #{id}
     </select>
@@ -23,7 +23,7 @@
     <!-- 第1步：通过任务表关联创建用户 -->
     <!-- 第2步：按结果主键和创建用户查询结果 -->
     <select id="findByIdAndUser" resultType="com.rag.extract.entity.ExtractResult">
-        SELECT r.id, r.task_id, r.document_id, r.field_id, r.field_code, r.field_name, r.field_value, r.raw_text, r.page_no, r.confidence, r.result_status, r.is_modified, r.create_time, r.update_time
+        SELECT r.id, r.task_id, r.document_id, r.field_id, r.field_code, r.field_name, r.field_value, r.original_value, r.manual_value, r.final_value, r.raw_text, r.page_no, r.confidence, r.result_status, r.is_modified, r.create_time, r.update_time
         FROM extract_result r
         INNER JOIN extract_task t ON t.id = r.task_id
         WHERE r.id = #{id}
@@ -32,7 +32,7 @@
 
     <!-- 第1步：按任务主键查询结果列表 -->
     <select id="findByTaskId" resultType="com.rag.extract.entity.ExtractResult">
-        SELECT id, task_id, document_id, field_id, field_code, field_name, field_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time
+        SELECT id, task_id, document_id, field_id, field_code, field_name, field_value, original_value, manual_value, final_value, raw_text, page_no, confidence, result_status, is_modified, create_time, update_time
         FROM extract_result
         WHERE task_id = #{taskId}
         ORDER BY id ASC
@@ -42,11 +42,19 @@
     <!-- 第2步：标记结果已经修改并刷新更新时间 -->
     <update id="updateManualValue">
         UPDATE extract_result
-        SET field_value = #{newValue},
+        SET manual_value = #{newValue},
+            final_value = #{newValue},
+            field_value = #{newValue},
             result_status = 'MODIFIED',
             is_modified = 1,
             update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <!-- 第1步：删除任务下的旧结果 -->
+    <delete id="deleteByTaskId">
+        DELETE FROM extract_result
+        WHERE task_id = #{taskId}
+    </delete>
 
 </mapper>

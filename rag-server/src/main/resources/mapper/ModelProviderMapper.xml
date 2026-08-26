@@ -17,13 +17,19 @@
     </select>
 
     <insert id="insert" parameterType="com.rag.entity.ModelProvider" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO ai_model_provider (name, base_url, api_key, model, is_active, create_time)
-        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{isActive}, NOW())
+        INSERT INTO ai_model_provider (name, base_url, api_key, model, image_base_url, image_api_key, image_model, is_active, create_time)
+        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{imageBaseUrl}, #{imageApiKey}, #{imageModel}, #{isActive}, NOW())
     </insert>
 
     <update id="update" parameterType="com.rag.entity.ModelProvider">
         UPDATE ai_model_provider
-        SET name = #{name}, base_url = #{baseUrl}, api_key = #{apiKey}, model = #{model}
+        SET name = #{name},
+            base_url = #{baseUrl},
+            api_key = #{apiKey},
+            model = #{model},
+            image_base_url = #{imageBaseUrl},
+            image_api_key = #{imageApiKey},
+            image_model = #{imageModel}
         WHERE id = #{id}
     </update>
 

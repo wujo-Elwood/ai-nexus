@@ -1,161 +1,169 @@
 <template>
-  <MainLayout>
-    <div class="kb-page page-shell">
-      <section class="page-hero kb-hero">
-        <div>
-          <span class="eyebrow">Knowledge Base</span>
-          <h1 class="section-title">把文档变成可追问的知识库</h1>
-          <p class="section-desc">
-            上传资料后自动解析、切片、向量化，聊天时按知识库召回相关内容，让回答更贴近你的业务资料。
-          </p>
-        </div>
-        <el-button type="primary" size="large" class="create-btn" @click="showCreateDialog">
-          <el-icon><Plus /></el-icon>
-          新建知识库
-        </el-button>
-      </section>
+  <div class="kb-page page-shell">
+    <section class="page-hero kb-hero">
+      <div>
+        <span class="eyebrow">Knowledge Base</span>
+        <h1 class="section-title">把文档变成可追问的知识库</h1>
+        <p class="section-desc">
+          上传资料后自动解析、切片、向量化，聊天时按知识库召回相关内容，让回答更贴近你的业务资料。
+        </p>
+      </div>
+      <el-button type="primary" size="large" class="create-btn" @click="showCreateDialog">
+        <el-icon><Plus /></el-icon>
+        新建知识库
+      </el-button>
+    </section>
 
-      <section class="stats-grid">
-        <div class="stat-card total-card">
-          <span>知识库总数</span>
-          <strong>{{ kbStats.total }}</strong>
-          <small>已创建的知识集合</small>
-        </div>
-        <div class="stat-card ready-card">
-          <span>可问答</span>
-          <strong>{{ kbStats.ready }}</strong>
-          <small>已有完成入库文件</small>
-        </div>
-        <div class="stat-card file-card">
-          <span>文件总数</span>
-          <strong>{{ kbStats.files }}</strong>
-          <small>参与检索的资料</small>
-        </div>
-      </section>
+    <section class="stats-grid">
+      <div class="stat-card total-card">
+        <span>知识库总数</span>
+        <strong>{{ kbStats.total }}</strong>
+        <small>已创建的知识集合</small>
+      </div>
+      <div class="stat-card ready-card">
+        <span>可问答</span>
+        <strong>{{ kbStats.ready }}</strong>
+        <small>已有完成入库文件</small>
+      </div>
+      <div class="stat-card file-card">
+        <span>文件总数</span>
+        <strong>{{ kbStats.files }}</strong>
+        <small>参与检索的资料</small>
+      </div>
+    </section>
 
-      <section class="toolbar glass-panel">
-        <div class="search-input-wrap">
-          <el-icon><Search /></el-icon>
-          <input
-            v-model="searchText"
-            type="text"
-            class="search-input"
-            placeholder="搜索知识库名称或描述"
-          />
-        </div>
-        <el-button :loading="loading" @click="loadKbList">
-          <el-icon><Refresh /></el-icon>
-          刷新
-        </el-button>
-      </section>
+    <section class="toolbar glass-panel">
+      <div class="search-input-wrap">
+        <el-icon><Search /></el-icon>
+        <input
+          v-model="searchText"
+          type="text"
+          class="search-input"
+          placeholder="搜索知识库名称或描述"
+        />
+      </div>
+      <el-button :loading="loading" @click="loadKbList">
+        <el-icon><Refresh /></el-icon>
+        刷新
+      </el-button>
+    </section>
 
-      <section class="kb-content">
-        <el-skeleton v-if="loading" :rows="5" animated />
-        <div v-else-if="filteredKbList.length === 0" class="empty-state glass-panel">
-          <div class="empty-icon">
-            <el-icon><Collection /></el-icon>
+    <section class="kb-content">
+      <el-skeleton v-if="loading" :rows="5" animated />
+      <div v-else-if="filteredKbList.length === 0" class="empty-state glass-panel">
+        <div class="empty-icon">
+          <el-icon><Collection /></el-icon>
+        </div>
+        <h3>还没有知识库</h3>
+        <p>点击右上角“新建知识库”，先创建一个资料空间。</p>
+      </div>
+      <div v-else class="kb-grid">
+        <article v-for="kb in filteredKbList" :key="kb.id" class="kb-card motion-card">
+          <div class="card-top">
+            <div class="card-icon">
+              <el-icon><Collection /></el-icon>
+            </div>
+            <el-dropdown trigger="click">
+              <button class="more-btn">
+                <el-icon><MoreFilled /></el-icon>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="goToFile(kb.id)">{{ isOwner(kb) ? '管理文件' : '查看文件' }}</el-dropdown-item>
+                  <el-dropdown-item v-if="isOwner(kb)" @click="showEditDialog(kb)">编辑知识库</el-dropdown-item>
+                  <el-dropdown-item v-if="isOwner(kb)" divided @click="handleDelete(kb.id)">删除知识库</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
-          <h3>还没有知识库</h3>
-          <p>点击右上角“新建知识库”，先创建一个资料空间。</p>
-        </div>
-        <div v-else class="kb-grid">
-          <article v-for="kb in filteredKbList" :key="kb.id" class="kb-card">
-            <div class="card-top">
-              <div class="card-icon">
-                <el-icon><Collection /></el-icon>
-              </div>
-              <el-dropdown trigger="click">
-                <button class="more-btn">
-                  <el-icon><MoreFilled /></el-icon>
-                </button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="goToFile(kb.id)">管理文件</el-dropdown-item>
-                    <el-dropdown-item divided @click="handleDelete(kb.id)">删除知识库</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+
+          <h3>{{ kb.name }}</h3>
+          <p class="card-desc">{{ kb.description || '暂无描述' }}</p>
+
+          <div class="card-meta">
+            <span>
+              <el-icon><Document /></el-icon>
+              {{ kb.fileCount || 0 }} 个文件
+            </span>
+            <span>
+              <el-icon><Clock /></el-icon>
+              {{ formatDate(kb.createTime) }}
+            </span>
+          </div>
+
+          <div class="card-footer">
+            <span class="status-badge" :class="getKbStatusClass(kb)">
+              {{ getKbStatusText(kb) }}
+            </span>
+            <div class="card-actions">
+            <el-button @click="goToInsights(kb.id)">策略统计</el-button>
+            <el-button @click="goToFile(kb.id)">文件管理</el-button>
+              <el-button type="primary" @click="goToChat(kb.id)">去提问</el-button>
             </div>
+          </div>
+        </article>
+      </div>
+    </section>
 
-            <h3>{{ kb.name }}</h3>
-            <p class="card-desc">{{ kb.description || '暂无描述' }}</p>
-
-            <div class="card-meta">
-              <span>
-                <el-icon><Document /></el-icon>
-                {{ kb.fileCount || 0 }} 个文件
-              </span>
-              <span>
-                <el-icon><Clock /></el-icon>
-                {{ formatDate(kb.createTime) }}
-              </span>
-            </div>
-
-            <div class="card-footer">
-              <span class="status-badge" :class="getKbStatusClass(kb)">
-                {{ getKbStatusText(kb) }}
-              </span>
-              <div class="card-actions">
-                <el-button @click="goToFile(kb.id)">文件管理</el-button>
-                <el-button type="primary" @click="goToChat(kb.id)">去提问</el-button>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <el-dialog v-model="dialogVisible" title="新建知识库" width="520px" class="create-dialog">
-        <el-form ref="formRef" :model="form" :rules="formRules" label-position="top">
-          <el-form-item label="名称" prop="name">
-            <el-input v-model="form.name" placeholder="例如：员工制度库" size="large" />
-          </el-form-item>
-          <el-form-item label="描述" prop="description">
-            <el-input
-              v-model="form.description"
-              type="textarea"
-              rows="3"
-              placeholder="简单说明这个知识库里会放哪些资料"
-            />
-          </el-form-item>
-        </el-form>
-        <template #footer>
-          <el-button @click="dialogVisible = false" size="large">取消</el-button>
-          <el-button type="primary" :loading="creating" @click="handleCreate" size="large">
-            创建
-          </el-button>
-        </template>
-      </el-dialog>
-    </div>
-  </MainLayout>
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑知识库' : '新建知识库'" width="520px" class="create-dialog">
+      <el-form ref="formRef" :model="form" :rules="formRules" label-position="top">
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="form.name" placeholder="例如：员工制度库" size="large" />
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            rows="3"
+            placeholder="简单说明这个知识库里会放哪些资料"
+          />
+        </el-form-item>
+        <el-form-item v-if="editingId" label="可见范围" prop="visibility">
+          <el-radio-group v-model="form.visibility">
+            <el-radio-button value="PRIVATE">仅自己可见</el-radio-button>
+            <el-radio-button value="PUBLIC">所有用户可读</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="large" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" size="large" @click="handleSave">
+          {{ editingId ? '保存' : '创建' }}
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getKbList, createKb, deleteKb } from '../../api/kb'
-import { getFileList } from '../../api/file'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, Collection, Document, MoreFilled, Plus, Refresh, Search } from '@element-plus/icons-vue'
-import MainLayout from '../../layouts/MainLayout.vue'
+import { getKbList, createKb, deleteKb, updateKb } from '../../api/kb'
+import { getFileList } from '../../api/file'
 
 const router = useRouter()
 
 const kbList = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
-const creating = ref(false)
+const saving = ref(false)
+const editingId = ref(null)
 const formRef = ref(null)
 const searchText = ref('')
 
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
+  visibility: 'PRIVATE'
 })
 
 const formRules = {
   name: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }]
 }
 
+// 根据搜索关键字过滤知识库列表
 const filteredKbList = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
   if (!keyword) {
@@ -168,6 +176,7 @@ const filteredKbList = computed(() => {
   })
 })
 
+// 统计知识库数量、可问答数量和文件总数
 const kbStats = computed(() => {
   return kbList.value.reduce((stats, item) => {
     stats.total += 1
@@ -186,18 +195,14 @@ onMounted(() => {
 // 加载知识库列表
 async function loadKbList() {
   try {
-    // 第1步：显示加载状态
     loading.value = true
-    // 第2步：读取知识库列表
     const res = await getKbList()
     const list = res.data || []
-    // 第3步：补充每个知识库的文件统计
     kbList.value = await Promise.all(list.map(loadKbFileStats))
   } catch (error) {
-    // 第4步：加载失败时记录错误
     console.error(error)
+    ElMessage.error('知识库加载失败')
   } finally {
-    // 第5步：关闭加载状态
     loading.value = false
   }
 }
@@ -205,16 +210,12 @@ async function loadKbList() {
 // 加载单个知识库的文件统计
 async function loadKbFileStats(kb) {
   try {
-    // 第1步：查询当前知识库下的文件
     const res = await getFileList(kb.id)
-    // 第2步：整理文件状态数量
     const files = res.data || []
-    const completedCount = files.filter(f => f.status === 'COMPLETED').length
-    const processingCount = files.filter(f => f.status === 'PROCESSING' || f.status === 'UPLOADED').length
-    // 第3步：返回带统计信息的知识库对象
+    const completedCount = files.filter(file => file.status === 'COMPLETED').length
+    const processingCount = files.filter(file => ['PROCESSING', 'UPLOADED'].includes(file.status)).length
     return { ...kb, fileCount: files.length, completedCount, processingCount }
   } catch (error) {
-    // 第4步：统计失败时使用默认数量
     console.error(error)
     return { ...kb, fileCount: 0, completedCount: 0, processingCount: 0 }
   }
@@ -222,103 +223,120 @@ async function loadKbFileStats(kb) {
 
 // 打开新建知识库弹窗
 function showCreateDialog() {
-  // 第1步：清空表单
+  // 第1步：清空编辑状态和表单内容
+  editingId.value = null
   form.name = ''
   form.description = ''
-  // 第2步：打开弹窗
+  form.visibility = 'PRIVATE'
+  // 第2步：打开知识库表单
   dialogVisible.value = true
 }
 
-// 创建知识库
-async function handleCreate() {
+// 打开编辑知识库弹窗
+function showEditDialog(kb) {
+  // 第1步：保存待编辑知识库编号
+  editingId.value = kb.id
+  // 第2步：回填知识库表单
+  form.name = kb.name || ''
+  form.description = kb.description || ''
+  form.visibility = kb.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
+  // 第3步：打开知识库表单
+  dialogVisible.value = true
+}
+
+// 创建或修改知识库
+async function handleSave() {
   try {
-    // 第1步：校验表单
+    // 第1步：校验知识库表单
     await formRef.value.validate()
-    // 第2步：提交创建请求
-    creating.value = true
-    await createKb(form)
-    // 第3步：提示成功并刷新列表
-    ElMessage.success('创建成功')
+    saving.value = true
+    // 第2步：根据编辑状态调用对应接口
+    if (editingId.value) {
+      await updateKb(editingId.value, form)
+      ElMessage.success('保存成功')
+    } else {
+      await createKb(form)
+      ElMessage.success('创建成功')
+    }
+    // 第3步：关闭弹窗并刷新知识库列表
     dialogVisible.value = false
     loadKbList()
   } catch (error) {
-    // 第4步：创建失败时记录错误
-    console.error(error)
+    if (error) {
+      console.error(error)
+    }
   } finally {
-    // 第5步：关闭提交状态
-    creating.value = false
+    // 第4步：关闭保存状态
+    saving.value = false
   }
+}
+
+// 判断当前用户是否为知识库创建者
+function isOwner(kb) {
+  // 第1步：统一转成字符串，兼容后端数字和本地字符串类型
+  return String(kb.createUser) === String(localStorage.getItem('userId'))
 }
 
 // 删除知识库
 async function handleDelete(id) {
   try {
-    // 第1步：确认是否删除
     await ElMessageBox.confirm('确定要删除这个知识库吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    // 第2步：调用删除接口
     await deleteKb(id)
-    // 第3步：提示成功并刷新列表
     ElMessage.success('删除成功')
     loadKbList()
   } catch (error) {
-    // 第4步：取消删除不提示错误
     if (error !== 'cancel') {
       console.error(error)
     }
   }
 }
 
-// 跳转到文件管理页
+// 跳转到文件管理页面
 function goToFile(kbId) {
-  // 第1步：带知识库编号进入文件页
   router.push(`/file/${kbId}`)
 }
 
-// 跳转到聊天页
+// 打开知识库策略和统计页面
+function goToInsights(kbId) {
+  router.push(`/kb/${kbId}/insights`)
+}
+
+// 跳转到聊天页面并携带知识库编号
 function goToChat(kbId) {
-  // 第1步：带知识库编号进入聊天页
   router.push({ path: '/chat', query: { kbId } })
 }
 
 // 获取知识库状态文案
 function getKbStatusText(kb) {
-  // 第1步：有文件正在处理时显示处理中
   if ((kb.processingCount || 0) > 0) {
     return '处理中'
   }
-  // 第2步：有完成文件时显示可问答
   if ((kb.completedCount || 0) > 0) {
     return '可问答'
   }
-  // 第3步：没有完成文件时显示待上传
   return '待上传'
 }
 
 // 获取知识库状态样式
 function getKbStatusClass(kb) {
-  // 第1步：处理中的知识库使用黄色状态
   if ((kb.processingCount || 0) > 0) {
     return 'processing'
   }
-  // 第2步：可问答的知识库使用绿色状态
   if ((kb.completedCount || 0) > 0) {
     return 'ready'
   }
-  // 第3步：待上传的知识库使用灰色状态
   return 'pending'
 }
 
 // 格式化日期
 function formatDate(dateStr) {
-  // 第1步：空日期直接返回空字符串
   if (!dateStr) {
     return ''
   }
-  // 第2步：按中文日期格式显示
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 </script>
@@ -326,47 +344,35 @@ function formatDate(dateStr) {
 <style scoped>
 .kb-hero .create-btn {
   min-width: 150px;
-  height: 52px;
+  height: 48px;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .stat-card {
   position: relative;
   overflow: hidden;
-  min-height: 142px;
-  padding: 24px;
-  border-radius: 26px;
-  color: #ffffff;
-  box-shadow: var(--shadow-card);
+  min-height: 126px;
+  padding: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--line-color);
+  background: rgba(30, 31, 35, 0.72);
 }
 
 .stat-card::after {
   content: "";
   position: absolute;
-  right: -40px;
-  bottom: -50px;
+  right: -42px;
+  bottom: -58px;
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.total-card {
-  background: linear-gradient(135deg, #155eef, #123f96);
-}
-
-.ready-card {
-  background: linear-gradient(135deg, #0f9f7a, #08785c);
-}
-
-.file-card {
-  background: linear-gradient(135deg, #344054, #101828);
+  background: rgba(229, 160, 68, 0.1);
 }
 
 .stat-card span,
@@ -374,7 +380,7 @@ function formatDate(dateStr) {
   position: relative;
   z-index: 1;
   display: block;
-  color: rgba(255, 255, 255, 0.74);
+  color: var(--muted-color);
 }
 
 .stat-card strong {
@@ -382,7 +388,8 @@ function formatDate(dateStr) {
   z-index: 1;
   display: block;
   margin: 12px 0 8px;
-  font-size: 46px;
+  color: var(--ink-color);
+  font-size: 38px;
   line-height: 1;
   font-weight: 900;
 }
@@ -392,7 +399,8 @@ function formatDate(dateStr) {
   align-items: center;
   gap: 14px;
   padding: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+  border-radius: 12px;
 }
 
 .search-input-wrap {
@@ -400,11 +408,11 @@ function formatDate(dateStr) {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 48px;
+  height: 46px;
   padding: 0 16px;
   border: 1px solid var(--line-color);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
+  border-radius: 10px;
+  background: rgba(247, 245, 242, 0.04);
 }
 
 .search-input-wrap .el-icon {
@@ -421,38 +429,35 @@ function formatDate(dateStr) {
   font-size: 15px;
 }
 
+.search-input::placeholder {
+  color: var(--subtle-color);
+}
+
 .kb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+  gap: 16px;
 }
 
 .kb-card {
   position: relative;
   overflow: hidden;
-  min-height: 300px;
-  padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 28px;
+  min-height: 286px;
+  padding: 22px;
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78)),
-    radial-gradient(circle at 20% 0%, rgba(21, 94, 239, 0.15), transparent 34%);
-  box-shadow: var(--shadow-soft);
+    radial-gradient(circle at 16% 0%, rgba(229, 160, 68, 0.12), transparent 32%),
+    rgba(30, 31, 35, 0.76);
   backdrop-filter: blur(18px);
-  transition: all 0.24s ease;
-}
-
-.kb-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-card);
 }
 
 .kb-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 6px;
-  background: linear-gradient(90deg, #155eef, #0f9f7a);
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-color), transparent);
 }
 
 .card-top,
@@ -465,36 +470,35 @@ function formatDate(dateStr) {
 
 .card-top {
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .card-icon {
-  width: 58px;
-  height: 58px;
+  width: 50px;
+  height: 50px;
   display: grid;
   place-items: center;
-  border-radius: 20px;
-  color: #ffffff;
-  font-size: 26px;
-  background: linear-gradient(135deg, #155eef, #0f9f7a);
-  box-shadow: var(--shadow-blue);
+  border: 1px solid rgba(229, 160, 68, 0.28);
+  border-radius: 12px;
+  color: var(--primary-dark);
+  font-size: 24px;
+  background: rgba(229, 160, 68, 0.1);
 }
 
 .more-btn {
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line-color);
+  border-radius: 10px;
   color: var(--muted-color);
-  background: rgba(16, 24, 40, 0.05);
-  cursor: pointer;
+  background: rgba(247, 245, 242, 0.04);
 }
 
 .kb-card h3 {
   margin-bottom: 10px;
-  font-size: 22px;
-  font-weight: 900;
   color: var(--ink-color);
+  font-size: 20px;
+  font-weight: 850;
 }
 
 .card-desc {
@@ -504,7 +508,8 @@ function formatDate(dateStr) {
 }
 
 .card-meta {
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 14px;
   margin: 20px 0;
   color: var(--muted-color);
 }
@@ -517,6 +522,7 @@ function formatDate(dateStr) {
 
 .card-footer {
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding-top: 18px;
   border-top: 1px solid var(--line-color);
@@ -527,26 +533,33 @@ function formatDate(dateStr) {
   padding: 7px 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 850;
 }
 
 .status-badge.ready {
-  color: #067647;
-  background: rgba(6, 118, 71, 0.12);
+  color: var(--success-color);
+  background: rgba(88, 214, 141, 0.12);
 }
 
 .status-badge.processing {
-  color: #b54708;
-  background: rgba(181, 71, 8, 0.12);
+  color: var(--warning-color);
+  background: rgba(244, 179, 90, 0.12);
 }
 
 .status-badge.pending {
-  color: #475467;
-  background: rgba(71, 84, 103, 0.12);
+  color: var(--muted-color);
+  background: rgba(247, 245, 242, 0.06);
 }
 
 .card-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.card-actions .el-button {
+  margin-left: 0;
 }
 
 .empty-state {
@@ -554,23 +567,26 @@ function formatDate(dateStr) {
   place-items: center;
   min-height: 320px;
   padding: 40px;
+  border-radius: 12px;
   text-align: center;
 }
 
 .empty-icon {
-  width: 80px;
-  height: 80px;
+  width: 76px;
+  height: 76px;
   display: grid;
   place-items: center;
   margin-bottom: 16px;
-  border-radius: 26px;
+  border: 1px solid rgba(229, 160, 68, 0.28);
+  border-radius: 18px;
   color: var(--primary-color);
-  font-size: 38px;
-  background: rgba(21, 94, 239, 0.1);
+  font-size: 36px;
+  background: rgba(229, 160, 68, 0.1);
 }
 
 .empty-state h3 {
   margin-bottom: 8px;
+  color: var(--ink-color);
   font-size: 22px;
 }
 

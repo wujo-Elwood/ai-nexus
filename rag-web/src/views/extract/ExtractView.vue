@@ -1,5 +1,4 @@
 <template>
-  <MainLayout>
     <div class="extract-page page-shell">
       <section class="page-hero">
         <div>
@@ -65,6 +64,12 @@
 
           <div class="template-desc">
             {{ selectedTemplate?.description || '选择模板后，系统会按模板字段调用模型抽取结构化结果。' }}
+          </div>
+          <div v-if="selectedTemplate" class="template-actions">
+            <span>当前模板：{{ selectedTemplate.templateName }}</span>
+            <el-button type="danger" text @click="handleDeleteTemplate(selectedTemplate)">
+              删除模板
+            </el-button>
           </div>
         </div>
 
@@ -208,12 +213,11 @@
         </aside>
       </section>
     </div>
-  </MainLayout>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Cpu,
   Document,
@@ -222,6 +226,7 @@ import {
 } from '@element-plus/icons-vue'
 import {
   createExtractTask,
+  deleteExtractTemplate,
   exportExtractTask,
   getExtractResults,
   getExtractTasks,
@@ -229,7 +234,6 @@ import {
   updateExtractResult,
   uploadExtractDocument
 } from '../../api/extract'
-import MainLayout from '../../layouts/MainLayout.vue'
 
 const templates = ref([])
 const selectedTemplateId = ref(null)
@@ -289,6 +293,23 @@ async function loadTemplates() {
   // 第3步：没有选中模板时默认选第一个
   if (!selectedTemplateId.value && templates.value.length > 0) {
     selectedTemplateId.value = templates.value[0].id
+  }
+}
+
+// 删除当前抽取模板
+async function handleDeleteTemplate(template) {
+  try {
+    await ElMessageBox.confirm(`确定删除模板「${template.templateName}」吗？`, '删除模板确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deleteExtractTemplate(template.id)
+    ElMessage.success('模板已删除')
+    selectedTemplateId.value = null
+    await loadTemplates()
+  } catch (error) {
+    if (error !== 'cancel') console.error(error)
   }
 }
 
@@ -581,11 +602,11 @@ function formatDate(dateStr) {
 
 .upload-panel :deep(.el-upload-dragger) {
   padding: 38px 18px;
-  border: 1px dashed rgba(21, 94, 239, 0.42);
+  border: 1px dashed rgba(245, 174, 70, 0.48);
   border-radius: 24px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(21, 94, 239, 0.12), transparent 34%),
-    rgba(255, 255, 255, 0.72);
+    radial-gradient(circle at 50% 0%, rgba(245, 174, 70, 0.14), transparent 34%),
+    rgba(8, 12, 22, 0.34);
 }
 
 .upload-icon {
@@ -610,9 +631,9 @@ function formatDate(dateStr) {
   gap: 6px;
   margin: 16px 0;
   padding: 16px;
-  border: 1px solid var(--line-color);
+  border: 1px solid rgba(245, 174, 70, 0.18);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(8, 12, 22, 0.34);
 }
 
 .selected-box span,
@@ -637,6 +658,18 @@ function formatDate(dateStr) {
   border-radius: 18px;
   background: rgba(21, 94, 239, 0.07);
   line-height: 1.7;
+}
+
+.template-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-color);
+  color: var(--muted-color);
+  font-size: 13px;
 }
 
 .summary-panel {

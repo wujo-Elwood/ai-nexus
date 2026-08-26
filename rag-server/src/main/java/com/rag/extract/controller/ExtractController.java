@@ -2,6 +2,7 @@ package com.rag.extract.controller;
 
 import com.rag.extract.dto.CreateExtractTaskRequest;
 import com.rag.extract.dto.ExportExtractTaskRequest;
+import com.rag.extract.dto.SaveExtractTemplateRequest;
 import com.rag.extract.dto.UpdateExtractResultRequest;
 import com.rag.extract.entity.ExtractDocument;
 import com.rag.extract.entity.ExtractResult;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,11 +43,37 @@ public class ExtractController {
      * 查询可用抽取模板
      */
     @GetMapping("/templates")
-    public Result<List<Map<String, Object>>> getTemplates() {
-        // 第1步：调用服务查询模板列表
-        List<Map<String, Object>> templates = extractService.getTemplates();
-        // 第2步：返回统一成功响应
+    public Result<List<Map<String, Object>>> getTemplates(HttpServletRequest request) {
+        // 第1步：从请求中读取当前用户编号
+        Long userId = (Long) request.getAttribute("userId");
+        // 第2步：调用服务查询模板列表
+        List<Map<String, Object>> templates = extractService.getTemplates(userId);
+        // 第3步：返回统一成功响应
         return Result.success(templates);
+    }
+
+    /**
+     * 保存抽取模板
+     */
+    @PostMapping("/templates")
+    public Result<?> saveTemplate(@RequestBody SaveExtractTemplateRequest body, HttpServletRequest request) {
+        // 第1步：从请求中读取当前用户编号
+        Long userId = (Long) request.getAttribute("userId");
+        // 第2步：调用服务保存模板
+        return Result.success(extractService.saveTemplate(body, userId));
+    }
+
+    /**
+     * 删除抽取模板
+     */
+    @DeleteMapping("/templates/{templateId}")
+    public Result<Void> deleteTemplate(@PathVariable Long templateId, HttpServletRequest request) {
+        // 第1步：从请求中读取当前用户编号
+        Long userId = (Long) request.getAttribute("userId");
+        // 第2步：调用服务删除模板
+        extractService.deleteTemplate(templateId, userId);
+        // 第3步：返回统一成功响应
+        return Result.success();
     }
 
     /**

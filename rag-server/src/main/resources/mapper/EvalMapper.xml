@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.eval.EvalMapper">
+    <select id="listCases" resultType="com.rag.eval.EvalCase">SELECT * FROM kb_eval_case WHERE kb_id=#{kbId} AND created_by=#{userId} AND enabled=1 ORDER BY create_time DESC</select>
+    <insert id="insertCase" parameterType="com.rag.eval.EvalCase" useGeneratedKeys="true" keyProperty="id">INSERT INTO kb_eval_case(kb_id,question,expected_answer,expected_sources,enabled,created_by,create_time) VALUES(#{kbId},#{question},#{expectedAnswer},#{expectedSources},1,#{createdBy},NOW())</insert>
+    <delete id="deleteCase">DELETE FROM kb_eval_case WHERE id=#{id} AND created_by=#{userId}</delete>
+    <insert id="insertRun" parameterType="com.rag.eval.EvalRun" useGeneratedKeys="true" keyProperty="id">INSERT INTO kb_eval_run(kb_id,run_status,total_count,hit_count,citation_hit_count,grounded_count,avg_latency_ms,total_tokens,parameter_snapshot,error_message,created_by,create_time,finished_at) VALUES(#{kbId},#{runStatus},#{totalCount},#{hitCount},#{citationHitCount},#{groundedCount},#{avgLatencyMs},#{totalTokens},#{parameterSnapshot},#{errorMessage},#{createdBy},NOW(),#{finishedAt})</insert>
+    <select id="listRuns" resultType="com.rag.eval.EvalRun">SELECT * FROM kb_eval_run WHERE kb_id=#{kbId} AND created_by=#{userId} ORDER BY create_time DESC LIMIT 50</select>
+</mapper>

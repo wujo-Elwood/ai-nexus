@@ -36,4 +36,9 @@ public interface ExtractResultMapper {
      * 更新人工修订值
      */
     int updateManualValue(@Param("id") Long id, @Param("newValue") String newValue);
+
+    /**
+     * 删除任务下的抽取结果
+     */
+    int deleteByTaskId(@Param("taskId") Long taskId);
 }

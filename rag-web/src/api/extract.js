@@ -6,6 +6,18 @@ export function getExtractTemplates() {
   return request.get('/api/extract/templates')
 }
 
+// 保存文档抽取模板
+export function saveExtractTemplate(data) {
+  // 第1步：提交模板基础信息和字段列表
+  return request.post('/api/extract/templates', data)
+}
+
+// 删除文档抽取模板
+export function deleteExtractTemplate(templateId) {
+  // 第1步：按模板编号删除当前用户创建的模板
+  return request.delete(`/api/extract/templates/${templateId}`)
+}
+
 // 上传待抽取文档
 export function uploadExtractDocument(file) {
   // 第1步：创建文件上传表单
@@ -29,6 +41,12 @@ export function createExtractTask(data) {
 export function getExtractTasks() {
   // 第1步：读取任务列表
   return request.get('/api/extract/tasks')
+}
+
+// 查询抽取任务详情
+export function getExtractTask(taskId) {
+  // 第1步：按任务编号读取任务详情
+  return request.get(`/api/extract/tasks/${taskId}`)
 }
 
 // 查询抽取任务结果

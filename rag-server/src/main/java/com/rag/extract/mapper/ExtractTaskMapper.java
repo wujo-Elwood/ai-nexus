@@ -38,6 +38,11 @@ public interface ExtractTaskMapper {
     int updateStatus(@Param("id") Long id, @Param("status") String status, @Param("message") String message);
 
     /**
+     * 更新任务状态和进度
+     */
+    int updateProgress(@Param("id") Long id, @Param("status") String status, @Param("message") String message, @Param("progress") Integer progress);
+
+    /**
      * 标记任务开始
      */
     int markStarted(@Param("id") Long id, @Param("status") String status);
@@ -46,4 +51,9 @@ public interface ExtractTaskMapper {
      * 标记任务完成
      */
     int markFinished(@Param("id") Long id, @Param("status") String status, @Param("message") String message);
+
+    /**
+     * 标记任务失败
+     */
+    int markFailed(@Param("id") Long id, @Param("message") String message, @Param("errorMessage") String errorMessage);
 }
