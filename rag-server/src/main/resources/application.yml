@@ -68,6 +68,10 @@ rag:
   chunk-overlap: 100
   top-k: 5
   candidate-k: ${RAG_CANDIDATE_K:10}
+  # 正式问答默认不调用额外的大模型改写查询，减少一次串行请求
+  query-rewrite-enabled: ${RAG_QUERY_REWRITE_ENABLED:false}
+  # 正式问答默认不调用额外的大模型压缩上下文，减少一次串行请求
+  context-compression-enabled: ${RAG_CONTEXT_COMPRESSION_ENABLED:false}
   similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.25}
   vector-weight: ${RAG_VECTOR_WEIGHT:0.6}
   keyword-weight: ${RAG_KEYWORD_WEIGHT:0.4}

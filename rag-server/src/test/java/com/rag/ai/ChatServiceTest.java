@@ -5,6 +5,7 @@ import com.rag.entity.KbChunk;
 import com.rag.entity.ModelProvider;
 import com.rag.mapper.ChunkMapper;
 import com.rag.rag.ContextCompressor;
+import com.rag.rag.KnowledgeContext;
 import com.rag.rag.KeywordSearchService;
 import com.rag.rag.PromptGuard;
 import com.rag.rag.QdrantService;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -101,6 +103,8 @@ class ChatServiceTest {
                 mock(ModelProviderService.class), reranker, keywordSearchService, mock(UsageService.class),
                 mock(PromptGuard.class), queryRewriter, mock(RetrievalCache.class),
                 mock(ContextCompressor.class), Runnable::run);
+        // 第3步：打开查询改写以验证诊断接口仍支持改写结果
+        ReflectionTestUtils.setField(service, "queryRewriteEnabled", true);
         ReflectionTestUtils.setField(service, "topK", 5);
         List<Map<String, Object>> results = service.recallTest("年假多少天", 3L);
 
@@ -145,6 +149,8 @@ class ChatServiceTest {
         ChatService service = new ChatService(embeddingService, qdrantService, chunkMapper, messageMapper,
                 providerService, reranker, keywordSearchService, usageService, mock(PromptGuard.class),
                 queryRewriter, retrievalCache, mock(ContextCompressor.class), Runnable::run);
+        // 第3步：打开查询改写以保持该测试对改写失败拒答链路的覆盖
+        ReflectionTestUtils.setField(service, "queryRewriteEnabled", true);
         ReflectionTestUtils.setField(service, "topK", 5);
         ReflectionTestUtils.setField(service, "candidateK", 10);
         String answer = service.chat(99L, "公司有没有住房补贴", 3L);
@@ -176,6 +182,8 @@ class ChatServiceTest {
                 mock(ModelProviderService.class), mock(Reranker.class), mock(KeywordSearchService.class),
                 mock(UsageService.class), mock(PromptGuard.class), queryRewriter, retrievalCache,
                 mock(ContextCompressor.class), Runnable::run);
+        // 第3步：打开查询改写以验证业务异常透传链路
+        ReflectionTestUtils.setField(service, "queryRewriteEnabled", true);
         ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
         Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources", String.class, Long.class);
         buildContext.setAccessible(true);
@@ -185,5 +193,67 @@ class ChatServiceTest {
 
         // 第3步：确认业务异常原样透传而不是被包装成 RuntimeException
         assertSame(mismatch, thrown.getCause());
+    }
+
+    /**
+     * 测试关闭查询改写后，知识库检索直接使用用户原问题，避免额外调用一次大模型。
+     */
+    @Test
+    void buildContextShouldUseOriginalQueryWhenRewriteDisabled() throws Exception {
+        // 第1步：准备一条可以被向量检索命中的文本块
+        EmbeddingService embeddingService = mock(EmbeddingService.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        QueryRewriter queryRewriter = mock(QueryRewriter.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KeywordSearchService keywordSearchService = mock(KeywordSearchService.class);
+        KbChunk chunk = new KbChunk();
+        chunk.setId(8L);
+        chunk.setFileId(4L);
+        chunk.setFileName("员工制度.pdf");
+        chunk.setChunkIndex(2);
+        chunk.setSourceInfo("员工制度.pdf, 第3段");
+        chunk.setContent("员工年假按照工龄计算。");
+        when(embeddingService.embed("年假多少天")).thenReturn(new float[]{0.1f, 0.2f});
+        when(qdrantService.searchWithScore(any(float[].class), eq(10), eq(3L)))
+                .thenReturn(List.of(new QdrantService.SearchResult(8L, 0.86f)));
+        when(chunkMapper.findByIdAndKbId(8L, 3L)).thenReturn(chunk);
+        when(keywordSearchService.search("年假多少天", 3L, 10)).thenReturn(Collections.emptyList());
+
+        // 第2步：组装服务并关闭查询改写
+        ChatService service = new ChatService(embeddingService, qdrantService, chunkMapper, null,
+                mock(ModelProviderService.class), mock(Reranker.class), keywordSearchService,
+                mock(UsageService.class), mock(PromptGuard.class), queryRewriter, retrievalCache,
+                mock(ContextCompressor.class), Runnable::run);
+        ReflectionTestUtils.setField(service, "topK", 5);
+        ReflectionTestUtils.setField(service, "candidateK", 10);
+        ReflectionTestUtils.setField(service, "queryRewriteEnabled", false);
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", mock(com.rag.mapper.KnowledgeBaseMapper.class));
+
+        // 第3步：执行私有检索流程并确认没有调用查询改写模型
+        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources", String.class, Long.class);
+        buildContext.setAccessible(true);
+        KnowledgeContext context = (KnowledgeContext) buildContext.invoke(service, "年假多少天", 3L);
+
+        // 第4步：确认检索上下文有效且改写器未被调用
+        assertTrue(context.hasContext());
+        assertEquals("年假多少天", context.getRewrittenQuery());
+        verify(queryRewriter, never()).rewrite(any());
+    }
+
+    /**
+     * 测试回答正文清理来源标记后仍保持普通文本内容。
+     */
+    @Test
+    void removeSourceMarkersShouldKeepAnswerText() throws Exception {
+        // 第1步：创建只用于调用私有清理方法的服务对象
+        ChatService service = new ChatService(null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
+        // 第2步：通过反射读取私有来源标记清理方法
+        Method method = ChatService.class.getDeclaredMethod("removeSourceMarkers", String.class);
+        method.setAccessible(true);
+        // 第3步：确认正文保留且来源标记被移除
+        String cleaned = (String) method.invoke(service, "结论是按制度执行。[来源: 员工制度.pdf, 第3段]");
+        assertEquals("结论是按制度执行。", cleaned);
     }
 }

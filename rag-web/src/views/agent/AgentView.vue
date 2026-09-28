@@ -90,11 +90,11 @@ const fallbackAgentList = [
   },
   {
     code: 'general-tool',
-    name: '工具智能体',
-    description: '自主编排工具调用完成实时任务（当前支持天气查询），每一步执行过程实时可见。',
+    name: '天气查询智能体',
+    description: '调用天气定位与查询工具回答实时天气问题，每一步执行过程实时可见。',
     status: 'ENABLED',
     version: '1.0',
-    scene: '实时信息查询、多步工具编排、执行过程可视化',
+    scene: '实时天气查询、坐标定位、执行过程可视化',
     modelDisplayName: '跟随模型设置'
   }
 ]
@@ -162,7 +162,7 @@ function getAgentTags(agent) {
     return ['文件检查', '分片分析', '召回测试', '报告生成']
   }
   if (agent.code === 'general-tool') {
-    return ['天气查询', '步骤可视', '多轮对话', '可扩展']
+    return ['天气查询', '坐标定位', '步骤可视', '实时数据']
   }
   return [agent.scene || '智能体']
 }

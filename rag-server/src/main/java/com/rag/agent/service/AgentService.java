@@ -25,7 +25,7 @@ public class AgentService {
     private static final String knowledgeQualityCode = "knowledge-quality";
     private static final String knowledgeQualityName = "知识库质检智能体";
     private static final String generalToolCode = "general-tool";
-    private static final String generalToolName = "工具智能体";
+    private static final String generalToolName = "天气查询智能体";
 
     private final KnowledgeQualityAgentService knowledgeQualityAgentService;
     private final AgentRunMapper agentRunMapper;
@@ -57,10 +57,10 @@ public class AgentService {
         agents.add(buildAgent(knowledgeQualityCode, knowledgeQualityName,
                 "检查知识库文件、分片、召回和问答风险，生成质量评分与优化建议。",
                 "知识库上线前质检、问答效果排查、交付报告生成", provider, modelDisplayName));
-        // 第3步：加入通用工具智能体
+        // 第3步：加入天气查询智能体
         agents.add(buildAgent(generalToolCode, generalToolName,
-                "自主编排工具调用完成实时任务（当前支持天气查询），每一步执行过程实时可见。",
-                "实时信息查询、多步工具编排、执行过程可视化", provider, modelDisplayName));
+                "调用天气定位与查询工具回答实时天气问题，每一步执行过程实时可见。",
+                "实时天气查询、坐标定位、执行过程可视化", provider, modelDisplayName));
         // 第4步：返回智能体列表
         return agents;
     }

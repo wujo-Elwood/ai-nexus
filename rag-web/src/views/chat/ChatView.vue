@@ -447,7 +447,8 @@ async function reloadMessages(targetSessionId) {
     messages.value = (res.data || []).map(item => ({
       id: item.id || createMessageId(),
       role: item.role,
-      content: item.content || ''
+      // 清理历史消息中已经保存的内部来源标记
+      content: cleanSourceMarkers(item.content || '')
     }))
   } catch (error) {
     console.error(error)
@@ -486,7 +487,8 @@ function startPolling() {
       const serverMessages = (res.data || []).map(item => ({
         id: item.id || createMessageId(),
         role: item.role,
-        content: item.content || ''
+        // 清理轮询返回消息中已经保存的内部来源标记
+        content: cleanSourceMarkers(item.content || '')
       }))
       if (serverMessages.length > messages.value.length) {
         messages.value = serverMessages
@@ -827,8 +829,19 @@ function renderMarkdown(content) {
   if (!content) {
     return ''
   }
-  const highlighted = content.replace(/\[来源:\s*([^\]]+)\]/g, '<span class="source-tag">来源: $1</span>')
-  return md.render(highlighted)
+  return md.render(cleanSourceMarkers(content))
+}
+
+// 清理内部校验用的来源标记，避免历史消息和导出内容继续展示
+function cleanSourceMarkers(content) {
+  if (!content) {
+    return ''
+  }
+  // 同时兼容旧消息中的方括号标记和已经生成的 source-tag HTML 文本
+  return content
+    .replace(/\[来源:\s*[^\]]+\]/g, '')
+    .replace(/<span\s+class=["']source-tag["'][^>]*>来源:\s*[\s\S]*?<\/span>/gi, '')
+    .trim()
 }
 
 // 滚动到底部
@@ -914,7 +927,8 @@ function exportChat() {
   let text = '# 对话导出\n\n'
   for (const msg of messages.value) {
     const role = msg.role === 'user' ? '用户' : 'AI 助手'
-    text += `## ${role}\n\n${msg.content}\n\n---\n\n`
+    // 导出前清理内部来源标记，避免把实现细节写入文件
+    text += `## ${role}\n\n${cleanSourceMarkers(msg.content)}\n\n---\n\n`
   }
   const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
