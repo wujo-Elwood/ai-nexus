@@ -188,7 +188,7 @@ const fallbackMenuItems = [
   },
   {
     path: '/agent-tools',
-    label: '工具智能体',
+    label: '天气查询智能体',
     symbol: '☁'
   },
   {

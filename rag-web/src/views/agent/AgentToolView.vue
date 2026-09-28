@@ -8,8 +8,8 @@
             返回智能体管理
           </el-button>
         </div>
-        <h2 class="page-title">工具智能体</h2>
-        <p class="page-desc">模型自主调用工具完成任务，每一步调用过程实时可见</p>
+        <h2 class="page-title">天气查询智能体</h2>
+        <p class="page-desc">模型自主调用天气工具完成任务，每一步调用过程实时可见</p>
       </div>
       <div class="tool-chips">
         <span v-for="tool in tools" :key="tool.name" class="tool-chip" :title="tool.description">
@@ -54,15 +54,22 @@
       </div>
     </div>
 
-    <div class="input-bar">
-      <el-input
-        v-model="input"
-        placeholder="输入问题，需要实时数据时会自动调用工具"
-        :disabled="streaming"
-        @keyup.enter="send"
-      />
-      <el-button v-if="!streaming" type="primary" :disabled="!input.trim()" @click="send">发送</el-button>
-      <el-button v-else type="warning" @click="stop">停止</el-button>
+    <div class="input-bar" :style="{ height: inputHeight + 'px' }">
+      <div class="resize-handle" title="拖动调整输入框高度" @mousedown="startResize"><span></span></div>
+      <div class="input-row">
+        <el-input
+          v-model="input"
+          type="textarea"
+          resize="none"
+          placeholder="输入天气问题，自动调用工具查询（Enter 发送，Shift+Enter 换行）"
+          :disabled="streaming"
+          @keydown.enter.exact="onEnterKey"
+        />
+        <div class="input-actions">
+          <el-button v-if="!streaming" type="primary" :disabled="!input.trim()" @click="send">发送</el-button>
+          <el-button v-else type="warning" @click="stop">停止</el-button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -87,8 +94,32 @@ const messages = ref([])
 const input = ref('')
 const streaming = ref(false)
 const chatWindowRef = ref(null)
+const inputHeight = ref(110)
 let abortController = null
 let typewriterTimer = null
+
+// 拖动调整输入框高度：向上拖变高，向下拖变矮
+function startResize(event) {
+  event.preventDefault()
+  const startY = event.clientY
+  const startHeight = inputHeight.value
+  const onMove = (e) => {
+    inputHeight.value = Math.min(420, Math.max(72, startHeight + (startY - e.clientY)))
+  }
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+// 中文输入法选词时的回车不触发发送
+function onEnterKey(event) {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  send()
+}
 
 // 打字机缓冲：增量先进队列，按固定节奏匀速上屏，保证肉眼可见的流式效果
 function queueDelta(msg, delta) {
@@ -455,8 +486,68 @@ function stop() {
 }
 
 .input-bar {
+  position: relative;
   display: flex;
+  flex-direction: column;
+  margin-top: 18px;
+  min-height: 72px;
+}
+
+.resize-handle {
+  position: absolute;
+  top: -9px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  z-index: 5;
+}
+
+.resize-handle span {
+  width: 46px;
+  height: 4px;
+  border-radius: 999px;
+  background: #2a2b30;
+  transition: background 0.2s;
+}
+
+.resize-handle:hover span {
+  background: var(--accent-color);
+}
+
+.input-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
   gap: 10px;
-  margin-top: 14px;
+}
+
+.input-row :deep(.el-textarea),
+.input-row :deep(.el-input) {
+  flex: 1;
+  height: 100%;
+}
+
+.input-row :deep(.el-textarea__inner) {
+  height: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  background: #15161a;
+  border-color: #232428;
+  color: var(--text-primary);
+  resize: none;
+  line-height: 1.5;
+}
+
+.input-row :deep(.el-textarea__inner:focus) {
+  border-color: rgba(229, 160, 68, 0.55);
+}
+
+.input-actions {
+  padding-bottom: 2px;
 }
 </style>
