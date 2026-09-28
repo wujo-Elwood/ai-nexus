@@ -81,6 +81,46 @@ const input = ref('')
 const streaming = ref(false)
 const chatWindowRef = ref(null)
 let abortController = null
+let typewriterTimer = null
+
+// 打字机缓冲：增量先进队列，按固定节奏匀速上屏，保证肉眼可见的流式效果
+function queueDelta(msg, delta) {
+  msg.deltaQueue += delta
+  if (!typewriterTimer) {
+    typewriterTimer = setInterval(pumpTypewriter, 24)
+  }
+}
+
+function pumpTypewriter() {
+  let busy = false
+  for (const msg of messages.value) {
+    if (msg.deltaQueue) {
+      busy = true
+      const take = Math.max(2, Math.ceil(msg.deltaQueue.length / 12))
+      msg.content += msg.deltaQueue.slice(0, take)
+      msg.deltaQueue = msg.deltaQueue.slice(take)
+    }
+  }
+  if (busy) {
+    scrollBottom()
+  } else {
+    clearInterval(typewriterTimer)
+    typewriterTimer = null
+  }
+}
+
+function flushTypewriter() {
+  if (typewriterTimer) {
+    clearInterval(typewriterTimer)
+    typewriterTimer = null
+  }
+  for (const msg of messages.value) {
+    if (msg.deltaQueue) {
+      msg.content += msg.deltaQueue
+      msg.deltaQueue = ''
+    }
+  }
+}
 
 onMounted(async () => {
   try {
@@ -93,6 +133,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (abortController) abortController.abort()
+  flushTypewriter()
 })
 
 // 返回智能体卡片总览
@@ -121,9 +162,10 @@ function handleEvent(msg, event, data) {
       msg.statusText = data.message || ''
       break
     case 'answer_delta':
-      msg.content += data.delta || ''
+      queueDelta(msg, data.delta || '')
       break
     case 'answer_reset':
+      msg.deltaQueue = ''
       msg.content = ''
       break
     case 'step_start':
@@ -147,6 +189,7 @@ function handleEvent(msg, event, data) {
       break
     }
     case 'answer':
+      flushTypewriter()
       msg.content = data.content
       break
     case 'done':
@@ -170,7 +213,7 @@ async function send() {
   input.value = ''
   streaming.value = true
   messages.value.push({ role: 'user', content: text })
-  const assistant = { role: 'assistant', content: '', steps: [], stepsOpen: true, pending: true, statusText: '' }
+  const assistant = { role: 'assistant', content: '', deltaQueue: '', steps: [], stepsOpen: true, pending: true, statusText: '' }
   messages.value.push(assistant)
   scrollBottom()
 
@@ -200,6 +243,7 @@ async function send() {
 
 function stop() {
   if (abortController) abortController.abort()
+  flushTypewriter()
 }
 </script>
 
