@@ -1,18 +1,18 @@
-# WUJO RAG 一键部署：MySQL + Qdrant + Ollama + 后端 + 前端
+# AI Nexus 一键部署：MySQL + Qdrant + Ollama + 后端 + 前端
 # 启动：docker compose up -d --build
 # 首次启动后访问 http://localhost:8080，注册账号并在"模型设置"中配置聊天模型供应商
 # 敏感配置通过根目录 .env 覆盖：MYSQL_ROOT_PASSWORD、JWT_SECRET
-name: wujo-rag
+name: ai-nexus
 
 services:
   mysql:
     image: mysql:8.0
-    container_name: wujo-rag-mysql
+    container_name: ai-nexus-mysql
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-wujo_rag_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ai_nexus_2024}
       TZ: Asia/Shanghai
     volumes:
       - mysql-data:/var/lib/mysql
@@ -28,7 +28,7 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.13.6
-    container_name: wujo-rag-qdrant
+    container_name: ai-nexus-qdrant
     volumes:
       - qdrant-data:/qdrant/storage
     ports:
@@ -38,7 +38,7 @@ services:
 
   ollama:
     image: ollama/ollama:0.11.4
-    container_name: wujo-rag-ollama
+    container_name: ai-nexus-ollama
     volumes:
       - ollama-models:/root/.ollama
     healthcheck:
@@ -53,7 +53,7 @@ services:
   # 拉取期间后端已可启动；文件处理失败会按内置策略自动重试
   ollama-init:
     image: ollama/ollama:0.11.4
-    container_name: wujo-rag-ollama-init
+    container_name: ai-nexus-ollama-init
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
@@ -68,17 +68,17 @@ services:
       context: ./rag-server
       args:
         MAVEN_MIRROR: ${MAVEN_MIRROR:-}
-    container_name: wujo-rag-server
+    container_name: ai-nexus-server
     environment:
       TZ: Asia/Shanghai
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/rag_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
       SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-wujo_rag_2024}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ai_nexus_2024}
       QDRANT_HOST: qdrant
       EMBEDDING_API_URL: http://ollama:11434/api/embeddings
       EMBEDDING_MODEL: bge-m3
       FILE_UPLOAD_DIR: /data/uploads
-      JWT_SECRET: ${JWT_SECRET:-wujo-rag-compose-jwt-secret-please-change-me}
+      JWT_SECRET: ${JWT_SECRET:-ai-nexus-compose-jwt-secret-please-change-me}
     volumes:
       - ./uploads:/data/uploads
     ports:
@@ -100,7 +100,7 @@ services:
       context: ./rag-web
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-}
-    container_name: wujo-rag-web
+    container_name: ai-nexus-web
     ports:
       - "8080:80"
     depends_on:

@@ -22,7 +22,7 @@ const LOGO_ART = [
 ].join('\n')
 
 const BOOT_LINES = [
-  { text: 'WUJO BIOS v3.2.1 — NEURAL SYSTEM CHECK', delay: 120 },
+  { text: 'AI NEXUS BIOS v3.2.1 — NEURAL SYSTEM CHECK', delay: 120 },
   { text: '', delay: 60 },
   { text: 'CPU0 : QUANTUM CORE @ 8.8 GHZ .......... OK', delay: 90 },
   { text: 'MEMORY TEST : 262144K .................. OK', delay: 90 },

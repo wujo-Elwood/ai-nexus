@@ -137,7 +137,7 @@ const SHOWCASE_GROUP = {
 }
 
 // 展开状态：默认收起，仅当当前路由命中展厅子项时自动展开
-const SHOWCASE_STORAGE_KEY = 'wujo-showcase-menu-open'
+const SHOWCASE_STORAGE_KEY = 'ai-nexus-showcase-menu-open'
 const showcaseOpen = ref(
   isShowcaseRoute() || localStorage.getItem(SHOWCASE_STORAGE_KEY) === '1'
 )

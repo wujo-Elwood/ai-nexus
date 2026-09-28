@@ -406,7 +406,7 @@ public class ImageGenerateService {
      * 构建带参考图的图片编辑 HTTP 请求
      */
     private HttpRequest buildImageEditHttpRequest(ModelProvider provider, ImageGenerateRequest request, String apiUrl) {
-        String boundary = "----wujo-image-" + UUID.randomUUID();
+        String boundary = "----ai-nexus-image-" + UUID.randomUUID();
         List<byte[]> parts = buildMultipartBodyParts(provider, request, boundary);
         return HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl))

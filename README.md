@@ -1,6 +1,6 @@
-# WUJO RAG 企业知识库平台
+# AI Nexus 企业级 AI 平台
 
-WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant 的企业知识库平台。系统覆盖文件入库、混合检索、可信问答、引用溯源、知识治理、RAG 评测、任务管理、系统健康监控、文档抽取、AI 生图、智能体和 RBAC 权限管理。
+AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant 的企业级 AI 应用平台，整合智能对话、知识库 RAG 问答、AI 生图、能力展示和企业权限管理。系统覆盖文件入库、混合检索、可信问答、引用溯源、知识治理、RAG 评测、任务管理、系统健康监控、文档抽取、智能体和 RBAC 权限管理。
 
 ![Java](https://img.shields.io/badge/Java-17-blue)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen)
@@ -63,6 +63,7 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 文档抽取：文档上传、抽取模板、字段配置、异步任务、人工修正和结果导出。
 - AI 生图：OpenAI 兼容生图供应商、异步生成任务、历史记录、查看、下载和删除。
 - 智能体管理：知识库质检智能体、运行记录、风险项、质量报告和历史报告。
+- 能力展示：粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞、水墨等多套 WebGL 视觉展示页。
 
 > 当前不包含图片 OCR、图片语义理解或流程图理解。AI 生图是独立功能，不参与知识库文档检索。
 > 自动生成业务报告不在当前范围；智能体质量报告属于既有质检功能。
@@ -96,7 +97,7 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 ## 项目结构
 
 ```text
-wujo_rag
+ai-nexus
 ├── docker-compose.yml                # MySQL/Qdrant/Ollama/前后端一键部署编排
 ├── database/                         # 初始化和历史数据库升级脚本
 ├── docs/                             # 设计、计划和模块说明
@@ -220,13 +221,13 @@ sudo firewall-cmd --permanent --add-port=8080/tcp && sudo firewall-cmd --reload 
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/wujo-Elwood/easy-rag.git
-cd easy-rag
+git clone https://github.com/wujo-Elwood/ai-nexus.git
+cd ai-nexus
 ```
 
 ### 2. 初始化全新数据库
 
-`database/init.sql` 已包含当前版本需要的基础表、新增字段、企业能力表、菜单和角色数据。MySQL 客户端应显式使用 `utf8mb4`，避免中文初始化数据出现 `ERROR 1366 Incorrect string value`。
+`database/init.sql` 包含当前版本需要的全部表结构（仅建表和字段，不含业务数据）。MySQL 客户端应显式使用 `utf8mb4`，避免执行脚本时出现 `ERROR 1366 Incorrect string value`。
 
 普通终端：
 
@@ -244,7 +245,7 @@ Get-Content -Raw -Encoding UTF8 database/init.sql |
 ### 3. 启动 Qdrant
 
 ```bash
-docker run --name wujo-qdrant -p 6333:6333 -p 6334:6334 -v ./qdrant_storage:/qdrant/storage qdrant/qdrant
+docker run --name ai-nexus-qdrant -p 6333:6333 -p 6334:6334 -v ./qdrant_storage:/qdrant/storage qdrant/qdrant
 ```
 
 ### 4. 启动 Embedding 服务
@@ -273,7 +274,7 @@ spring:
     password: your_mysql_password
 
 file:
-  upload-dir: D:/data/wujo-rag/uploads
+  upload-dir: D:/data/ai-nexus/uploads
 
 jwt:
   secret: replace-with-a-long-random-secret
@@ -347,7 +348,7 @@ npm run dev
 | 顺序 | 脚本 | 作用 |
 | --- | --- | --- |
 | 1 | `extract_v2_upgrade.sql` | 抽取模板创建人、任务进度、失败原因和结果修正字段 |
-| 2 | `rbac_management.sql` | 菜单、角色、用户角色和角色菜单 |
+| 2 | `rbac_management.sql` | 菜单、角色、用户角色和角色菜单表结构 |
 | 3 | `agent_management.sql` | 智能体运行与质检报告记录 |
 | 4 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
 | 5 | `image_history.sql` | 生图异步任务和历史记录 |
@@ -355,8 +356,8 @@ npm run dev
 | 7 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
 | 8 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
 | 9 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
-| 10 | `system_health_upgrade.sql` | 系统健康面板菜单和管理员授权 |
-| 11 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心、RAG 评测表和菜单 |
+| 10 | `system_health_upgrade.sql` | 系统健康面板相关表结构 |
+| 11 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
 | 12 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
 | 13 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
 
@@ -424,6 +425,7 @@ foreach ($script in $scripts) {
 | `/profile` | 个人资料 | 昵称和头像信息 |
 | `/change-password` | 修改密码 | 校验旧密码并更新密码 |
 | `/stats` | 用量统计 | 调用量、Token、耗时和趋势 |
+| `/showcase` | 能力展示 | 粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞等 WebGL 展示页 |
 
 ## 主要 API
 

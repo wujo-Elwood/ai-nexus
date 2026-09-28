@@ -20,6 +20,6 @@ RUN mvn -B -q -DskipTests package
 FROM eclipse-temurin:17-jre
 ENV TZ=Asia/Shanghai
 WORKDIR /app
-COPY --from=build /app/target/rag-server-1.0.0.jar app.jar
+COPY --from=build /app/target/ai-nexus-server-1.0.0.jar app.jar
 EXPOSE 8888
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -55,7 +55,7 @@ const REPEL_FORCE = 2.6
 const CYCLE_MS = 9000
 
 const shapeMeta = [
-  { key: 'brand', label: 'WUJO RAG', flat: true },
+  { key: 'brand', label: 'AI NEXUS', flat: true },
   { key: 'slogan', label: '星辰大海', flat: true },
   { key: 'galaxy', label: '银河' },
   { key: 'knot', label: '环结' },
@@ -92,7 +92,7 @@ const CJK_TEXT_FONT = '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", san
 
 // 各形态的目标数据构建器；文字形态依赖 canvas 字体渲染，改为首次使用时才构建
 const shapeBuilders = {
-  brand: () => ({ positions: sampleText('WUJO RAG', LATIN_TEXT_FONT), colors: buildColors(['#ffd9a0', '#ff9f43', '#5ec2ff', '#fff6e8']) }),
+  brand: () => ({ positions: sampleText('AI NEXUS', LATIN_TEXT_FONT), colors: buildColors(['#ffd9a0', '#ff9f43', '#5ec2ff', '#fff6e8']) }),
   slogan: () => ({ positions: sampleText('星辰大海', CJK_TEXT_FONT), colors: buildColors(['#7ee0ff', '#4f9dff', '#b8fff2', '#eaf6ff']) }),
   galaxy: () => ({ positions: makeGalaxy(), colors: buildColors(['#c6a0ff', '#7f73ff', '#ff9ad5', '#fff1c9']) }),
   knot: () => ({ positions: makeTorusKnot(), colors: buildColors(['#ff6b6b', '#ffd93d', '#6bff8f', '#6bc9ff', '#c56bff']) }),
