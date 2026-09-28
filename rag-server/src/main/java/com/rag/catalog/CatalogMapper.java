@@ -41,6 +41,18 @@ public interface CatalogMapper {
     @Delete("DELETE FROM kb_file_tag_rel WHERE file_id=#{fileId}")
     int clearFileTags(@Param("fileId") Long fileId);
 
+    /** 删除知识库下全部文件的标签关联。 */
+    @Delete("DELETE r FROM kb_file_tag_rel r INNER JOIN kb_file f ON r.file_id=f.id WHERE f.kb_id=#{kbId}")
+    int deleteTagRelsByKbId(@Param("kbId") Long kbId);
+
+    /** 删除知识库下全部标签。 */
+    @Delete("DELETE FROM kb_file_tag WHERE kb_id=#{kbId}")
+    int deleteTagsByKbId(@Param("kbId") Long kbId);
+
+    /** 删除知识库下全部目录。 */
+    @Delete("DELETE FROM kb_file_folder WHERE kb_id=#{kbId}")
+    int deleteFoldersByKbId(@Param("kbId") Long kbId);
+
     /** 新增文件标签关联。 */
     @Insert("INSERT IGNORE INTO kb_file_tag_rel(file_id,tag_id,create_time) VALUES(#{fileId},#{tagId},NOW())")
     int addFileTag(@Param("fileId") Long fileId, @Param("tagId") Long tagId);

@@ -51,4 +51,7 @@ public interface KnowledgeBaseMapper {
 
     /** 查询热门文件，当前按切片数量近似热度 */
     List<Map<String, Object>> findPopularFiles(@Param("kbId") Long kbId, @Param("limit") int limit);
+
+    /** 保存知识库摘要和生成时间 */
+    int updateSummary(@Param("id") Long id, @Param("summary") String summary);
 }

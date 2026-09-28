@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * RBAC 菜单服务测试
@@ -39,6 +41,41 @@ class RbacServiceTest {
         assertEquals(2, menus.get(0).getChildren().size());
         assertEquals("知识库", menus.get(0).getChildren().get(0).getMenuName());
         assertEquals("AI 聊天", menus.get(0).getChildren().get(1).getMenuName());
+    }
+
+    /**
+     * 测试只有启用的管理员角色可以执行全局向量重建
+     */
+    @Test
+    void hasRoleShouldRequireEnabledRoleCode() {
+        MemorySysRoleMapper roleMapper = new MemorySysRoleMapper();
+        SysRole admin = new SysRole();
+        admin.setRoleCode("admin");
+        admin.setEnabled(1);
+        roleMapper.roles.add(admin);
+        RbacService service = new RbacService(new MemorySysMenuMapper(), roleMapper);
+
+        assertTrue(service.hasRole(100L, "admin"));
+        admin.setEnabled(0);
+        assertFalse(service.hasRole(100L, "admin"));
+    }
+
+    /**
+     * 测试接口级权限校验按菜单权限编码匹配
+     */
+    @Test
+    void hasPermissionShouldMatchUserMenuPermissionCode() {
+        // 第1步：给用户授予带 rbac:manage 权限码的菜单
+        MemorySysMenuMapper menuMapper = new MemorySysMenuMapper();
+        SysMenu managed = buildMenu(9L, 0L, "权限管理", "/rbac", "⚙", 90);
+        managed.setPermissionCode("rbac:manage");
+        menuMapper.userMenus.add(managed);
+        RbacService service = new RbacService(menuMapper, new MemorySysRoleMapper());
+
+        // 第2步：拥有对应权限码时放行，其他权限码拒绝
+        assertTrue(service.hasPermission(100L, "rbac:manage"));
+        assertFalse(service.hasPermission(100L, "settings:view"));
+        assertFalse(service.hasPermission(null, "rbac:manage"));
     }
 
     /**

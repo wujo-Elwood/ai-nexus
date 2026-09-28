@@ -9,6 +9,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -92,6 +93,46 @@ class KnowledgeBaseServiceTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> service.checkManageAccess(10L, 2L));
         assertEquals(403, exception.getCode());
+    }
+
+    /**
+     * 测试删除知识库时先清理文件、切片、向量等关联数据，再删除知识库
+     */
+    @Test
+    void deleteShouldCleanRelationsBeforeDeletingKnowledgeBase() {
+        // 第1步：准备属于用户1的知识库
+        KnowledgeBaseMapper mapper = mock(KnowledgeBaseMapper.class);
+        FileService fileService = mock(FileService.class);
+        when(mapper.findById(10L)).thenReturn(buildKnowledgeBase(10L, 1L, "待删除", "PRIVATE"));
+        KnowledgeBaseService service = new KnowledgeBaseService();
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", mapper);
+        ReflectionTestUtils.setField(service, "fileService", fileService);
+
+        // 第2步：创建者删除知识库
+        service.delete(10L, 1L);
+
+        // 第3步：确认关联数据先被清理，再删除知识库记录
+        verify(fileService).deleteKbData(10L);
+        verify(mapper).deleteById(10L);
+    }
+
+    /**
+     * 测试非创建者删除知识库被拒绝且不触发清理
+     */
+    @Test
+    void deleteShouldRejectOtherUserWithoutCleanup() {
+        KnowledgeBaseMapper mapper = mock(KnowledgeBaseMapper.class);
+        FileService fileService = mock(FileService.class);
+        when(mapper.findById(10L)).thenReturn(buildKnowledgeBase(10L, 1L, "私有库", "PRIVATE"));
+        KnowledgeBaseService service = new KnowledgeBaseService();
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", mapper);
+        ReflectionTestUtils.setField(service, "fileService", fileService);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.delete(10L, 2L));
+        assertEquals(403, exception.getCode());
+        verify(fileService, never()).deleteKbData(10L);
+        verify(mapper, never()).deleteById(10L);
     }
 
     /**

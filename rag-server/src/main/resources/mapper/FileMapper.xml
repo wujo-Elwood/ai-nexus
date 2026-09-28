@@ -25,6 +25,17 @@
         ORDER BY create_time DESC
     </select>
 
+    <select id="findAllCurrent" resultType="com.rag.entity.KbFile">
+        SELECT * FROM kb_file
+        WHERE (is_current = 1 OR is_current IS NULL)
+        ORDER BY kb_id, id
+    </select>
+
+    <update id="markAllVectorsPending">
+        UPDATE kb_file
+        SET vector_status = 'PENDING'
+    </update>
+
     <!-- 按 SHA-256 查询重复文件 -->
     <select id="findBySha256" resultType="com.rag.entity.KbFile">
         SELECT * FROM kb_file WHERE kb_id = #{kbId} AND file_sha256 = #{fileSha256} LIMIT 1
@@ -127,6 +138,19 @@
     <delete id="deleteById">
         DELETE FROM kb_file
         WHERE id = #{id}
+    </delete>
+
+    <!-- 删除知识库下全部文件（含历史版本） -->
+    <delete id="deleteByKbId">
+        DELETE FROM kb_file
+        WHERE kb_id = #{kbId}
+    </delete>
+
+    <!-- 删除知识库下全部文件的版本快照 -->
+    <delete id="deleteVersionsByKbId">
+        DELETE v FROM kb_file_version v
+        INNER JOIN kb_file f ON v.file_id = f.id
+        WHERE f.kb_id = #{kbId}
     </delete>
 
 </mapper>

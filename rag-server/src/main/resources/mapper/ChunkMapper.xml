@@ -26,10 +26,22 @@
         WHERE f.kb_id = #{kbId}
     </select>
 
+    <select id="findCompletedCurrentByKbId" resultType="com.rag.entity.KbChunk">
+        SELECT c.*, f.file_name AS file_name
+        FROM kb_chunk c
+        INNER JOIN kb_file f ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId}
+          AND f.status = 'COMPLETED'
+          AND (f.is_current = 1 OR f.is_current IS NULL)
+        ORDER BY f.id, c.chunk_index
+    </select>
+
     <select id="findByIdAndKbId" resultType="com.rag.entity.KbChunk">
         SELECT c.*, f.file_name AS file_name FROM kb_chunk c
         INNER JOIN kb_file f ON c.file_id = f.id
         WHERE c.id = #{id} AND f.kb_id = #{kbId}
+          AND (f.is_current = 1 OR f.is_current IS NULL)
+          AND f.status = 'COMPLETED'
     </select>
 
     <insert id="insert" parameterType="com.rag.entity.KbChunk" useGeneratedKeys="true" keyProperty="id">
@@ -47,6 +59,16 @@
 
     <delete id="deleteByFileId">
         DELETE FROM kb_chunk WHERE file_id = #{fileId}
+    </delete>
+
+    <delete id="deleteByKbId">
+        DELETE c FROM kb_chunk c
+        INNER JOIN kb_file f ON c.file_id = f.id
+        WHERE f.kb_id = #{kbId}
+    </delete>
+
+    <delete id="deleteByAllFiles">
+        DELETE FROM kb_chunk
     </delete>
 
     <select id="searchByKeyword" resultType="com.rag.entity.KbChunk">

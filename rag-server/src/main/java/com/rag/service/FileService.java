@@ -1,15 +1,23 @@
 package com.rag.service;
 
 import com.rag.ai.EmbeddingService;
+import com.rag.catalog.CatalogMapper;
 import com.rag.common.BusinessException;
 import com.rag.entity.KbChunk;
 import com.rag.entity.KbFile;
+import com.rag.entity.MultipartUploadSession;
 import com.rag.mapper.ChunkMapper;
 import com.rag.mapper.FileMapper;
 import com.rag.mapper.KnowledgeBaseMapper;
+import com.rag.mapper.MultipartUploadChunkMapper;
+import com.rag.mapper.MultipartUploadSessionMapper;
 import com.rag.rag.DocumentParser;
 import com.rag.rag.QdrantService;
+import com.rag.rag.RetrievalCache;
 import com.rag.rag.TextSplitter;
+import com.rag.rbac.service.RbacService;
+import com.rag.eval.EvalMapper;
+import com.rag.agent.mapper.AgentRunMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,6 +38,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.time.LocalDateTime;
 import java.util.concurrent.Executor;
+import java.util.stream.Stream;
 
 /**
  * 文件服务
@@ -45,7 +54,19 @@ public class FileService {
     @Autowired
     private KnowledgeBaseMapper knowledgeBaseMapper;
     @Autowired
+    private RbacService rbacService;
+    @Autowired
     private ChunkMapper chunkMapper;
+    @Autowired
+    private CatalogMapper catalogMapper;
+    @Autowired
+    private MultipartUploadChunkMapper multipartUploadChunkMapper;
+    @Autowired
+    private MultipartUploadSessionMapper multipartUploadSessionMapper;
+    @Autowired
+    private EvalMapper evalMapper;
+    @Autowired
+    private AgentRunMapper agentRunMapper;
     @Autowired
     private DocumentParser documentParser;
     @Autowired
@@ -54,6 +75,8 @@ public class FileService {
     private EmbeddingService embeddingService;
     @Autowired
     private QdrantService qdrantService;
+    @Autowired
+    private RetrievalCache retrievalCache;
     @Autowired
     @Qualifier("fileProcessExecutor")
     private Executor fileProcessExecutor;
@@ -66,6 +89,16 @@ public class FileService {
     private int maxProcessAttempts;
     @Value("${file.process.retry-delay-seconds:60}")
     private long retryDelaySeconds;
+
+    /** 全局向量重建状态快照，供管理界面显示进度 */
+    private final Object rebuildStatusLock = new Object();
+    private int rebuildTotalFiles;
+    private int rebuildCompletedFiles;
+    private int rebuildFailedFiles;
+    private Long rebuildStartedBy;
+    private LocalDateTime rebuildStartedAt;
+    private LocalDateTime rebuildFinishedAt;
+    private String rebuildError;
 
     private static final Set<String> allowedTypes = Set.of(
             "application/pdf",
@@ -172,6 +205,8 @@ public class FileService {
                 kbFile.getFilePath(), 1, null);
         //提交后台异步任务
         submitProcessTask(kbFile);
+        //旧版本已降级为非当前版本，检索缓存立即失效
+        invalidateRetrievalCache(kbId);
         return kbFile;
     }
 
@@ -196,6 +231,23 @@ public class FileService {
     }
 
     /**
+     * 失效指定知识库的检索缓存，事务中则延迟到提交后执行
+     * 文件删除、重新处理或版本切换后，缓存中的 chunk ID 可能已删除或不再是当前版本
+     */
+    private void invalidateRetrievalCache(Long kbId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    retrievalCache.invalidateKb(kbId);
+                }
+            });
+            return;
+        }
+        retrievalCache.invalidateKb(kbId);
+    }
+
+    /**
      * 解析文件并写入文本切片和向量库
      */
     private void processFile(KbFile kbFile) {
@@ -214,6 +266,9 @@ public class FileService {
             //提取文件内容为字符串
             String content = documentParser.parse(file);
             log.info("Parsed document, content length: {}", content.length());
+            if (!isProcessingAllowed(kbFile)) {
+                return;
+            }
             // 第2步：进入文本切片阶段
             kbFile.setProcessStage("SPLITTING");
             kbFile.setProgress(40);
@@ -230,6 +285,10 @@ public class FileService {
             //存储文件拆分后的文本片段
             List<KbChunk> chunkBuffer = buildChunkBuffer(kbFile, chunkTexts);
             saveChunksBatch(chunkBuffer);
+            if (!isProcessingAllowed(kbFile)) {
+                chunkMapper.deleteByFileId(kbFile.getId());
+                return;
+            }
             List<KbChunk> savedChunks = chunkMapper.findByFileId(kbFile.getId());
             // 第3步：进入向量化和向量入库阶段
             kbFile.setProcessStage("VECTORIZING");
@@ -237,6 +296,10 @@ public class FileService {
             fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
                     kbFile.getProgress(), null);
             //批量插入向量库
+            if (!isProcessingAllowed(kbFile)) {
+                chunkMapper.deleteByFileId(kbFile.getId());
+                return;
+            }
             saveVectorsBatch(kbFile, savedChunks);
             kbFile.setVectorStatus("READY");
             fileMapper.updateQuality(kbFile.getId(), "PASSED", java.math.BigDecimal.valueOf(100), "READY");
@@ -262,7 +325,22 @@ public class FileService {
             kbFile.setNextRetryTime(nextRetryTime);
             fileMapper.updateProcessFailure(kbFile.getId(), kbFile.getProcessStage(), kbFile.getProgress(),
                     kbFile.getErrorMessage(), attempts, nextRetryTime);
+        } finally {
+            //处理完成后切片已更换，下次检索必须重新召回
+            retrievalCache.invalidateKb(kbFile.getKbId());
         }
+    }
+
+    /**
+     * 校验异步处理期间知识库和文件仍然有效
+     */
+    private boolean isProcessingAllowed(KbFile file) {
+        if (KnowledgeBaseService.isDeleting(file.getKbId())) {
+            return false;
+        }
+        com.rag.entity.KnowledgeBase kb = knowledgeBaseMapper.findById(file.getKbId());
+        KbFile current = fileMapper.findById(file.getId());
+        return kb != null && current != null && (current.getIsCurrent() == null || current.getIsCurrent() == 1);
     }
 
     /**
@@ -364,6 +442,8 @@ public class FileService {
         KbFile target = getById(id);
         Long groupId = target.getVersionGroupId() == null ? target.getId() : target.getVersionGroupId();
         fileMapper.setCurrentVersion(target.getId(), groupId);
+        //版本切换后缓存中的旧版本切片不再可信
+        invalidateRetrievalCache(target.getKbId());
         //旧版本通常已有向量，只有缺失时才重建，避免无谓删除和重复调用模型
         if (!"READY".equalsIgnoreCase(target.getVectorStatus()) && "COMPLETED".equalsIgnoreCase(target.getStatus())) {
             reprocess(id);
@@ -420,6 +500,8 @@ public class FileService {
         // 清除旧的向量和切片
         qdrantService.deleteByFileId(id);
         chunkMapper.deleteByFileId(id);
+        //重建期间旧切片已删除，缓存必须立即失效
+        retrievalCache.invalidateKb(file.getKbId());
         // 重新走处理流程
         file.setStatus("UPLOADED");
         file.setProcessStage("UPLOADED");
@@ -443,6 +525,132 @@ public class FileService {
     }
 
     /**
+     * 重建知识库全部当前版本文件的切片和向量
+     * 用于更换 Embedding 模型后批量重建，逐文件异步执行，进度可在任务中心查看
+     *
+     * @return 提交重建的文件数量
+     */
+    public int reprocessKb(Long kbId, Long userId) {
+        com.rag.entity.KnowledgeBase kb = knowledgeBaseMapper.findById(kbId);
+        if (kb == null) {
+            throw new BusinessException(404, "Knowledge base not found");
+        }
+        if (!kb.getCreateUser().equals(userId)) {
+            throw new BusinessException(403, "无权重建该知识库的向量");
+        }
+        if (qdrantService.isRebuilding()) {
+            throw new BusinessException(409, "全局向量正在重建，暂时无法提交知识库重建");
+        }
+        List<KbFile> files = fileMapper.findCurrentByKbId(kbId);
+        for (KbFile file : files) {
+            reprocess(file.getId());
+        }
+        return files.size();
+    }
+
+    /**
+     * 管理员提交全部知识库的向量重建任务
+     */
+    public int rebuildAllVectors(Long userId) {
+        if (!rbacService.hasRole(userId, "admin")) {
+            throw new BusinessException(403, "仅管理员可以执行全局向量重建");
+        }
+        if (qdrantService.isRebuilding()) {
+            throw new BusinessException(409, "全局向量正在重建，请勿重复提交");
+        }
+        qdrantService.startRebuild();
+        List<KbFile> files;
+        try {
+            //进入重建状态后再读取文件快照，避免并发上传任务漏进本次重建
+            files = fileMapper.findAllCurrent();
+            synchronized (rebuildStatusLock) {
+                rebuildTotalFiles = files.size();
+                rebuildCompletedFiles = 0;
+                rebuildFailedFiles = 0;
+                rebuildStartedBy = userId;
+                rebuildStartedAt = LocalDateTime.now();
+                rebuildFinishedAt = null;
+                rebuildError = null;
+            }
+            fileProcessExecutor.execute(() -> rebuildAllVectorsTask(files));
+        } catch (RuntimeException e) {
+            //线程池拒绝提交时立即释放重建状态，避免服务永久拒绝检索和写入
+            synchronized (rebuildStatusLock) {
+                rebuildError = e.getMessage() == null ? "无法提交重建任务" : e.getMessage();
+                rebuildFinishedAt = LocalDateTime.now();
+            }
+            qdrantService.finishRebuild();
+            throw new BusinessException(503, "无法提交全局向量重建任务，请稍后重试");
+        }
+        return files.size();
+    }
+
+    /**
+     * 执行全部知识库向量重建任务
+     */
+    private void rebuildAllVectorsTask(List<KbFile> files) {
+        qdrantService.beginRebuildWrites();
+        try {
+            //使用固定探测文本取得当前 Embedding 模型维度，空知识库也能完成 collection 迁移
+            float[] probe = embeddingService.embed("qdrant vector rebuild dimension probe");
+            qdrantService.recreateCollection(probe.length);
+            chunkMapper.deleteByAllFiles();
+            fileMapper.markAllVectorsPending();
+            for (KbFile file : files) {
+                if (knowledgeBaseMapper.findById(file.getKbId()) != null) {
+                    processFile(file);
+                    synchronized (rebuildStatusLock) {
+                        if ("COMPLETED".equalsIgnoreCase(file.getStatus())) {
+                            rebuildCompletedFiles++;
+                        } else {
+                            rebuildFailedFiles++;
+                        }
+                    }
+                } else {
+                    synchronized (rebuildStatusLock) {
+                        rebuildCompletedFiles++;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            synchronized (rebuildStatusLock) {
+                rebuildError = e.getMessage() == null ? "全局向量重建失败" : e.getMessage();
+            }
+            throw e;
+        } finally {
+            qdrantService.endRebuildWrites();
+            qdrantService.finishRebuild();
+            retrievalCache.invalidateAll();
+            synchronized (rebuildStatusLock) {
+                rebuildFinishedAt = LocalDateTime.now();
+            }
+        }
+    }
+
+    /** 查询全局向量重建状态，返回最近一次重建的进度快照 */
+    public Map<String, Object> getRebuildStatus() {
+        synchronized (rebuildStatusLock) {
+            int total = rebuildTotalFiles;
+            int completed = rebuildCompletedFiles;
+            int failed = rebuildFailedFiles;
+            int progress = total == 0 ? (qdrantService.isRebuilding() ? 0 : 100)
+                    : Math.min(100, (completed + failed) * 100 / total);
+            Map<String, Object> status = new LinkedHashMap<>();
+            status.put("rebuilding", qdrantService.isRebuilding());
+            status.put("status", qdrantService.isRebuilding() ? "RUNNING" : (rebuildError == null ? "COMPLETED" : "FAILED"));
+            status.put("totalFiles", total);
+            status.put("completedFiles", completed);
+            status.put("failedFiles", failed);
+            status.put("progress", progress);
+            status.put("startedBy", rebuildStartedBy);
+            status.put("startedAt", rebuildStartedAt);
+            status.put("finishedAt", rebuildFinishedAt);
+            status.put("error", rebuildError);
+            return status;
+        }
+    }
+
+    /**
      * 删除文件及其切片和向量
      */
     @Transactional
@@ -453,11 +661,108 @@ public class FileService {
         }
         qdrantService.deleteByFileId(id);
         chunkMapper.deleteByFileId(id);
+        catalogMapper.clearFileTags(id);
         try {
             Files.deleteIfExists(Paths.get(file.getFilePath()));
         } catch (IOException e) {
             log.error("Failed to delete file from disk", e);
         }
         fileMapper.deleteById(id);
+        invalidateRetrievalCache(file.getKbId());
+    }
+
+    /**
+     * 清理知识库的全部关联数据：向量、切片、文件、版本、目录、标签和分片上传记录
+     * 数据库无外键约束，删除知识库时必须显式清理，否则全部残留为孤儿数据
+     */
+    @Transactional
+    public void deleteKbData(Long kbId) {
+        // 第1步：一次性删除该库全部向量，失败时阻断数据库删除以避免孤立向量
+        qdrantService.deleteByKbId(kbId);
+        // 第2步：删除磁盘上的原始文件（含历史版本的物理文件）
+        for (KbFile file : fileMapper.findByKbId(kbId)) {
+            try {
+                deletePathStrict(file.getFilePath());
+            } catch (IOException e) {
+                throw new BusinessException(500, "无法删除知识库文件，请检查磁盘权限后重试：" + file.getFilePath());
+            }
+        }
+        //删除未完成分片目录和知识库备份文件，避免磁盘残留
+        List<MultipartUploadSession> uploadSessions = multipartUploadSessionMapper.findByKbId(kbId);
+        if (uploadSessions != null && uploadDir != null && !uploadDir.isBlank()) {
+            for (MultipartUploadSession session : uploadSessions) {
+                try {
+                    deleteDirectoryStrict(Paths.get(uploadDir).resolve(".parts").resolve(session.getUploadId()));
+                } catch (IOException e) {
+                    throw new BusinessException(500, "无法删除上传临时文件，请检查磁盘权限后重试");
+                }
+            }
+        }
+        try {
+            if (uploadDir != null && !uploadDir.isBlank()) {
+                Path backupDirectory = Paths.get(uploadDir).resolve("backups");
+                if (Files.exists(backupDirectory)) {
+                    try (Stream<Path> paths = Files.list(backupDirectory)) {
+                        paths.filter(path -> path.getFileName().toString().startsWith("kb-" + kbId + "-"))
+                                .forEach(path -> {
+                                    try {
+                                        deletePathStrict(path.toString());
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                });
+                    }
+                }
+            }
+        } catch (RuntimeException | IOException e) {
+            throw new BusinessException(500, "无法删除知识库备份文件，请检查磁盘权限后重试");
+        }
+        // 第3步：删除数据库中的切片、版本、标签、目录、文件和分片上传记录
+        if (evalMapper != null) {
+            evalMapper.deleteRunItemsByKbId(kbId);
+            evalMapper.deleteRunsByKbId(kbId);
+            evalMapper.deleteCasesByKbId(kbId);
+        }
+        if (agentRunMapper != null) {
+            agentRunMapper.deleteByKbId(kbId);
+        }
+        chunkMapper.deleteByKbId(kbId);
+        fileMapper.deleteVersionsByKbId(kbId);
+        catalogMapper.deleteTagRelsByKbId(kbId);
+        catalogMapper.deleteTagsByKbId(kbId);
+        catalogMapper.deleteFoldersByKbId(kbId);
+        fileMapper.deleteByKbId(kbId);
+        multipartUploadChunkMapper.deleteByKbId(kbId);
+        multipartUploadSessionMapper.deleteByKbId(kbId);
+        retrievalCache.invalidateKb(kbId);
+    }
+
+    /** 删除文件或目录，不存在时按幂等成功处理 */
+    private void deletePathStrict(String path) throws IOException {
+        if (path == null || path.isBlank()) {
+            return;
+        }
+        Path target = Paths.get(path);
+        if (Files.notExists(target)) {
+            return;
+        }
+        if (Files.isDirectory(target)) {
+            deleteDirectoryStrict(target);
+            return;
+        }
+        Files.delete(target);
+    }
+
+    /** 递归删除目录，任一文件失败都抛出异常 */
+    private void deleteDirectoryStrict(Path directory) throws IOException {
+        if (Files.notExists(directory)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(directory)) {
+            List<Path> ordered = paths.sorted(Comparator.reverseOrder()).toList();
+            for (Path path : ordered) {
+                Files.delete(path);
+            }
+        }
     }
 }

@@ -67,18 +67,3 @@ CREATE TABLE IF NOT EXISTS kb_eval_run_item (
     INDEX idx_eval_item_run (run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 初始化第二优先级能力的菜单入口，重复执行不会产生重复菜单
-INSERT INTO sys_menu (parent_id, menu_name, path, route_name, component, icon, menu_type, permission_code, sort_no, visible, enabled)
-SELECT 0, '任务中心', '/tasks', 'TaskCenter', 'TaskCenterView', 'list-check', 'MENU', 'tasks:view', 90, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE permission_code = 'tasks:view');
-
-INSERT INTO sys_menu (parent_id, menu_name, path, route_name, component, icon, menu_type, permission_code, sort_no, visible, enabled)
-SELECT 0, 'RAG 评测', '/eval', 'EvalCenter', 'EvalCenterView', 'clipboard-check', 'MENU', 'eval:view', 100, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE permission_code = 'eval:view');
-
--- 管理员自动获得新菜单，普通用户也可使用任务中心和评测中心
-INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
-SELECT r.id, m.id
-FROM sys_role r
-INNER JOIN sys_menu m ON m.permission_code IN ('tasks:view', 'eval:view')
-WHERE r.role_code IN ('admin', 'user');

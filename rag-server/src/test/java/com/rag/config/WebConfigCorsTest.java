@@ -1,6 +1,7 @@
 package com.rag.config;
 
 import com.rag.controller.AuthController;
+import com.rag.rbac.service.RbacService;
 import com.rag.service.UserService;
 import com.rag.utils.JwtUtils;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -36,6 +37,9 @@ class WebConfigCorsTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private RbacService rbacService;
 
     /**
      * 测试不同主机来源的登录预检请求均被允许

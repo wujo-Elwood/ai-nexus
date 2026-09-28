@@ -1,12 +1,14 @@
 package com.rag.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rag.common.BusinessException;
 import com.rag.entity.KbChunk;
 import com.rag.entity.ModelProvider;
 import com.rag.entity.UsageLog;
 import com.rag.mapper.ChatMessageMapper;
 import com.rag.mapper.ChunkMapper;
 import com.rag.mapper.KnowledgeBaseMapper;
+import com.rag.mapper.AnswerQualityMapper;
 import com.rag.rag.*;
 import com.rag.rag.QdrantService.SearchResult;
 import com.rag.service.ModelProviderService;
@@ -72,6 +74,9 @@ public class ChatService {
     private final RetrievalCache retrievalCache;
     private final ContextCompressor contextCompressor;
     private final Executor chatStreamExecutor;
+    /** 回答质量事实写入器，聊天主流程不可用时只记录日志。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private AnswerQualityMapper answerQualityMapper;
     /** 检索候选选择器 */
     @org.springframework.beans.factory.annotation.Autowired
     private RetrievalSelector retrievalSelector;
@@ -141,7 +146,10 @@ public class ChatService {
         //知识库模式没有证据时直接拒答，不调用大模型
         if (kbId != null && !context.hasContext()) {
             String refusal = trustedAnswerGuard.validate("", context).getContent();
-            saveMessage(sessionId, "assistant", refusal);
+            Long answerMessageId = saveMessage(sessionId, "assistant", refusal);
+            // 调用质量事实写入方法，记录无证据拒答
+            recordAnswerQuality(answerMessageId, sessionId, kbId, message, 0, 0,
+                    false, true, "NO_EVIDENCE");
             recordUsage(sessionId, provider, System.currentTimeMillis(), "SUCCESS", 0, 0);
             return refusal;
         }
@@ -155,10 +163,19 @@ public class ChatService {
             String answer = llmResult.content;
             if (kbId != null) {
                 //知识库模式只保存经过来源校验的回答
-                answer = trustedAnswerGuard.validate(answer, context).getContent();
+                TrustedAnswerResult trusted = trustedAnswerGuard.validate(answer, context);
+                answer = trusted.getContent();
+                Map<String, Object> metrics = AnswerEvidenceMetrics.calculate(answer, trusted.isGrounded(), trusted.getCitations());
+                Long answerMessageId = saveMessage(sessionId, "assistant", answer);
+                // 调用质量事实写入方法，记录同步回答指标
+                recordAnswerQuality(answerMessageId, sessionId, kbId, message,
+                        ((Number) metrics.get("confidence")).intValue(),
+                        ((Number) metrics.get("evidenceCoverage")).intValue(),
+                        trusted.isGrounded(), !trusted.isGrounded(), trusted.getReason());
+            } else {
+                // 普通聊天保持原有持久化逻辑
+                saveMessage(sessionId, "assistant", answer);
             }
-            // 保存助手回复到数据库
-            saveMessage(sessionId, "assistant", answer);
             // 记录本次调用的 Token 用量和耗时
             recordUsage(sessionId, provider, startTime, "SUCCESS",
                     llmResult.promptTokens, llmResult.completionTokens);
@@ -220,9 +237,16 @@ public class ChatService {
                 safeSendJson(emitter, "citation", context.getCitations());
                 if (!context.hasContext()) {
                     String refusal = trustedAnswerGuard.validate("", context).getContent();
-                    saveMessage(sessionId, "assistant", refusal);
+                    Long answerMessageId = saveMessage(sessionId, "assistant", refusal);
+                    // 调用质量事实写入方法，记录流式无证据拒答
+                    recordAnswerQuality(answerMessageId, sessionId, kbId, message, 0, 0,
+                            false, true, "NO_EVIDENCE");
                     safeSend(emitter, SseEmitter.event().name("message").data(refusal));
-                    safeSendJson(emitter, "answer-meta", Map.of("grounded", false, "reason", "NO_EVIDENCE", "citationCount", 0));
+                    // 计算无证据拒答的回答指标并保持指标归零
+                    Map<String, Object> noEvidenceMeta = new LinkedHashMap<>(AnswerEvidenceMetrics.calculate(refusal, false, List.of()));
+                    noEvidenceMeta.put("grounded", false);
+                    noEvidenceMeta.put("reason", "NO_EVIDENCE");
+                    safeSendJson(emitter, "answer-meta", noEvidenceMeta);
                     safeSend(emitter, SseEmitter.event().name("done").data("[DONE]"));
                     safeComplete(emitter);
                     recordUsage(sessionId, provider, startTime, "SUCCESS", 0, 0);
@@ -234,7 +258,7 @@ public class ChatService {
             // 通知前端正在生成
             safeSend(emitter, SseEmitter.event().name("status").data("正在生成..."));
             // 使用 LangChain4j 流式调用大模型，逐段推送到前端
-            LlmResult llmResult = streamLlmResponse(sessionId, chatMessages, emitter, provider, context);
+            LlmResult llmResult = streamLlmResponse(sessionId, message, kbId, chatMessages, emitter, provider, context);
             // 记录 Token 用量
             recordUsage(sessionId, provider, startTime, "SUCCESS",
                     llmResult.promptTokens, llmResult.completionTokens);
@@ -254,7 +278,8 @@ public class ChatService {
      * @param provider  大模型供应商配置
      * @return LlmResult 包含完整回复内容和 Token 用量
      */
-    private LlmResult streamLlmResponse(Long sessionId, List<dev.langchain4j.data.message.ChatMessage> chatMessages,
+    private LlmResult streamLlmResponse(Long sessionId, String question, Long kbId,
+                                        List<dev.langchain4j.data.message.ChatMessage> chatMessages,
                                         SseEmitter emitter, ModelProvider provider, KnowledgeContext context) {
         // 第1步：创建完整回复缓存
         StringBuilder fullResponse = new StringBuilder();
@@ -293,12 +318,19 @@ public class ChatService {
                         //知识库模式在完整回答生成后校验来源，再一次性发送可信回答
                         TrustedAnswerResult trusted = trustedAnswerGuard.validate(answer, context);
                         answer = trusted.getContent();
-                        saveMessage(sessionId, "assistant", answer);
+                        Long answerMessageId = saveMessage(sessionId, "assistant", answer);
                         safeSend(emitter, SseEmitter.event().name("message").data(answer));
-                        safeSendJson(emitter, "answer-meta", Map.of(
-                                "grounded", trusted.isGrounded(),
-                                "reason", trusted.getReason(),
-                                "citationCount", trusted.getCitations().size()));
+                        // 计算可信回答的置信度、证据覆盖率和引用数量
+                        Map<String, Object> answerMeta = new LinkedHashMap<>(AnswerEvidenceMetrics.calculate(
+                                answer, trusted.isGrounded(), trusted.getCitations()));
+                        answerMeta.put("grounded", trusted.isGrounded());
+                        answerMeta.put("reason", trusted.getReason());
+                        safeSendJson(emitter, "answer-meta", answerMeta);
+                        // 调用质量事实写入方法，记录流式回答指标
+                        recordAnswerQuality(answerMessageId, sessionId, kbId, question,
+                                ((Number) answerMeta.get("confidence")).intValue(),
+                                ((Number) answerMeta.get("evidenceCoverage")).intValue(),
+                                trusted.isGrounded(), !trusted.isGrounded(), trusted.getReason());
                     } else if (!fullResponse.isEmpty()) {
                         //普通聊天保持原有保存逻辑
                         saveMessage(sessionId, "assistant", answer);
@@ -512,6 +544,9 @@ public class ChatService {
             retrievalCache.put(kbId, searchQuery, selectedIds);
 
             return buildKnowledgeContext(selected, searchQuery);
+        } catch (BusinessException e) {
+            //向量维度不匹配等业务异常原样抛出，保留可行动的错误提示
+            throw e;
         } catch (Exception e) {
             log.error("Failed to build knowledge context", e);
             throw new RuntimeException("Knowledge retrieval failed", e);
@@ -1009,15 +1044,41 @@ public class ChatService {
      * @param role      消息角色：user 或 assistant
      * @param content   消息内容
      */
-    private void saveMessage(Long sessionId, String role, String content) {
+    private Long saveMessage(Long sessionId, String role, String content) {
         try {
             com.rag.entity.ChatMessage msg = new com.rag.entity.ChatMessage();
             msg.setSessionId(sessionId);
             msg.setRole(role);
             msg.setContent(content);
             chatMessageMapper.insert(msg);
+            return msg.getId();
         } catch (Exception e) {
             log.error("Failed to save chat message", e);
+            return null;
+        }
+    }
+
+    /** 保存知识库回答质量事实，写入失败不影响聊天主流程。 */
+    private void recordAnswerQuality(Long answerMessageId, Long sessionId, Long kbId, String question,
+                                     Integer confidence, Integer evidenceCoverage, boolean grounded,
+                                     boolean refusal, String reason) {
+        if (answerQualityMapper == null || answerMessageId == null || sessionId == null || kbId == null) {
+            return;
+        }
+        try {
+            com.rag.entity.AnswerQuality quality = new com.rag.entity.AnswerQuality();
+            quality.setAnswerMessageId(answerMessageId);
+            quality.setSessionId(sessionId);
+            quality.setKbId(kbId);
+            quality.setQuestion(question == null ? "" : question.trim());
+            quality.setConfidence(confidence == null ? 0 : confidence);
+            quality.setEvidenceCoverage(evidenceCoverage == null ? 0 : evidenceCoverage);
+            quality.setGrounded(grounded);
+            quality.setRefusal(refusal);
+            quality.setReason(reason);
+            answerQualityMapper.insert(quality);
+        } catch (Exception e) {
+            log.error("Failed to save answer quality fact", e);
         }
     }
 

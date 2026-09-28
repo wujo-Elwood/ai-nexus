@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.AnswerQualityMapper">
+
+    <!-- 保存一条回答质量事实 -->
+    <insert id="insert" parameterType="com.rag.entity.AnswerQuality" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_answer_quality (
+            answer_message_id, session_id, kb_id, question, confidence,
+            evidence_coverage, grounded, refusal, reason, create_time
+        ) VALUES (
+            #{answerMessageId}, #{sessionId}, #{kbId}, #{question}, #{confidence},
+            #{evidenceCoverage}, #{grounded}, #{refusal}, #{reason}, NOW()
+        )
+    </insert>
+
+    <!-- 查询窗口内拒答、低指标或最新无帮助反馈样本 -->
+    <select id="findSamples" resultType="com.rag.entity.AnswerQuality">
+        SELECT q.*, f.helpful AS helpful
+        FROM ai_answer_quality q
+        LEFT JOIN ai_feedback f ON f.id = (
+            SELECT MAX(f2.id)
+            FROM ai_feedback f2
+            WHERE f2.message_id = q.answer_message_id
+        )
+        WHERE q.create_time &gt;= #{from}
+          AND (q.refusal = 1 OR q.confidence &lt; 50 OR q.evidence_coverage &lt; 50 OR f.helpful = 0)
+        ORDER BY q.create_time DESC, q.id DESC
+    </select>
+
+</mapper>

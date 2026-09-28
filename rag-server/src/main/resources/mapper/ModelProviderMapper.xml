@@ -4,21 +4,44 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.rag.mapper.ModelProviderMapper">
 
+    <sql id="providerColumns">
+        p.id, p.name, p.base_url, p.api_key, p.model,
+        p.image_base_url, p.image_api_key, p.image_model,
+        p.is_active, p.created_by, p.create_time
+    </sql>
+
     <select id="findAll" resultType="com.rag.entity.ModelProvider">
-        SELECT * FROM ai_model_provider ORDER BY create_time DESC
+        SELECT <include refid="providerColumns"/>, u.username AS created_by_name
+        FROM ai_model_provider p
+        LEFT JOIN sys_user u ON u.id = p.created_by
+        ORDER BY p.create_time DESC
+    </select>
+
+    <select id="findByCreatedBy" resultType="com.rag.entity.ModelProvider">
+        SELECT <include refid="providerColumns"/>, u.username AS created_by_name
+        FROM ai_model_provider p
+        LEFT JOIN sys_user u ON u.id = p.created_by
+        WHERE p.created_by = #{createdBy}
+        ORDER BY p.create_time DESC
     </select>
 
     <select id="findById" resultType="com.rag.entity.ModelProvider">
-        SELECT * FROM ai_model_provider WHERE id = #{id}
+        SELECT <include refid="providerColumns"/>, u.username AS created_by_name
+        FROM ai_model_provider p
+        LEFT JOIN sys_user u ON u.id = p.created_by
+        WHERE p.id = #{id}
     </select>
 
     <select id="findActive" resultType="com.rag.entity.ModelProvider">
-        SELECT * FROM ai_model_provider WHERE is_active = 1 LIMIT 1
+        SELECT <include refid="providerColumns"/>, u.username AS created_by_name
+        FROM ai_model_provider p
+        LEFT JOIN sys_user u ON u.id = p.created_by
+        WHERE p.is_active = 1 LIMIT 1
     </select>
 
     <insert id="insert" parameterType="com.rag.entity.ModelProvider" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO ai_model_provider (name, base_url, api_key, model, image_base_url, image_api_key, image_model, is_active, create_time)
-        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{imageBaseUrl}, #{imageApiKey}, #{imageModel}, #{isActive}, NOW())
+        INSERT INTO ai_model_provider (name, base_url, api_key, model, image_base_url, image_api_key, image_model, is_active, created_by, create_time)
+        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{imageBaseUrl}, #{imageApiKey}, #{imageModel}, #{isActive}, #{createdBy}, NOW())
     </insert>
 
     <update id="update" parameterType="com.rag.entity.ModelProvider">

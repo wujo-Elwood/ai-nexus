@@ -59,6 +59,18 @@ public class RbacService {
     }
 
     /**
+     * 判断用户是否拥有启用的指定角色
+     */
+    public boolean hasRole(Long userId, String roleCode) {
+        if (userId == null || roleCode == null || roleCode.isBlank()) {
+            return false;
+        }
+        return roleMapper.findByUserId(userId).stream()
+                .anyMatch(role -> role.getEnabled() != null && role.getEnabled() == 1
+                        && roleCode.equals(role.getRoleCode()));
+    }
+
+    /**
      * 查询全部菜单树
      */
     public List<MenuTreeNode> listAllMenus() {

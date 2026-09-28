@@ -28,4 +28,10 @@
     <delete id="deleteByUploadId">
         DELETE FROM kb_upload_chunk WHERE upload_id = #{uploadId}
     </delete>
+
+    <delete id="deleteByKbId">
+        DELETE c FROM kb_upload_chunk c
+        INNER JOIN kb_upload_session s ON c.upload_id = s.upload_id
+        WHERE s.kb_id = #{kbId}
+    </delete>
 </mapper>

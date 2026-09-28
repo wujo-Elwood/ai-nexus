@@ -90,3 +90,33 @@ qdrant_storage/
 
 # Ollama 模型目录
 .ollama/
+
+# ==================== 开发探针临时产物 ====================
+
+# tools/dev-probes/*.mjs 每次运行都会在 rag-web/ 下建一个
+# .chrome-<probe>-<timestamp>/ 无头 Chrome profile 目录。
+# 这些目录里的 *.log / *.db 命中上面的忽略规则，所以
+# `git clean -fd` 删不掉它们，必须用 `git clean -fdx`。
+.chrome-*/
+.chrome-*
+
+# ==================== 本地工具与临时产物 ====================
+
+# 本地 AI 助手工作目录
+.agents/
+.workbuddy/
+.workbuddy-ai/
+.zcode/
+.e2e-content.txt
+
+# 本地调试与视觉验证临时目录
+tmp/
+visuals/
+
+# 前端临时构建产物与开发探针
+rag-web/dist-*/
+rag-web/vite.config.js.timestamp-*.mjs
+rag-web/ink_*.png
+rag-web/probe*.mjs
+rag-web/vl_verify.mjs
+rag-web/tools/

@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: rag-server
+    name: ai-nexus-server
 
   # MySQL
   datasource:
@@ -43,7 +43,7 @@ mybatis:
 
 # 文件存储目录
 file:
-  upload-dir: ${FILE_UPLOAD_DIR:D:/workspace/wujo_rag/uploads}
+  upload-dir: ${FILE_UPLOAD_DIR:D:/workspace/ai-nexus/uploads}
   process:
     max-attempts: ${FILE_PROCESS_MAX_ATTEMPTS:3}
     retry-delay-seconds: ${FILE_PROCESS_RETRY_DELAY_SECONDS:60}

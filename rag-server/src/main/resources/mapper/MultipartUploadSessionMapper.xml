@@ -44,7 +44,14 @@
           AND status IN ('UPLOADING', 'FAILED')
     </select>
 
+    <select id="findByKbId" resultType="com.rag.entity.MultipartUploadSession">
+        SELECT * FROM kb_upload_session WHERE kb_id = #{kbId}
+    </select>
+
     <delete id="deleteByUploadId">
         DELETE FROM kb_upload_session WHERE upload_id = #{uploadId}
+    </delete>
+    <delete id="deleteByKbId">
+        DELETE FROM kb_upload_session WHERE kb_id = #{kbId}
     </delete>
 </mapper>
