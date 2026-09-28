@@ -2,6 +2,12 @@
   <div class="agent-tool-page">
     <div class="page-header">
       <div>
+        <div class="header-back">
+          <el-button @click="backToAgentList">
+            <el-icon><ArrowLeft /></el-icon>
+            返回智能体管理
+          </el-button>
+        </div>
         <h2 class="page-title">工具智能体</h2>
         <p class="page-desc">模型自主调用工具完成任务，每一步调用过程实时可见</p>
       </div>
@@ -62,9 +68,12 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { listAgentTools, streamAgentChat } from '../../api/agentTool'
 
+const router = useRouter()
 const tools = ref([])
 const messages = ref([])
 const input = ref('')
@@ -84,6 +93,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (abortController) abortController.abort()
 })
+
+// 返回智能体卡片总览
+function backToAgentList() {
+  router.push('/agents')
+}
 
 function scrollBottom() {
   nextTick(() => {
@@ -194,6 +208,10 @@ function stop() {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
+}
+
+.header-back {
+  margin-bottom: 10px;
 }
 
 .page-title {
