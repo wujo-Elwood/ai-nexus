@@ -87,6 +87,15 @@ const fallbackAgentList = [
     version: '1.0',
     scene: '知识库上线前质检、问答效果排查、交付报告生成',
     modelDisplayName: '跟随模型设置'
+  },
+  {
+    code: 'general-tool',
+    name: '工具智能体',
+    description: '自主编排工具调用完成实时任务（当前支持天气查询），每一步执行过程实时可见。',
+    status: 'ENABLED',
+    version: '1.0',
+    scene: '实时信息查询、多步工具编排、执行过程可视化',
+    modelDisplayName: '跟随模型设置'
   }
 ]
 
@@ -121,6 +130,10 @@ function openAgent(agent) {
     router.push('/agents/kb-quality')
     return
   }
+  if (agent.code === 'general-tool') {
+    router.push('/agent-tools')
+    return
+  }
   ElMessage.info('这个智能体详情页还没有接入')
 }
 
@@ -147,6 +160,9 @@ function getStatusTagType(status) {
 function getAgentTags(agent) {
   if (agent.code === 'knowledge-quality') {
     return ['文件检查', '分片分析', '召回测试', '报告生成']
+  }
+  if (agent.code === 'general-tool') {
+    return ['天气查询', '步骤可视', '多轮对话', '可扩展']
   }
   return [agent.scene || '智能体']
 }
