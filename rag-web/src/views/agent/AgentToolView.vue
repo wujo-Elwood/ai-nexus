@@ -26,6 +26,7 @@
         <div class="msg-bubble">
           <template v-if="msg.role === 'user'">{{ msg.content }}</template>
           <template v-else>
+            <div v-if="msg.statusText" class="stream-status">{{ msg.statusText }}</div>
             <div v-if="msg.steps.length" class="steps-panel">
               <div class="steps-title" @click="msg.stepsOpen = !msg.stepsOpen">
                 {{ msg.stepsOpen ? '▾' : '▸' }} 执行过程（{{ msg.steps.length }} 步{{ costText(msg) }}）
@@ -116,6 +117,15 @@ function handleEvent(msg, event, data) {
     case 'open':
       msg.runId = data.runId
       break
+    case 'status':
+      msg.statusText = data.message || ''
+      break
+    case 'answer_delta':
+      msg.content += data.delta || ''
+      break
+    case 'answer_reset':
+      msg.content = ''
+      break
     case 'step_start':
       msg.steps.push({
         stepNo: data.stepNo,
@@ -160,7 +170,7 @@ async function send() {
   input.value = ''
   streaming.value = true
   messages.value.push({ role: 'user', content: text })
-  const assistant = { role: 'assistant', content: '', steps: [], stepsOpen: true, pending: true }
+  const assistant = { role: 'assistant', content: '', steps: [], stepsOpen: true, pending: true, statusText: '' }
   messages.value.push(assistant)
   scrollBottom()
 
@@ -286,6 +296,12 @@ function stop() {
   background: #15161a;
   border: 1px solid #232428;
   color: var(--text-primary);
+}
+
+.stream-status {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--accent-color);
 }
 
 .steps-panel {

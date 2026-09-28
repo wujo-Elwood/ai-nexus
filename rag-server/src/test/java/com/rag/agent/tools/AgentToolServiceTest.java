@@ -9,12 +9,14 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.StreamingResponseHandler;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.output.Response;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,27 +26,37 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * 通用工具智能体执行循环测试：用脚本化的假模型验证步骤回调、结果回填和落库
+ * 通用工具智能体流式执行循环测试：用脚本化的假流式模型验证
+ * 状态提示、流式增量、步骤回调、结果回填和落库
  */
 class AgentToolServiceTest {
 
-    /** 按脚本顺序返回响应的假模型 */
-    private static class FakeChatModel implements ChatLanguageModel {
-        private final List<Response<AiMessage>> script;
+    /** 一条脚本：先输出的增量文本 + 最终响应 */
+    private record ScriptedStep(List<String> deltas, Response<AiMessage> response) {
+    }
+
+    /** 按脚本顺序回放的假流式模型 */
+    private static class FakeStreamingModel implements StreamingChatLanguageModel {
+        private final List<ScriptedStep> script;
         private int calls = 0;
 
-        FakeChatModel(List<Response<AiMessage>> script) {
+        FakeStreamingModel(List<ScriptedStep> script) {
             this.script = script;
         }
 
         @Override
-        public Response<AiMessage> generate(List<ChatMessage> messages) {
+        public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Response<AiMessage> generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications) {
-            return script.get(Math.min(calls++, script.size() - 1));
+        public void generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
+                             StreamingResponseHandler<AiMessage> handler) {
+            ScriptedStep step = script.get(Math.min(calls++, script.size() - 1));
+            for (String delta : step.deltas()) {
+                handler.onNext(delta);
+            }
+            handler.onComplete(step.response());
         }
     }
 
@@ -74,11 +86,18 @@ class AgentToolServiceTest {
     /** 收集事件的监听器 */
     private static class CollectingListener implements AgentToolListener {
         final List<String> events = new ArrayList<>();
+        final StringBuilder streamed = new StringBuilder();
         String answer = "";
+        boolean done = false;
 
         @Override
         public void onOpen(String runId, Object tools) {
             events.add("open");
+        }
+
+        @Override
+        public void onStatus(String message) {
+            events.add("status:" + message);
         }
 
         @Override
@@ -92,6 +111,18 @@ class AgentToolServiceTest {
         }
 
         @Override
+        public void onAnswerDelta(String delta) {
+            events.add("delta:" + delta);
+            streamed.append(delta);
+        }
+
+        @Override
+        public void onAnswerReset() {
+            events.add("answer_reset");
+            streamed.setLength(0);
+        }
+
+        @Override
         public void onAnswer(String content) {
             events.add("answer");
             answer = content;
@@ -100,6 +131,7 @@ class AgentToolServiceTest {
         @Override
         public void onDone(String runId) {
             events.add("done");
+            done = true;
         }
 
         @Override
@@ -110,19 +142,21 @@ class AgentToolServiceTest {
 
     private AgentToolService newService(AgentToolStepMapper stepMapper) {
         ToolRegistry registry = new ToolRegistry(List.of(new EchoTool()), new ObjectMapper());
-        return new AgentToolService(registry, null, stepMapper, new ObjectMapper(), null);
+        // 同线程执行器：测试中工具执行和下一轮递归按顺序同步跑完
+        return new AgentToolService(registry, null, stepMapper, new ObjectMapper(), Runnable::run);
     }
 
     @Test
-    void shouldExecuteToolAndAnswer() {
+    void shouldExecuteToolAndStreamAnswer() {
         ToolExecutionRequest request = ToolExecutionRequest.builder()
                 .id("call-1")
                 .name("echo")
                 .arguments("{\"text\":\"你好\"}")
                 .build();
-        FakeChatModel model = new FakeChatModel(List.of(
-                Response.from(AiMessage.from(request)),
-                Response.from(AiMessage.from("工具结果是：回显：你好"))
+        FakeStreamingModel model = new FakeStreamingModel(List.of(
+                new ScriptedStep(List.of(), Response.from(AiMessage.from(request))),
+                new ScriptedStep(List.of("工具结果是", "：回显：你好"),
+                        Response.from(AiMessage.from("工具结果是：回显：你好")))
         ));
 
         AgentToolStepMapper stepMapper = mock(AgentToolStepMapper.class);
@@ -133,11 +167,23 @@ class AgentToolServiceTest {
                 UserMessage.userMessage("调用工具试试")
         ));
 
-        String answer = service.runLoop(model, messages, "run-1", listener);
+        service.runStreamLoop(model, messages, "run-1", listener, 0, new AtomicInteger());
 
-        assertEquals("工具结果是：回显：你好", answer);
-        // open 事件由 doChat 的 SSE 包装层发出，runLoop 只负责步骤与回答
-        assertEquals(List.of("step_start:echo", "step_result:SUCCESS:回显：你好", "answer"), listener.events);
+        assertEquals(List.of(
+                "status:正在分析问题，决定是否调用工具…",
+                "answer_reset",
+                "status:正在调用工具…",
+                "step_start:echo",
+                "step_result:SUCCESS:回显：你好",
+                "status:正在结合工具结果思考…",
+                "delta:工具结果是",
+                "delta:：回显：你好",
+                "status:null",
+                "answer",
+                "done"
+        ), listener.events);
+        assertEquals("工具结果是：回显：你好", listener.answer);
+        assertEquals("工具结果是：回显：你好", listener.streamed.toString());
         // system + user + ai(工具调用) + 工具结果 + ai(最终回答)
         assertEquals(5, messages.size());
         verify(stepMapper, times(1)).insert(any(AgentToolStep.class));
@@ -145,20 +191,40 @@ class AgentToolServiceTest {
 
     @Test
     void shouldStopAtMaxRoundsWhenModelAlwaysCallsTools() {
-        FakeChatModel model = new FakeChatModel(List.of(
-                Response.from(AiMessage.from(ToolExecutionRequest.builder()
+        FakeStreamingModel model = new FakeStreamingModel(List.of(
+                new ScriptedStep(List.of(), Response.from(AiMessage.from(ToolExecutionRequest.builder()
                         .id("call-loop")
                         .name("echo")
                         .arguments("{\"text\":\"循环\"}")
-                        .build()))
+                        .build())))
         ));
 
         AgentToolService service = newService(mock(AgentToolStepMapper.class));
         CollectingListener listener = new CollectingListener();
 
-        String answer = service.runLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener);
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener, 0, new AtomicInteger());
 
-        assertTrue(answer.contains("已连续调用工具"), answer);
+        assertTrue(listener.answer.contains("已连续调用工具"), listener.answer);
         assertEquals(AgentToolService.MAX_ROUNDS, listener.events.stream().filter(e -> e.startsWith("step_start")).count());
+        assertTrue(listener.done);
+    }
+
+    @Test
+    void shouldStreamFinalAnswerDeltas() {
+        FakeStreamingModel model = new FakeStreamingModel(List.of(
+                new ScriptedStep(List.of("今天", "南京", "有雨"), Response.from(AiMessage.from("今天南京有雨")))
+        ));
+
+        AgentToolService service = newService(mock(AgentToolStepMapper.class));
+        CollectingListener listener = new CollectingListener();
+
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("天气"))), "run-3", listener, 0, new AtomicInteger());
+
+        assertEquals(List.of(
+                "status:正在分析问题，决定是否调用工具…",
+                "delta:今天", "delta:南京", "delta:有雨",
+                "status:null",
+                "answer", "done"), listener.events);
+        assertEquals("今天南京有雨", listener.streamed.toString());
     }
 }
