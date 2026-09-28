@@ -187,6 +187,11 @@ const fallbackMenuItems = [
     symbol: '✦'
   },
   {
+    path: '/agent-tools',
+    label: '工具智能体',
+    symbol: '☁'
+  },
+  {
     path: '/rbac',
     label: '权限管理',
     symbol: '▧'
