@@ -1,11 +1,21 @@
 package com.rag.service;
 
 import com.rag.ai.EmbeddingService;
+import com.rag.catalog.CatalogMapper;
+import com.rag.common.BusinessException;
 import com.rag.entity.KbFile;
+import com.rag.entity.KnowledgeBase;
+import com.rag.entity.MultipartUploadSession;
 import com.rag.mapper.ChunkMapper;
 import com.rag.mapper.FileMapper;
+import com.rag.mapper.KnowledgeBaseMapper;
+import com.rag.mapper.MultipartUploadChunkMapper;
+import com.rag.mapper.MultipartUploadSessionMapper;
+import com.rag.eval.EvalMapper;
+import com.rag.agent.mapper.AgentRunMapper;
 import com.rag.rag.DocumentParser;
 import com.rag.rag.QdrantService;
+import com.rag.rag.RetrievalCache;
 import com.rag.rag.TextSplitter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -15,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.concurrent.Executor;
 import java.util.List;
 
@@ -49,6 +60,7 @@ class FileServiceTest {
         TextSplitter textSplitter = mock(TextSplitter.class);
         EmbeddingService embeddingService = mock(EmbeddingService.class);
         QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
         Executor directExecutor = Runnable::run;
         doAnswer(invocation -> {
             KbFile file = invocation.getArgument(0);
@@ -61,6 +73,7 @@ class FileServiceTest {
         FileService service = new FileService();
         ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
         ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
         ReflectionTestUtils.setField(service, "documentParser", documentParser);
         ReflectionTestUtils.setField(service, "textSplitter", textSplitter);
         ReflectionTestUtils.setField(service, "embeddingService", embeddingService);
@@ -132,5 +145,267 @@ class FileServiceTest {
 
         verify(fileMapper).claimRetry(21L);
         org.junit.jupiter.api.Assertions.assertNotNull(submitted.get());
+    }
+
+    /**
+     * 测试删除文件后立即失效该知识库的检索缓存
+     */
+    @Test
+    void deleteShouldInvalidateRetrievalCache() throws IOException {
+        FileMapper fileMapper = mock(FileMapper.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        CatalogMapper catalogMapper = mock(CatalogMapper.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KbFile file = new KbFile();
+        file.setId(15L);
+        file.setKbId(3L);
+        file.setFilePath(tempDir.resolve("gone.txt").toString());
+        when(fileMapper.findById(15L)).thenReturn(file);
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "catalogMapper", catalogMapper);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+
+        service.delete(15L);
+
+        verify(retrievalCache).invalidateKb(3L);
+    }
+
+    /**
+     * 测试重新处理文件时缓存立即失效，避免重建期间命中已删除切片
+     */
+    @Test
+    void reprocessShouldInvalidateRetrievalCacheImmediately() {
+        FileMapper fileMapper = mock(FileMapper.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KbFile file = new KbFile();
+        file.setId(15L);
+        file.setKbId(3L);
+        when(fileMapper.findById(15L)).thenReturn(file);
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+        //直接丢弃提交的后台任务，聚焦缓存失效行为
+        ReflectionTestUtils.setField(service, "fileProcessExecutor", (Executor) task -> { });
+
+        service.reprocess(15L);
+
+        verify(retrievalCache).invalidateKb(3L);
+    }
+
+    /**
+     * 测试版本回滚后失效检索缓存，旧版本切片不再作为当前内容返回
+     */
+    @Test
+    void rollbackShouldInvalidateRetrievalCache() {
+        FileMapper fileMapper = mock(FileMapper.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KbFile file = new KbFile();
+        file.setId(15L);
+        file.setKbId(3L);
+        file.setVersionGroupId(15L);
+        file.setVectorStatus("READY");
+        file.setStatus("COMPLETED");
+        when(fileMapper.findById(15L)).thenReturn(file);
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+
+        service.rollback(15L);
+
+        verify(fileMapper).setCurrentVersion(15L, 15L);
+        verify(retrievalCache).invalidateKb(3L);
+    }
+
+    /**
+     * 测试知识库级重建向量：仅创建者可操作，且逐文件提交重建
+     */
+    @Test
+    void reprocessKbShouldReprocessCurrentFilesForOwner() {
+        FileMapper fileMapper = mock(FileMapper.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        KnowledgeBaseMapper knowledgeBaseMapper = mock(KnowledgeBaseMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setId(3L);
+        kb.setCreateUser(1L);
+        when(knowledgeBaseMapper.findById(3L)).thenReturn(kb);
+        KbFile first = buildFile(11L, 3L);
+        KbFile second = buildFile(12L, 3L);
+        when(fileMapper.findCurrentByKbId(3L)).thenReturn(List.of(first, second));
+        when(fileMapper.findById(11L)).thenReturn(first);
+        when(fileMapper.findById(12L)).thenReturn(second);
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+        ReflectionTestUtils.setField(service, "fileProcessExecutor", (Executor) task -> { });
+
+        int submitted = service.reprocessKb(3L, 1L);
+
+        assertEquals(2, submitted);
+        verify(qdrantService).deleteByFileId(11L);
+        verify(qdrantService).deleteByFileId(12L);
+
+        //非创建者必须被拒绝
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.reprocessKb(3L, 2L));
+        assertEquals(403, exception.getCode());
+    }
+
+    /**
+     * 全局重建期间单库重建必须被拒绝，避免两个任务同时替换 collection
+     */
+    @Test
+    void reprocessKbShouldRejectWhenQdrantRebuilding() {
+        KnowledgeBaseMapper knowledgeBaseMapper = mock(KnowledgeBaseMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setId(3L);
+        kb.setCreateUser(1L);
+        when(knowledgeBaseMapper.findById(3L)).thenReturn(kb);
+        when(qdrantService.isRebuilding()).thenReturn(true);
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.reprocessKb(3L, 1L));
+        assertEquals(409, exception.getCode());
+    }
+
+    /**
+     * 测试删除知识库时清理向量、切片、文件、版本、标签和分片上传全部关联数据
+     */
+    @Test
+    void deleteKbDataShouldCleanAllRelations() {
+        FileMapper fileMapper = mock(FileMapper.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        CatalogMapper catalogMapper = mock(CatalogMapper.class);
+        MultipartUploadChunkMapper multipartUploadChunkMapper = mock(MultipartUploadChunkMapper.class);
+        MultipartUploadSessionMapper multipartUploadSessionMapper = mock(MultipartUploadSessionMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KbFile file = buildFile(11L, 3L);
+        file.setFilePath(tempDir.resolve("missing.txt").toString());
+        when(fileMapper.findByKbId(3L)).thenReturn(List.of(file));
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "catalogMapper", catalogMapper);
+        ReflectionTestUtils.setField(service, "multipartUploadChunkMapper", multipartUploadChunkMapper);
+        ReflectionTestUtils.setField(service, "multipartUploadSessionMapper", multipartUploadSessionMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+
+        service.deleteKbData(3L);
+
+        verify(qdrantService).deleteByKbId(3L);
+        verify(chunkMapper).deleteByKbId(3L);
+        verify(fileMapper).deleteVersionsByKbId(3L);
+        verify(catalogMapper).deleteTagRelsByKbId(3L);
+        verify(catalogMapper).deleteTagsByKbId(3L);
+        verify(catalogMapper).deleteFoldersByKbId(3L);
+        verify(fileMapper).deleteByKbId(3L);
+        verify(multipartUploadChunkMapper).deleteByKbId(3L);
+        verify(multipartUploadSessionMapper).deleteByKbId(3L);
+        verify(retrievalCache).invalidateKb(3L);
+    }
+
+    /**
+     * 删除标记存在时后台处理必须在写入切片前退出
+     */
+    @Test
+    void processFileShouldStopWhenKnowledgeBaseIsBeingDeleted() throws Exception {
+        FileMapper fileMapper = mock(FileMapper.class);
+        KnowledgeBaseMapper knowledgeBaseMapper = mock(KnowledgeBaseMapper.class);
+        DocumentParser documentParser = mock(DocumentParser.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        KbFile file = buildFile(11L, 3L);
+        file.setFilePath(tempDir.resolve("source.txt").toString());
+        Files.writeString(Path.of(file.getFilePath()), "content");
+        when(knowledgeBaseMapper.findById(3L)).thenReturn(null);
+        when(documentParser.parse(any(File.class))).thenReturn("content");
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
+        ReflectionTestUtils.setField(service, "documentParser", documentParser);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+        ReflectionTestUtils.invokeMethod(service, "processFile", file);
+
+        verify(chunkMapper, never()).insertBatch(any());
+        verify(qdrantService, never()).upsertBatch(any());
+    }
+
+    /**
+     * 删除知识库时应清理评测、智能体记录和分片临时目录
+     */
+    @Test
+    void deleteKbDataShouldCleanEvaluationAgentAndPartDirectory() throws Exception {
+        FileMapper fileMapper = mock(FileMapper.class);
+        ChunkMapper chunkMapper = mock(ChunkMapper.class);
+        CatalogMapper catalogMapper = mock(CatalogMapper.class);
+        MultipartUploadChunkMapper uploadChunkMapper = mock(MultipartUploadChunkMapper.class);
+        MultipartUploadSessionMapper uploadSessionMapper = mock(MultipartUploadSessionMapper.class);
+        EvalMapper evalMapper = mock(EvalMapper.class);
+        AgentRunMapper agentRunMapper = mock(AgentRunMapper.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        MultipartUploadSession session = new MultipartUploadSession();
+        session.setUploadId("upload-1");
+        when(uploadSessionMapper.findByKbId(3L)).thenReturn(List.of(session));
+        when(fileMapper.findByKbId(3L)).thenReturn(List.of());
+
+        FileService service = new FileService();
+        ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
+        ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(service, "catalogMapper", catalogMapper);
+        ReflectionTestUtils.setField(service, "multipartUploadChunkMapper", uploadChunkMapper);
+        ReflectionTestUtils.setField(service, "multipartUploadSessionMapper", uploadSessionMapper);
+        ReflectionTestUtils.setField(service, "evalMapper", evalMapper);
+        ReflectionTestUtils.setField(service, "agentRunMapper", agentRunMapper);
+        ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
+        ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
+        ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
+        Path partDirectory = tempDir.resolve(".parts").resolve("upload-1");
+        Files.createDirectories(partDirectory);
+        Files.writeString(partDirectory.resolve("part"), "data");
+
+        service.deleteKbData(3L);
+
+        verify(evalMapper).deleteRunItemsByKbId(3L);
+        verify(evalMapper).deleteRunsByKbId(3L);
+        verify(evalMapper).deleteCasesByKbId(3L);
+        verify(agentRunMapper).deleteByKbId(3L);
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(partDirectory));
+    }
+
+    /** 构造测试文件 */
+    private KbFile buildFile(Long id, Long kbId) {
+        KbFile file = new KbFile();
+        file.setId(id);
+        file.setKbId(kbId);
+        return file;
     }
 }

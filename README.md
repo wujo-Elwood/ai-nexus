@@ -54,6 +54,7 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - RAG 评测中心：维护测试集，执行召回评测，统计命中、引用命中和平均耗时。
 - 系统健康面板：检查 MySQL、Qdrant、Embedding、LLM、磁盘空间和线程池状态。
 - RBAC：菜单、角色、角色菜单、用户角色和用户管理。
+- 模型供应商按创建人隔离：普通用户只能查看和操作自己创建的供应商及其 API Key，管理员可查看全部；他人创建且正在使用的供应商对普通用户只展示名称和模型，不下发密钥。
 - 用户资料和密码修改；注册时校验两次密码一致。
 - 允许通过 `localhost`、`127.0.0.1` 和实际局域网 IP 访问前端开发服务。
 
@@ -96,6 +97,7 @@ WUJO RAG 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 
 ```text
 wujo_rag
+├── docker-compose.yml                # MySQL/Qdrant/Ollama/前后端一键部署编排
 ├── database/                         # 初始化和历史数据库升级脚本
 ├── docs/                             # 设计、计划和模块说明
 ├── rag-server/
@@ -141,6 +143,79 @@ wujo_rag
 | Ollama | 可选，默认用于本地 Embedding |
 
 ## 快速启动
+
+### Docker Compose 一键部署（推荐）
+
+前置要求：已安装 Docker 和 Docker Compose v2。一条命令拉起 MySQL、Qdrant、Ollama（自动拉取 `bge-m3` 模型）、后端和前端：
+
+```bash
+docker compose up -d --build
+```
+
+- 首次构建需下载镜像、Maven/npm 依赖和约 1.2GB 的 `bge-m3` 模型，耗时较长。
+- 启动完成后访问 `http://localhost:8080`，注册账号，然后在"模型设置"页面配置聊天模型供应商（聊天模型的 base_url、api_key 需自备，Embedding 已由内置 Ollama 提供）。
+- 后端 API 调试地址：`http://localhost:8888`；Qdrant 控制台：`http://localhost:6333/dashboard`。
+- 数据持久化：MySQL、Qdrant、Ollama 模型使用命名卷；上传文件保存在项目 `./uploads` 目录。
+- 数据库建表由首次启动时自动挂载执行的 `database/init.sql` 完成，无需手动初始化。
+
+生产部署请在项目根目录创建 `.env` 覆盖默认密码和密钥；国内网络可同时配置构建加速：
+
+```dotenv
+MYSQL_ROOT_PASSWORD=your-mysql-password
+JWT_SECRET=your-long-random-secret
+MAVEN_MIRROR=https://maven.aliyun.com/repository/public
+NPM_REGISTRY=https://registry.npmmirror.com
+```
+
+常用命令：
+
+```bash
+docker compose logs -f rag-server   # 查看后端日志
+docker compose ps                   # 查看各服务状态
+docker compose down                 # 停止（数据卷保留）
+docker compose down -v              # 停止并清空全部数据
+```
+
+#### Linux 服务器部署
+
+Compose 文件和全部镜像本身就是 Linux 容器，Linux 服务器上开箱即用，无需平台适配。步骤如下：
+
+1. 安装 Docker Engine 和 Compose v2 插件（Ubuntu / Debian 为例）：
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo systemctl enable --now docker
+
+# 让当前用户免 sudo 使用 docker，重新登录后生效
+sudo usermod -aG docker $USER
+
+docker compose version   # 验证输出 v2.x
+```
+
+CentOS / RHEL / openEuler 先配置 docker-ce 软件源，再执行
+`sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin`。
+
+2. 服务器建议配置：2 核 4G 内存起步（MySQL、Java 后端、Ollama 同机运行），磁盘预留 10G 以上（镜像、模型和数据卷）。
+
+3. 上传代码到服务器并配置 `.env`（内容见上方示例，至少修改密码和 JWT 密钥）。
+
+4. 放行 8080 端口，云服务器还需在控制台安全组放行：
+
+```bash
+sudo ufw allow 8080/tcp                                                    # Ubuntu / Debian
+sudo firewall-cmd --permanent --add-port=8080/tcp && sudo firewall-cmd --reload   # CentOS / RHEL
+```
+
+5. 在项目根目录执行 `docker compose up -d --build`，完成后访问 `http://<服务器IP>:8080`。
+   前端由 nginx 同源反代后端，Linux 上无需配置 CORS。
+
+6. 所有服务已配置 `restart: unless-stopped`，配合 Docker 开机自启，服务器重启后自动恢复，无需人工干预。
+
+可选 GPU 加速：服务器有 NVIDIA 显卡时，安装驱动和
+[nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+后为 compose 中的 `ollama` 服务添加 GPU 配置即可加速 Embedding；纯 CPU 同样可以运行。
+
+### 手动部署
 
 ### 1. 克隆项目
 
@@ -231,6 +306,8 @@ jwt:
 
 启动后在“模型设置”页面新增 OpenAI 兼容供应商并激活。聊天需要 `base_url`、`api_key` 和 `model`；AI 生图可单独配置 `image_base_url`、`image_api_key` 和 `image_model`，留空时沿用聊天配置。
 
+供应商会记录创建人：普通用户只看到并只能修改、删除、激活自己创建的供应商，管理员可以看到并操作全部，列表额外展示创建人。`is_active` 仍是全局单值，全系统共用同一个激活供应商，因此普通用户列表中会出现一项只读的“平台供应商”用于展示当前正在使用的模型，其密钥不下发。
+
 ### 7. 启动后端
 
 Windows：
@@ -281,6 +358,7 @@ npm run dev
 | 10 | `system_health_upgrade.sql` | 系统健康面板菜单和管理员授权 |
 | 11 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心、RAG 评测表和菜单 |
 | 12 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
+| 13 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
 
 普通终端示例：
 
@@ -312,7 +390,8 @@ $scripts = @(
   'kb_capabilities_upgrade.sql',
   'system_health_upgrade.sql',
   'kb_second_priority_upgrade.sql',
-  'kb_summary_upgrade.sql'
+  'kb_summary_upgrade.sql',
+  'model_provider_owner_upgrade.sql'
 )
 
 foreach ($script in $scripts) {
@@ -339,6 +418,7 @@ foreach ($script in $scripts) {
 | `/image` | AI 生图 | 异步生成、历史、查看和下载 |
 | `/agents` | 智能体管理 | 智能体入口和运行记录 |
 | `/agents/kb-quality` | 知识库质检智能体 | 执行质检并查看质量报告 |
+| `/knowledge-gaps` | 知识缺口分析 | 查看最近 7 天或 30 天的拒答、低质量问题聚类 |
 | `/rbac` | 权限管理 | 菜单、角色、授权和用户管理 |
 | `/settings` | 模型设置 | 聊天和生图供应商配置 |
 | `/profile` | 个人资料 | 昵称和头像信息 |
@@ -352,7 +432,7 @@ foreach ($script in $scripts) {
 | 模块 | 主要接口 |
 | --- | --- |
 | 认证与用户 | `POST /auth/register`、`POST /auth/login`、`GET/PUT /user/profile`、`PUT /user/password` |
-| 知识库 | `GET/POST /kb`、`GET/PUT/DELETE /kb/{id}`、`GET/PUT /kb/{id}/strategy`、`GET/POST /kb/{id}/summary` |
+| 知识库 | `GET/POST /kb`、`GET/PUT/DELETE /kb/{id}`、`GET/PUT /kb/{id}/strategy`、`GET/POST /kb/{id}/summary`、`POST /kb/{id}/rebuild-vectors`、`POST /kb/rebuild-vectors`（管理员全局重建） |
 | 文件 | `POST /file/upload`、`GET /file/list/{kbId}`、`GET /file/{id}`、`POST /file/{id}/reprocess`、`DELETE /file/{id}`、预览和下载 |
 | 分片上传 | `POST /file/multipart/init`、`PUT /file/multipart/{uploadId}/chunks/{chunkIndex}`、状态、完成和取消 |
 | 版本与分类 | `GET /file/{id}/versions`、`POST /file/{id}/rollback`、`PUT /file/{id}/catalog`、文件标签查询和更新 |
@@ -361,13 +441,14 @@ foreach ($script in $scripts) {
 | 健康与统计 | `GET /kb/{kbId}/health`、`GET /kb/{kbId}/stats` |
 | 聊天检索 | `POST /chat/send`、`POST /chat/stream`、会话历史、召回测试、`POST /chat/diagnose` 和反馈 |
 | 任务中心 | `GET /tasks`、`POST /tasks/{taskType}/{taskId}/retry`、取消任务 |
+| 知识缺口 | `GET /knowledge-gaps/report?days=7|30`、`POST /knowledge-gaps/analyze?days=7|30`（管理员） |
 | RAG 评测 | 评测用例新增/查询/删除、评测运行和运行列表 |
 | 系统健康 | `GET /system-health/overview` |
 | 文档抽取 | 模板、文档上传、任务、结果修正和导出接口 |
 | AI 生图 | 生成、任务、历史、查看、下载和删除接口 |
 | 智能体 | 智能体列表、知识库质检运行、报告详情和删除 |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
-| 模型与统计 | 模型供应商增删改查、激活供应商、`GET /usage/stats` |
+| 模型与统计 | 模型供应商增删改查、激活供应商（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
 
 ## 主要数据库表
 
@@ -382,6 +463,7 @@ foreach ($script in $scripts) {
 | 文档抽取 | `extract_document`、`extract_template`、`extract_field`、`extract_task`、`extract_result`、`extract_review_record`、`extract_export_record` |
 | AI 生图 | `ai_image_task`、`ai_image_history` |
 | 智能体 | `agent_run` |
+| 知识缺口分析 | `ai_answer_quality`、`kb_gap_report` |
 
 ## 核心流程
 
@@ -427,6 +509,27 @@ mvn.cmd clean package
 ```
 
 ## 常见问题
+
+### 更换 Embedding 模型
+
+向量库中的存量向量按旧模型生成，直接切换模型会导致维度不匹配报错或检索失准。正确顺序：
+
+1. 修改 `EMBEDDING_MODEL` 环境变量（Docker Compose 中修改对应环境变量）并重启后端。
+2. 如果只是同维度重建，可对单个知识库调用重建接口，系统会逐文件自动清空旧向量、重新解析和向量化：
+
+```bash
+curl -X POST http://localhost:8888/api/kb/{kbId}/rebuild-vectors -H "Authorization: Bearer <登录Token>"
+```
+
+3. 如果新模型维度变化，必须由管理员调用全局重建接口。共享 collection 会被删除并按新维度重建，然后重新处理全部知识库当前版本文件：
+
+```bash
+curl -X POST http://localhost:8888/api/kb/rebuild-vectors -H "Authorization: Bearer <管理员Token>"
+```
+
+4. 重建是异步的，可在任务中心查看各文件进度；全局重建期间检索会返回“正在重建”，不会读取半成品。
+5. 也可以不调接口，在文件管理页对文件逐个“重新处理”，但仅适用于 collection 维度未变化的情况。
+6. 维度不匹配时文件处理和聊天会直接返回明确的错误提示，按提示处理即可。
 
 ### 登录返回 403
 

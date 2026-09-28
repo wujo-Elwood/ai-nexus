@@ -12,6 +12,7 @@
         <el-icon><Plus /></el-icon>
         新建知识库
       </el-button>
+      <el-button size="large" @click="router.push('/knowledge-gaps')">知识缺口分析</el-button>
     </section>
 
     <section class="stats-grid">
@@ -30,6 +31,28 @@
         <strong>{{ kbStats.files }}</strong>
         <small>参与检索的资料</small>
       </div>
+    </section>
+
+    <section class="glass-panel rebuild-panel">
+      <div class="rebuild-head">
+        <div>
+          <span class="eyebrow">Vector Rebuild</span>
+          <h2>全局向量重建</h2>
+        </div>
+        <div class="rebuild-actions">
+          <el-tag :type="rebuildStatus.rebuilding ? 'warning' : rebuildStatus.status === 'FAILED' ? 'danger' : 'success'">
+            {{ rebuildStatus.rebuilding ? '重建中' : rebuildStatus.status === 'FAILED' ? '失败' : '已完成' }}
+          </el-tag>
+          <el-button link type="primary" @click="router.push('/tasks')">查看任务中心</el-button>
+        </div>
+      </div>
+      <el-progress :percentage="Number(rebuildStatus.progress || 0)" :status="rebuildStatus.status === 'FAILED' ? 'exception' : undefined" />
+      <div class="rebuild-meta">
+        <span>已完成 {{ rebuildStatus.completedFiles || 0 }} / {{ rebuildStatus.totalFiles || 0 }} 个文件</span>
+        <span>失败 {{ rebuildStatus.failedFiles || 0 }} 个</span>
+        <span v-if="rebuildStatus.startedBy">发起用户 ID：{{ rebuildStatus.startedBy }}</span>
+      </div>
+      <p v-if="rebuildStatus.error" class="rebuild-error">{{ rebuildStatus.error }}</p>
     </section>
 
     <section class="toolbar glass-panel">
@@ -136,11 +159,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, Collection, Document, MoreFilled, Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { getKbList, createKb, deleteKb, updateKb } from '../../api/kb'
+import { getKbList, createKb, deleteKb, updateKb, getGlobalRebuildStatus } from '../../api/kb'
 import { getFileList } from '../../api/file'
 
 const router = useRouter()
@@ -152,6 +175,8 @@ const saving = ref(false)
 const editingId = ref(null)
 const formRef = ref(null)
 const searchText = ref('')
+const rebuildStatus = ref({ status: 'COMPLETED', progress: 100 })
+let rebuildTimer = null
 
 const form = reactive({
   name: '',
@@ -190,6 +215,17 @@ const kbStats = computed(() => {
 
 onMounted(() => {
   loadKbList()
+  // 页面打开后立即加载状态，并在页面停留期间持续刷新
+  loadRebuildStatus()
+  rebuildTimer = window.setInterval(loadRebuildStatus, 2000)
+})
+
+onBeforeUnmount(() => {
+  // 离开知识库页面后停止轮询，避免后台持续请求
+  if (rebuildTimer) {
+    window.clearInterval(rebuildTimer)
+    rebuildTimer = null
+  }
 })
 
 // 加载知识库列表
@@ -204,6 +240,19 @@ async function loadKbList() {
     ElMessage.error('知识库加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载全局向量重建状态
+async function loadRebuildStatus() {
+  try {
+    // 调用状态接口获取最新重建进度
+    const res = await getGlobalRebuildStatus()
+    if (res.data) {
+      rebuildStatus.value = res.data
+    }
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -364,16 +413,7 @@ function formatDate(dateStr) {
   background: rgba(30, 31, 35, 0.72);
 }
 
-.stat-card::after {
-  content: "";
-  position: absolute;
-  right: -42px;
-  bottom: -58px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  background: rgba(229, 160, 68, 0.1);
-}
+/* 右下角橙色装饰球已移除：::after 现在归全局"星云流光边框"的外扩云雾层使用。 */
 
 .stat-card span,
 .stat-card small {
@@ -401,6 +441,47 @@ function formatDate(dateStr) {
   padding: 14px;
   margin-bottom: 18px;
   border-radius: 12px;
+}
+
+.rebuild-panel {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.rebuild-head,
+.rebuild-meta,
+.rebuild-actions {
+  display: flex;
+  align-items: center;
+}
+
+.rebuild-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rebuild-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rebuild-head h2 {
+  margin: 4px 0 14px;
+}
+
+.rebuild-meta {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 18px;
+  margin-top: 10px;
+  color: var(--muted-color);
+  font-size: 13px;
+}
+
+.rebuild-error {
+  margin: 10px 0 0;
+  color: var(--el-color-danger);
 }
 
 .search-input-wrap {
@@ -452,13 +533,8 @@ function formatDate(dateStr) {
   backdrop-filter: blur(18px);
 }
 
-.kb-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: linear-gradient(90deg, var(--primary-color), transparent);
-}
+/* 顶部装饰条已由全局"星云流光边框"（global.css 第3.1步）接管，
+   此处不能再占用 ::before，否则会覆盖星云气态边框。 */
 
 .card-top,
 .card-meta,
@@ -606,6 +682,22 @@ function formatDate(dateStr) {
 
   .kb-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .rebuild-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rebuild-actions {
+    justify-content: flex-start;
+  }
+
+  .rebuild-meta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

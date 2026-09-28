@@ -40,6 +40,12 @@ public interface ChunkMapper {
     /** 根据文件 ID 删除所有文本块 */
     int deleteByFileId(@Param("fileId") Long fileId);
 
+    /** 根据知识库 ID 删除所有文本块（通过 kb_file 表关联） */
+    int deleteByKbId(@Param("kbId") Long kbId);
+
+    /** 删除全部知识库切片，用于共享向量集合全局重建 */
+    int deleteByAllFiles();
+
     /** 在指定知识库中按关键词模糊搜索文本块（用于混合检索） */
     List<KbChunk> searchByKeyword(@Param("kbId") Long kbId,
                                    @Param("keyword") String keyword,

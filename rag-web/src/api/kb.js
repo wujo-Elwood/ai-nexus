@@ -4,6 +4,11 @@ export function getKbList() {
   return request.get('/api/kb')
 }
 
+/** 查询全局向量重建进度。 */
+export function getGlobalRebuildStatus() {
+  return request.get('/api/kb/rebuild-vectors/status')
+}
+
 export function createKb(data) {
   return request.post('/api/kb', data)
 }

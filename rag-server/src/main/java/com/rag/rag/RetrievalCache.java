@@ -53,6 +53,25 @@ public class RetrievalCache {
         cache.put(key, new CachedEntry(chunkIds, System.currentTimeMillis()));
     }
 
+    /**
+     * 知识库文件变更后清除该库全部缓存
+     * 文件删除、重新处理或版本回滚后，缓存中保留的 chunk ID 可能已失效，
+     * 必须主动清除，避免 5 分钟 TTL 内检索到已删除或非当前版本的内容
+     */
+    public synchronized void invalidateKb(Long kbId) {
+        if (kbId == null) {
+            return;
+        }
+        cache.keySet().removeIf(key -> key.startsWith(kbId + ":"));
+    }
+
+    /**
+     * 清空全部知识库检索缓存
+     */
+    public synchronized void invalidateAll() {
+        cache.clear();
+    }
+
     private String buildKey(Long kbId, String query) {
         return kbId + ":" + query.hashCode();
     }

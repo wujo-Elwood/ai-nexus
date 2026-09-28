@@ -14,6 +14,7 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ public class KnowledgeSummaryService {
     private final BiFunction<String, ModelProvider, String> modelCaller;
 
     /** 创建使用真实 OpenAI 兼容模型的摘要服务。 */
+    @Autowired
     public KnowledgeSummaryService(ChunkMapper chunkMapper, KnowledgeBaseMapper knowledgeBaseMapper,
                                    KnowledgeBaseService knowledgeBaseService, ModelProviderService modelProviderService) {
         this(chunkMapper, knowledgeBaseMapper, knowledgeBaseService, modelProviderService, null);

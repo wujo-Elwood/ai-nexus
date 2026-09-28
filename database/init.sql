@@ -99,7 +99,9 @@ CREATE TABLE IF NOT EXISTS ai_model_provider (
     image_api_key VARCHAR(255) COMMENT '生图 API 密钥，为空时沿用普通 API 密钥',
     image_model VARCHAR(100) COMMENT '生图模型名称，为空时沿用普通模型名称',
     is_active TINYINT DEFAULT 0 COMMENT '是否激活：1=激活，0=未激活',
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_by BIGINT COMMENT '创建人用户ID，为空表示历史数据或系统预置，仅管理员可见',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_model_provider_creator (created_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -143,6 +145,39 @@ CREATE TABLE IF NOT EXISTS extract_document (
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_parse_status (parse_status),
     INDEX idx_uploaded_by (uploaded_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Answer quality facts used by knowledge gap analysis
+CREATE TABLE IF NOT EXISTS ai_answer_quality (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    answer_message_id BIGINT NOT NULL,
+    session_id BIGINT NOT NULL,
+    kb_id BIGINT NOT NULL,
+    question VARCHAR(2000) NOT NULL,
+    confidence INT NOT NULL DEFAULT 0,
+    evidence_coverage INT NOT NULL DEFAULT 0,
+    grounded TINYINT NOT NULL DEFAULT 0,
+    refusal TINYINT NOT NULL DEFAULT 0,
+    reason VARCHAR(120) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_answer_quality_time (create_time),
+    INDEX idx_answer_quality_kb_time (kb_id, create_time),
+    INDEX idx_answer_quality_message (answer_message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Knowledge gap report snapshots for the 7-day and 30-day windows
+CREATE TABLE IF NOT EXISTS kb_gap_report (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    window_days INT NOT NULL,
+    sample_count INT NOT NULL DEFAULT 0,
+    refusal_count INT NOT NULL DEFAULT 0,
+    low_confidence_count INT NOT NULL DEFAULT 0,
+    negative_feedback_count INT NOT NULL DEFAULT 0,
+    report_json LONGTEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'NOT_GENERATED',
+    error_message TEXT,
+    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_gap_report_window_days (window_days)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 第2步 创建抽取模板表，保存模板基础信息
@@ -682,14 +717,18 @@ INSERT INTO sys_menu (parent_id, menu_name, path, route_name, component, icon, m
 SELECT 0, 'RAG 评测', '/eval', 'EvalCenter', 'EvalCenterView', 'clipboard-check', 'MENU', 'eval:view', 100, 1, 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE permission_code = 'eval:view');
 
+INSERT INTO sys_menu (parent_id, menu_name, path, route_name, component, icon, menu_type, permission_code, sort_no, visible, enabled)
+SELECT 0, '知识缺口', '/knowledge-gaps', 'KnowledgeGaps', 'KnowledgeGapView', 'warning', 'MENU', 'knowledge-gap:view', 110, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE permission_code = 'knowledge-gap:view');
+
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id
 FROM sys_role r
-INNER JOIN sys_menu m ON m.permission_code IN ('health:view', 'tasks:view', 'eval:view')
+INNER JOIN sys_menu m ON m.permission_code IN ('health:view', 'tasks:view', 'eval:view', 'knowledge-gap:view')
 WHERE r.role_code = 'admin';
 
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.id, m.id
 FROM sys_role r
-INNER JOIN sys_menu m ON m.permission_code IN ('tasks:view', 'eval:view')
+INNER JOIN sys_menu m ON m.permission_code IN ('tasks:view', 'eval:view', 'knowledge-gap:view')
 WHERE r.role_code = 'user';

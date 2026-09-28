@@ -135,34 +135,47 @@
     </section>
 
     <section class="solar-stage" aria-hidden="true">
-      <div class="solar-video-shell">
-        <video
-          class="solar-video"
-          autoplay
-          muted
-          loop
-          playsinline
-          preload="auto"
-          poster="/images/ai-platform-background-2560x1440.png"
-        >
-          <source src="/videos/solar-system-panorama.mp4" type="video/mp4">
-        </video>
-        <span class="solar-video-glow"></span>
-        <span class="solar-video-grain"></span>
+      <div class="universe-shell">
+        <!-- 3D 场景就绪前先铺一层纯 CSS 的静态星空，避免出现空档期 -->
+        <div v-if="!stageReady" class="stage-placeholder"></div>
+        <SolarSystemBackground v-else />
+        <span class="universe-grain"></span>
       </div>
     </section>
+
+    <p class="stage-hint" aria-hidden="true">拖动旋转视角 · 滚轮缩放</p>
   </main>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login, register } from '../../api/auth'
 import { useUserStore } from '../../stores/user'
 
+// 3D 背景按需异步加载。
+// 它连同 three.js 一起有近 1MB（gzip 后约 300KB），如果写成静态 import，
+// 登录页的 JS 要等整包下载解析完才会执行，用户看到的就是"白屏卡一会才进页面"。
+// 改成异步组件后：外壳背景 CSS 立刻可见 → 表单立刻可交互 → 3D 稍后就位。
+const SolarSystemBackground = defineAsyncComponent(
+  () => import('../../components/SolarSystemBackground.vue')
+)
+
+// 标记 3D 背景是否已挂载：未就绪时用 CSS 兜底光斑占位，避免出现"先黑后亮"的空档。
+const stageReady = ref(false)
+
 const router = useRouter()
 const userStore = useUserStore()
+
+onMounted(() => {
+  // 等首帧绘制完成再挂载 3D，确保登录表单优先抢占主线程
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      stageReady.value = true
+    })
+  })
+})
 
 const activeTab = ref('login')
 const loading = ref(false)
@@ -280,12 +293,23 @@ async function handleRegister() {
   min-height: 100dvh;
   padding: 0;
   overflow: hidden;
+  /* 背景可拖拽旋转，用抓手光标提示可交互 */
+  cursor: grab;
+  /* 按住拖动旋转视角时不要触发文本/图片选中：选区高亮会在画布上方跟着跳动，
+     看起来就像画面在闪；而且"按住拖动"本身就是浏览器的选择手势。
+     表单区域单独放回 text（见 .login-card），否则输入框里选不了字。 */
+  user-select: none;
   color: #f6f1e8;
   background:
     radial-gradient(ellipse at 33% 46%, rgba(45, 97, 145, 0.28), transparent 34%),
     radial-gradient(ellipse at 68% 30%, rgba(63, 87, 115, 0.2), transparent 26%),
     radial-gradient(ellipse at 26% 80%, rgba(229, 160, 68, 0.08), transparent 28%),
     linear-gradient(180deg, #08090d 0%, #030508 58%, #020305 100%);
+}
+
+/* 拖拽过程中由背景组件把 body 光标切换为 grabbing，此处只需处理表单区 */
+.login-card {
+  cursor: default;
 }
 
 .login-page::before {
@@ -394,15 +418,16 @@ async function handleRegister() {
   z-index: 4;
   width: min(430px, 100%);
   padding: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   background:
-    linear-gradient(145deg, rgba(34, 31, 27, 0.88), rgba(16, 17, 20, 0.92)),
-    rgba(22, 23, 27, 0.88);
+    linear-gradient(145deg, rgba(30, 28, 26, 0.92), rgba(12, 13, 16, 0.95)),
+    rgba(18, 19, 23, 0.94);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.055),
-    0 28px 90px rgba(0, 0, 0, 0.48);
-  backdrop-filter: blur(22px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 28px 90px rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(26px) saturate(1.1);
   transform: translateY(-50%);
 }
 
@@ -465,69 +490,65 @@ async function handleRegister() {
   pointer-events: none;
 }
 
-.solar-video-shell {
+.universe-shell {
   position: absolute;
   inset: 0;
   overflow: hidden;
   background: #030508;
 }
 
-.solar-video-shell::before {
+/* 3D 未就绪时的占位：用静态光斑模拟"远处有一颗恒星"，
+   与真实场景的天空底色、地平暖调保持一致，切换时几乎看不出接缝。 */
+.stage-placeholder {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 29% 51%, rgba(255, 214, 150, 0.5), rgba(255, 150, 60, 0.16) 9%, rgba(255, 130, 50, 0) 20%),
+    radial-gradient(circle at 29% 51%, rgba(120, 90, 60, 0.12), transparent 42%),
+    radial-gradient(circle at 24% 20%, rgba(86, 111, 157, 0.16), transparent 38%),
+    linear-gradient(180deg, #08090d 0%, #030508 58%, #020305 100%);
+}
+
+.universe-shell::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 2;
   background:
-    radial-gradient(circle at 48% 51%, rgba(255, 198, 92, 0.2), transparent 20%),
-    radial-gradient(ellipse at 24% 20%, rgba(86, 111, 157, 0.18), transparent 38%),
-    linear-gradient(90deg, rgba(3, 5, 8, 0.04) 0%, rgba(3, 5, 8, 0.12) 45%, rgba(3, 5, 8, 0.56) 72%, rgba(3, 5, 8, 0.96) 100%),
-    linear-gradient(180deg, rgba(2, 3, 6, 0.08), rgba(2, 3, 6, 0.34));
+    radial-gradient(ellipse at 24% 20%, rgba(86, 111, 157, 0.16), transparent 38%),
+    linear-gradient(90deg, rgba(3, 5, 8, 0.05) 0%, rgba(3, 5, 8, 0.12) 45%, rgba(3, 5, 8, 0.56) 72%, rgba(3, 5, 8, 0.94) 100%),
+    linear-gradient(180deg, rgba(2, 3, 6, 0.08), rgba(2, 3, 6, 0.32));
 }
 
-.solar-video-shell::after {
+.universe-shell::after {
   content: "";
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   z-index: 3;
-  width: min(58vw, 880px);
-  background: linear-gradient(90deg, rgba(3, 5, 8, 0), rgba(3, 5, 8, 0.72) 42%, #030508 100%);
+  width: min(62vw, 940px);
+  /* ⚠️ 这里曾经用 `radial-gradient(ellipse at 72% 50%, ...)` 做局部压暗，
+     它在 78% 半径处**硬切到透明**，边界在屏幕上是一条可见的竖直亮暗分界。
+     太阳一旦漂到那条线附近，圆圆的日面就会被"切"出一个直边，
+     看起来像个平面的多边形 —— 这个坑排查了很久，务必不要再改回 ellipse。
+     现在改为纯水平线性渐变：从左到右单调加深，任意位置都不会出现突变边界。 */
+  background:
+    linear-gradient(
+      90deg,
+      rgba(3, 5, 8, 0) 0%,
+      rgba(3, 5, 8, 0.18) 30%,
+      rgba(3, 5, 8, 0.58) 62%,
+      rgba(3, 5, 8, 0.9) 86%,
+      rgba(3, 5, 8, 0.97) 100%
+    );
 }
 
-.solar-video {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 42% center;
-  opacity: 0.94;
-  filter: saturate(1.08) contrast(1.05) brightness(0.86);
-  transform: translate(-50%, -50%);
-}
-
-.solar-video-glow {
-  position: absolute;
-  left: 45%;
-  top: 50%;
-  z-index: 4;
-  width: clamp(260px, 28vw, 520px);
-  height: clamp(260px, 28vw, 520px);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 206, 116, 0.2) 0 14%, rgba(255, 164, 69, 0.12) 32%, transparent 70%);
-  filter: blur(18px);
-  mix-blend-mode: screen;
-  transform: translate(-50%, -50%);
-  animation: solarGlowPulse 5.8s ease-in-out infinite;
-}
-
-.solar-video-grain {
+.universe-grain {
   position: absolute;
   inset: 0;
   z-index: 5;
-  opacity: 0.18;
+  opacity: 0.16;
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 0.62) 0 1px, transparent 1px),
     radial-gradient(circle, rgba(255, 205, 132, 0.36) 0 1px, transparent 1px);
@@ -539,11 +560,22 @@ async function handleRegister() {
     190px 172px;
 }
 
-@keyframes solarGlowPulse {
-  50% {
-    opacity: 0.72;
-    transform: translate(-50%, -50%) scale(1.08);
-  }
+/* 交互提示：左下角常驻，不拦截指针事件 */
+.stage-hint {
+  position: absolute;
+  left: clamp(20px, 3vw, 44px);
+  bottom: clamp(18px, 3vh, 34px);
+  z-index: 6;
+  margin: 0;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  color: rgba(246, 241, 232, 0.52);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  background: rgba(3, 5, 8, 0.42);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
 }
 
 .login-form {
@@ -686,13 +718,14 @@ async function handleRegister() {
     opacity: 0.42;
   }
 
-  .solar-video-shell {
+  .universe-shell {
     inset: 0;
   }
 
-  .solar-video {
-    object-position: 44% center;
-    filter: saturate(1.02) contrast(1.02) brightness(0.62);
+  /* 移动端卡片居中覆盖 3D 场景，右侧渐变遮罩失效，改为整体均匀压暗 */
+  .universe-shell::after {
+    width: 100%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(3, 5, 8, 0.82), rgba(3, 5, 8, 0.9) 70%);
   }
 
   .orbit-one {
@@ -705,6 +738,11 @@ async function handleRegister() {
 
   .orbit-three {
     width: 940px;
+  }
+
+  /* 移动端空间紧张且以触屏为主，隐藏交互提示 */
+  .stage-hint {
+    display: none;
   }
 
 }

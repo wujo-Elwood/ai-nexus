@@ -37,4 +37,8 @@
           AND created_by = #{createdBy}
     </delete>
 
+    <delete id="deleteByKbId">
+        DELETE FROM agent_run WHERE kb_id = #{kbId}
+    </delete>
+
 </mapper>

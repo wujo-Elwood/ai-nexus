@@ -1,5 +1,6 @@
 package com.rag.ai;
 
+import com.rag.common.BusinessException;
 import com.rag.entity.KbChunk;
 import com.rag.entity.ModelProvider;
 import com.rag.mapper.ChunkMapper;
@@ -15,12 +16,15 @@ import com.rag.service.UsageService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -148,5 +152,38 @@ class ChatServiceTest {
         // 第3步：确认返回固定拒答且没有执行重排序
         assertEquals("知识库中没有找到足够依据，暂时无法可靠回答这个问题。", answer);
         verify(reranker, never()).rerank(any(), any(), any(), anyInt());
+    }
+
+    /**
+     * 测试向量维度不匹配的业务异常原样透传，不被包装成笼统的检索失败
+     */
+    @Test
+    void buildContextShouldRethrowBusinessExceptionAsIs() throws Exception {
+        // 第1步：准备向量检索直接抛出维度不匹配业务异常的场景
+        EmbeddingService embeddingService = mock(EmbeddingService.class);
+        QdrantService qdrantService = mock(QdrantService.class);
+        QueryRewriter queryRewriter = mock(QueryRewriter.class);
+        RetrievalCache retrievalCache = mock(RetrievalCache.class);
+        com.rag.mapper.KnowledgeBaseMapper knowledgeBaseMapper = mock(com.rag.mapper.KnowledgeBaseMapper.class);
+        when(knowledgeBaseMapper.findById(3L)).thenReturn(new com.rag.entity.KnowledgeBase());
+        when(queryRewriter.rewrite("公司有没有住房补贴")).thenReturn("公司住房补贴");
+        when(embeddingService.embed("公司住房补贴")).thenReturn(new float[]{0.1f, 0.2f});
+        BusinessException mismatch = new BusinessException(500, "向量维度不匹配：向量库为 1024 维，当前 Embedding 模型输出 768 维");
+        when(qdrantService.searchWithScore(any(float[].class), anyInt(), eq(3L))).thenThrow(mismatch);
+
+        // 第2步：通过反射执行私有的知识库上下文构建方法
+        ChatService service = new ChatService(embeddingService, qdrantService, null, null,
+                mock(ModelProviderService.class), mock(Reranker.class), mock(KeywordSearchService.class),
+                mock(UsageService.class), mock(PromptGuard.class), queryRewriter, retrievalCache,
+                mock(ContextCompressor.class), Runnable::run);
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
+        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources", String.class, Long.class);
+        buildContext.setAccessible(true);
+
+        InvocationTargetException thrown = assertThrows(InvocationTargetException.class,
+                () -> buildContext.invoke(service, "公司有没有住房补贴", 3L));
+
+        // 第3步：确认业务异常原样透传而不是被包装成 RuntimeException
+        assertSame(mismatch, thrown.getCause());
     }
 }

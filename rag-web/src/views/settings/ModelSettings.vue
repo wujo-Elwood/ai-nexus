@@ -21,6 +21,7 @@
             <div class="provider-name-cell">
               <span>{{ row.name }}</span>
               <span v-if="row.isActive === 1" class="active-provider-mark">使用中</span>
+              <span v-if="isReadonlyRow(row)" class="readonly-provider-mark">平台供应商</span>
             </div>
           </template>
         </el-table-column>
@@ -36,6 +37,11 @@
             {{ row.imageBaseUrl || '沿用普通 API 地址' }}
           </template>
         </el-table-column>
+        <el-table-column prop="createdByName" label="创建人" width="120" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.createdByName || '—' }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.isActive === 1 ? 'success' : 'info'" size="small">
@@ -45,13 +51,13 @@
         </el-table-column>
         <el-table-column label="操作" width="230" align="center">
           <template #default="{ row }">
-            <el-button v-if="row.isActive !== 1" type="primary" link @click="handleActivate(row)">
+            <el-button v-if="row.isActive !== 1" type="primary" link :disabled="isReadonlyRow(row)" @click="handleActivate(row)">
               激活
             </el-button>
-            <el-button type="primary" link @click="openDialog(row)">
+            <el-button type="primary" link :disabled="isReadonlyRow(row)" @click="openDialog(row)">
               编辑
             </el-button>
-            <el-button type="danger" link :disabled="row.isActive === 1" @click="handleDelete(row)">
+            <el-button type="danger" link :disabled="isReadonlyRow(row) || row.isActive === 1" @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -227,6 +233,11 @@ function getProviderRowClass({ row }) {
   return row.isActive === 1 ? 'active-provider-row' : ''
 }
 
+// 后端不会下发他人创建的供应商密钥，密钥为空即代表当前用户只能查看
+function isReadonlyRow(row) {
+  return !row.apiKey
+}
+
 // 激活供应商
 async function handleActivate(row) {
   try {
@@ -306,6 +317,21 @@ async function handleDelete(row) {
   border-radius: 999px;
   background: rgba(245, 174, 70, 0.14);
   color: #f5ae46;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.readonly-provider-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b8bcc4;
   font-size: 12px;
   font-weight: 850;
   line-height: 1;

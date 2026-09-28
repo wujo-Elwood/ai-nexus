@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
  */
 @SpringBootApplication
 @EnableScheduling
-@MapperScan({"com.rag.mapper", "com.rag.extract.mapper", "com.rag.agent.mapper", "com.rag.image.mapper", "com.rag.rbac.mapper", "com.rag.catalog", "com.rag.task", "com.rag.eval"})
+    @MapperScan({"com.rag.mapper", "com.rag.extract.mapper", "com.rag.agent.mapper", "com.rag.image.mapper", "com.rag.rbac.mapper", "com.rag.catalog", "com.rag.task", "com.rag.eval"})
 public class RagApplication {
 
     /**
@@ -37,6 +37,12 @@ public class RagApplication {
     @Bean("chatStreamExecutor")
     public ThreadPoolExecutor chatStreamExecutor() {
         return new ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    }
+
+    /** 知识缺口分析线程池，用于隔离定时和手动报告生成任务。 */
+    @Bean("knowledgeGapAnalysisExecutor")
+    public ThreadPoolExecutor knowledgeGapAnalysisExecutor() {
+        return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
     }
 
     /**

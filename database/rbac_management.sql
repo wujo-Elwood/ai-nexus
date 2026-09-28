@@ -127,3 +127,14 @@ INNER JOIN sys_role r ON r.role_code = 'user'
 WHERE NOT EXISTS (
     SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id
 );
+
+-- 第11步：初始化知识缺口分析菜单并授权
+INSERT INTO sys_menu (parent_id, menu_name, path, route_name, component, icon, menu_type, permission_code, sort_no, visible, enabled)
+SELECT 0, '知识缺口', '/knowledge-gaps', 'KnowledgeGaps', 'KnowledgeGapView', 'warning', 'MENU', 'knowledge-gap:view', 110, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE permission_code = 'knowledge-gap:view');
+
+INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
+SELECT r.id, m.id
+FROM sys_role r
+INNER JOIN sys_menu m ON m.permission_code = 'knowledge-gap:view'
+WHERE r.role_code IN ('admin', 'user');

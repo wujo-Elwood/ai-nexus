@@ -33,6 +33,33 @@
               <span>{{ item.label }}</span>
             </router-link>
           </nav>
+
+          <nav class="nav-section showcase-nav">
+            <h2>展示</h2>
+            <button
+              type="button"
+              class="side-menu-item showcase-toggle"
+              :class="{ active: showcaseActive, open: showcaseOpen }"
+              :aria-expanded="showcaseOpen"
+              @click="toggleShowcase"
+            >
+              <span class="menu-symbol">{{ SHOWCASE_GROUP.symbol }}</span>
+              <span class="showcase-toggle-label">{{ SHOWCASE_GROUP.label }}</span>
+              <span class="showcase-arrow" aria-hidden="true">›</span>
+            </button>
+            <div v-show="showcaseOpen" class="showcase-children">
+              <router-link
+                v-for="item in SHOWCASE_GROUP.children"
+                :key="item.path"
+                :to="item.path"
+                class="side-menu-item showcase-child"
+                :class="{ active: isActiveRoute(item.path) }"
+              >
+                <span class="child-dot" aria-hidden="true"></span>
+                <span>{{ item.label }}</span>
+              </router-link>
+            </div>
+          </nav>
         </aside>
 
         <section class="workspace">
@@ -87,6 +114,52 @@ let meteorTimer = null
 let cosmicEffectId = 0
 let cachedMenuItems = []
 
+// 展厅类纯展示入口，不依赖后端菜单配置，统一收在可折叠的「视觉展厅」大菜单下
+const SHOWCASE_GROUP = {
+  label: '视觉展厅',
+  symbol: '✧',
+  children: [
+    { path: '/showcase', label: '粒子展厅', symbol: '✧' },
+    { path: '/cyber-city', label: '赛博都市', symbol: '⬢' },
+    { path: '/jarvis', label: 'JARVIS 工作台', symbol: '◎' },
+    { path: '/fractal-tunnel', label: '无限分形隧道', symbol: '∞' },
+    { path: '/black-hole', label: '黑洞引力透镜', symbol: '⬤' },
+    { path: '/storm', label: '雷暴之眼', symbol: '⚡' },
+    { path: '/digital-life', label: '数字生命', symbol: '✺' },
+    { path: '/aurora', label: '极光雪原', symbol: '❅' },
+    { path: '/fluid-smoke', label: '流体烟雾', symbol: '≈' },
+    { path: '/volumetric-light', label: '体积光', symbol: '◐' },
+    { path: '/ink-wash', label: '水墨晕染', symbol: '墨' },
+    { path: '/tesseract', label: '四维超立方体', symbol: '◈' },
+    { path: '/supernova', label: '超新星爆发', symbol: '✹' },
+    { path: '/liquid-metal', label: '液态水银', symbol: '◒' }
+  ]
+}
+
+// 展开状态：默认收起，仅当当前路由命中展厅子项时自动展开
+const SHOWCASE_STORAGE_KEY = 'wujo-showcase-menu-open'
+const showcaseOpen = ref(
+  isShowcaseRoute() || localStorage.getItem(SHOWCASE_STORAGE_KEY) === '1'
+)
+
+// 当前路由是否落在展厅子项内（用于父菜单高亮）
+const showcaseActive = computed(() =>
+  SHOWCASE_GROUP.children.some(item => route.path.startsWith(item.path))
+)
+
+// 判断当前路由是否属于展厅
+function isShowcaseRoute() {
+  return SHOWCASE_GROUP.children.some(item => route.path.startsWith(item.path))
+}
+
+// 展开/收起展厅大菜单，并记住用户选择
+function toggleShowcase() {
+  // 第1步：切换展开状态
+  showcaseOpen.value = !showcaseOpen.value
+  // 第2步：持久化选择，刷新后保持
+  localStorage.setItem(SHOWCASE_STORAGE_KEY, showcaseOpen.value ? '1' : '0')
+}
+
 const fallbackMenuItems = [
   {
     path: '/kb',
@@ -139,6 +212,11 @@ const fallbackMenuItems = [
     symbol: '▤'
   },
   {
+    path: '/knowledge-gaps',
+    label: '知识缺口',
+    symbol: '⌁'
+  },
+  {
     path: '/eval',
     label: 'RAG 评测',
     symbol: '✓'
@@ -178,6 +256,7 @@ async function loadCurrentMenus() {
     const items = buildMenuItems(res.data || [])
     // 第2步：接口返回菜单时替换默认菜单
     if (items.length > 0) {
+      // 展厅入口不在后端菜单表内，独立成组渲染，不参与此处拼接
       cachedMenuItems = items
       menuItems.value = items
     }
@@ -226,6 +305,7 @@ function getMenuSymbol(menu) {
     'stats:view': '▥',
     'health:view': '◉',
     'tasks:view': '▤',
+    'knowledge-gap:view': '⌁',
     'eval:view': '✓'
   }
   if (symbolMap[menu.permissionCode]) {
@@ -586,6 +666,23 @@ function randomNumber(min, max) {
   border-right: 1px solid var(--border);
   background: rgba(12, 14, 18, 0.68);
   backdrop-filter: blur(18px);
+  /* 功能菜单 + 展开后的展厅子项可能超出视口高度，允许纵向滚动 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 侧边栏滚动条收细，避免破坏整体视觉 */
+.side-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.side-nav::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.side-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .nav-section {
@@ -632,6 +729,64 @@ function randomNumber(min, max) {
   width: 14px;
   color: var(--primary-color);
   font-size: 12px;
+}
+
+/* 展厅大菜单：与功能菜单保持同一视觉语言，父项可折叠 */
+.showcase-nav {
+  margin-top: 18px;
+}
+
+.showcase-toggle {
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.showcase-toggle-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.showcase-arrow {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.22s ease;
+}
+
+.showcase-toggle.open .showcase-arrow {
+  transform: rotate(90deg);
+}
+
+/* 子项整体缩进，并用左侧细线表达从属关系 */
+.showcase-children {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.showcase-child {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.child-dot {
+  width: 4px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.showcase-child.active .child-dot {
+  opacity: 1;
 }
 
 .workspace {
@@ -811,9 +966,21 @@ function randomNumber(min, max) {
   .side-nav {
     border-right: 0;
     border-bottom: 1px solid var(--line-color);
+    /* 移动端侧栏横排，无需纵向滚动 */
+    overflow-y: visible;
   }
 
   .feature-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 展厅大菜单在移动端独占整行，子项内部改为两列，避免过长 */
+  .showcase-nav {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+  }
+
+  .showcase-children {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

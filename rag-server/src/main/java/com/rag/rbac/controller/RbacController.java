@@ -1,6 +1,7 @@
 package com.rag.rbac.controller;
 
 import com.rag.entity.SysUser;
+import com.rag.rbac.annotation.RequirePermission;
 import com.rag.rbac.dto.IdListRequest;
 import com.rag.rbac.entity.SysMenu;
 import com.rag.rbac.entity.SysRole;
@@ -53,6 +54,7 @@ public class RbacController {
     /**
      * 查询全部菜单
      */
+    @RequirePermission("rbac:manage")
     @GetMapping("/menus")
     public Result<List<MenuTreeNode>> listMenus() {
         // 第1步：返回全部菜单树，供菜单管理维护
@@ -62,6 +64,7 @@ public class RbacController {
     /**
      * 新增菜单
      */
+    @RequirePermission("rbac:manage")
     @PostMapping("/menus")
     public Result<SysMenu> createMenu(@RequestBody SysMenu menu) {
         // 第1步：新增菜单并返回数据库编号
@@ -71,6 +74,7 @@ public class RbacController {
     /**
      * 修改菜单
      */
+    @RequirePermission("rbac:manage")
     @PutMapping("/menus/{id}")
     public Result<SysMenu> updateMenu(@PathVariable Long id, @RequestBody SysMenu menu) {
         // 第1步：更新指定菜单
@@ -80,6 +84,7 @@ public class RbacController {
     /**
      * 删除菜单
      */
+    @RequirePermission("rbac:manage")
     @DeleteMapping("/menus/{id}")
     public Result<Void> deleteMenu(@PathVariable Long id) {
         // 第1步：删除菜单和相关授权
@@ -90,6 +95,7 @@ public class RbacController {
     /**
      * 查询全部角色
      */
+    @RequirePermission("rbac:manage")
     @GetMapping("/roles")
     public Result<List<SysRole>> listRoles() {
         // 第1步：返回角色列表
@@ -99,6 +105,7 @@ public class RbacController {
     /**
      * 新增角色
      */
+    @RequirePermission("rbac:manage")
     @PostMapping("/roles")
     public Result<SysRole> createRole(@RequestBody SysRole role) {
         // 第1步：新增角色
@@ -108,6 +115,7 @@ public class RbacController {
     /**
      * 修改角色
      */
+    @RequirePermission("rbac:manage")
     @PutMapping("/roles/{id}")
     public Result<SysRole> updateRole(@PathVariable Long id, @RequestBody SysRole role) {
         // 第1步：更新角色
@@ -117,6 +125,7 @@ public class RbacController {
     /**
      * 删除角色
      */
+    @RequirePermission("rbac:manage")
     @DeleteMapping("/roles/{id}")
     public Result<Void> deleteRole(@PathVariable Long id) {
         // 第1步：删除角色和相关授权
@@ -127,6 +136,7 @@ public class RbacController {
     /**
      * 查询角色菜单授权
      */
+    @RequirePermission("rbac:manage")
     @GetMapping("/roles/{id}/menus")
     public Result<List<Long>> listRoleMenus(@PathVariable Long id) {
         // 第1步：返回角色已勾选菜单编号
@@ -136,6 +146,7 @@ public class RbacController {
     /**
      * 保存角色菜单授权
      */
+    @RequirePermission("rbac:manage")
     @PutMapping("/roles/{id}/menus")
     public Result<Void> saveRoleMenus(@PathVariable Long id, @RequestBody IdListRequest request) {
         // 第1步：保存角色菜单授权
@@ -146,6 +157,7 @@ public class RbacController {
     /**
      * 查询用户列表
      */
+    @RequirePermission("rbac:manage")
     @GetMapping("/users")
     public Result<List<SysUser>> listUsers() {
         // 第1步：返回不包含密码的用户列表
@@ -155,6 +167,7 @@ public class RbacController {
     /**
      * 删除用户
      */
+    @RequirePermission("rbac:manage")
     @DeleteMapping("/users/{id}")
     public Result<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
         // 第1步：读取当前登录用户编号
@@ -167,6 +180,7 @@ public class RbacController {
     /**
      * 查询用户角色授权
      */
+    @RequirePermission("rbac:manage")
     @GetMapping("/users/{id}/roles")
     public Result<List<SysRole>> listUserRoles(@PathVariable Long id) {
         // 第1步：返回用户拥有的角色
@@ -176,6 +190,7 @@ public class RbacController {
     /**
      * 保存用户角色授权
      */
+    @RequirePermission("rbac:manage")
     @PutMapping("/users/{id}/roles")
     public Result<Void> saveUserRoles(@PathVariable Long id, @RequestBody IdListRequest request) {
         // 第1步：保存用户角色授权

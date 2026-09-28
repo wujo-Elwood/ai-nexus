@@ -11,6 +11,8 @@ public interface ModelProviderMapper {
 
     List<ModelProvider> findAll();
 
+    List<ModelProvider> findByCreatedBy(@Param("createdBy") Long createdBy);
+
     ModelProvider findById(@Param("id") Long id);
 
     ModelProvider findActive();

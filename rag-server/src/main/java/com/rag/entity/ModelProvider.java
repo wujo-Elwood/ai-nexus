@@ -27,6 +27,10 @@ public class ModelProvider {
     private String imageModel;
     /** 是否激活：1=激活，0=未激活 */
     private Integer isActive;
+    /** 创建人用户ID，历史数据为空 */
+    private Long createdBy;
+    /** 创建人用户名，查询时联表带出，仅用于展示 */
+    private String createdByName;
     /** 创建时间 */
     private LocalDateTime createTime;
 }

@@ -27,4 +27,7 @@ public interface MultipartUploadChunkMapper {
 
     /** 删除上传会话下的全部分片记录 */
     int deleteByUploadId(@Param("uploadId") String uploadId);
+
+    /** 删除知识库下全部分片记录 */
+    int deleteByKbId(@Param("kbId") Long kbId);
 }

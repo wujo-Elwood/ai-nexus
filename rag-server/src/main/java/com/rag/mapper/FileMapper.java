@@ -23,6 +23,12 @@ public interface FileMapper {
     /** 查询知识库当前版本文件 */
     List<KbFile> findCurrentByKbId(@Param("kbId") Long kbId);
 
+    /** 查询所有知识库的当前版本文件 */
+    List<KbFile> findAllCurrent();
+
+    /** 将全部文件向量状态标记为待处理 */
+    int markAllVectorsPending();
+
     /** 按哈希查询同知识库重复文件 */
     KbFile findBySha256(@Param("kbId") Long kbId, @Param("fileSha256") String fileSha256);
 
@@ -85,4 +91,10 @@ public interface FileMapper {
 
     /** 删除文件记录 */
     int deleteById(@Param("id") Long id);
+
+    /** 删除知识库下全部文件记录（含历史版本） */
+    int deleteByKbId(@Param("kbId") Long kbId);
+
+    /** 删除知识库下全部文件的版本快照 */
+    int deleteVersionsByKbId(@Param("kbId") Long kbId);
 }

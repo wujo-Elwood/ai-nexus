@@ -1,6 +1,7 @@
 package com.rag.controller;
 
 import com.rag.entity.KnowledgeBase;
+import com.rag.service.FileService;
 import com.rag.service.KnowledgeBaseService;
 import com.rag.kb.KnowledgeSummaryService;
 import com.rag.vo.Result;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 知识库控制器
@@ -24,6 +26,10 @@ public class KnowledgeBaseController {
     /** 知识库摘要服务 */
     @Autowired
     private KnowledgeSummaryService knowledgeSummaryService;
+
+    /** 文件服务，用于重建知识库向量 */
+    @Autowired
+    private FileService fileService;
 
     /** 创建知识库（默认私有） */
     @PostMapping
@@ -71,6 +77,26 @@ public class KnowledgeBaseController {
         Long userId = (Long) httpRequest.getAttribute("userId");
         knowledgeBaseService.delete(id, userId);
         return Result.success();
+    }
+
+    /** 重建知识库全部当前版本文件的向量（只有创建者可以操作，用于更换 Embedding 模型后重建） */
+    @PostMapping("/{id}/rebuild-vectors")
+    public Result<Integer> rebuildVectors(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        return Result.success(fileService.reprocessKb(id, userId));
+    }
+
+    /** 管理员重建全部知识库向量 */
+    @PostMapping("/rebuild-vectors")
+    public Result<Integer> rebuildAllVectors(HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        return Result.success(fileService.rebuildAllVectors(userId));
+    }
+
+    /** 查询全局向量重建进度，供任务中心展示 */
+    @GetMapping("/rebuild-vectors/status")
+    public Result<Map<String, Object>> rebuildVectorsStatus() {
+        return Result.success(fileService.getRebuildStatus());
     }
 
     /** 查询知识库策略 */

@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 知识库服务
@@ -15,8 +17,19 @@ import java.util.List;
 @Service
 public class KnowledgeBaseService {
 
+    /** 正在删除的知识库编号，供异步文件处理任务快速终止 */
+    private static final Set<Long> DELETING_KB_IDS = ConcurrentHashMap.newKeySet();
+
+    /** 判断知识库是否正在删除 */
+    public static boolean isDeleting(Long kbId) {
+        return kbId != null && DELETING_KB_IDS.contains(kbId);
+    }
+
     @Autowired
     private KnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Autowired
+    private FileService fileService;
 
     /** 创建知识库，默认私有 */
     public KnowledgeBase create(String name, String description, Long userId) {
@@ -80,7 +93,8 @@ public class KnowledgeBaseService {
         return kb;
     }
 
-    /** 删除知识库（只有创建者可以删除） */
+    /** 删除知识库及其全部文件、切片、向量等关联数据（只有创建者可以删除） */
+    @org.springframework.transaction.annotation.Transactional
     public void delete(Long id, Long userId) {
         KnowledgeBase kb = knowledgeBaseMapper.findById(id);
         if (kb == null) {
@@ -89,7 +103,14 @@ public class KnowledgeBaseService {
         if (!kb.getCreateUser().equals(userId)) {
             throw new BusinessException(403, "No permission to delete this knowledge base");
         }
-        knowledgeBaseMapper.deleteById(id);
+        DELETING_KB_IDS.add(id);
+        try {
+            //数据库无外键约束，必须先清理关联数据，否则文件、切片和向量全部残留
+            fileService.deleteKbData(id);
+            knowledgeBaseMapper.deleteById(id);
+        } finally {
+            DELETING_KB_IDS.remove(id);
+        }
     }
 
     /**

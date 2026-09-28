@@ -23,8 +23,9 @@
           <el-option
             v-for="provider in providerList"
             :key="provider.id"
-            :label="`${provider.name} / ${provider.model}`"
+            :label="formatProviderLabel(provider)"
             :value="provider.id"
+            :disabled="!provider.apiKey"
           />
         </el-select>
         <div class="mode-card">
@@ -198,23 +199,29 @@
         </article>
       </div>
 
-      <div class="chat-input-panel">
+      <div
+        class="chat-resize-handle"
+        title="拖动调整输入框高度"
+        @mousedown="startInputResize"
+      ></div>
+
+      <div class="chat-input-panel" :style="{ height: inputAreaHeight + 'px' }">
         <el-input
           v-model="inputMessage"
           type="textarea"
-          :autosize="{ minRows: 3, maxRows: 7 }"
+          resize="none"
           placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
           @keydown.enter.exact="handleEnter"
         />
         <el-button
           type="primary"
           class="send-button"
+          title="发送（Enter）"
           :loading="loading"
           :disabled="!inputMessage.trim()"
           @click="sendMessage"
         >
           <el-icon><Promotion /></el-icon>
-          发送
         </el-button>
       </div>
     </section>
@@ -252,6 +259,40 @@ const recallLoading = ref(false)
 const recallResults = ref([])
 let pollingTimer = null
 
+// 输入区高度：可用鼠标拖动上方的分隔条上下调整
+const inputAreaHeight = ref(110)
+const INPUT_MIN_HEIGHT = 110
+const INPUT_MAX_HEIGHT = 480
+let resizingInput = false
+let resizeStartY = 0
+let resizeStartHeight = 0
+
+function handleInputResizeMove(event) {
+  if (!resizingInput) return
+  const next = resizeStartHeight - (event.clientY - resizeStartY)
+  inputAreaHeight.value = Math.min(Math.max(next, INPUT_MIN_HEIGHT), INPUT_MAX_HEIGHT)
+}
+
+function stopInputResize() {
+  if (!resizingInput) return
+  resizingInput = false
+  document.removeEventListener('mousemove', handleInputResizeMove)
+  document.removeEventListener('mouseup', stopInputResize)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
+function startInputResize(event) {
+  resizingInput = true
+  resizeStartY = event.clientY
+  resizeStartHeight = inputAreaHeight.value
+  document.addEventListener('mousemove', handleInputResizeMove)
+  document.addEventListener('mouseup', stopInputResize)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+  event.preventDefault()
+}
+
 const sessionStorageKey = 'rag_chat_sessions'
 const pendingChatSessionKey = 'rag_chat_pending_session'
 const pendingChatTimeoutMs = 2 * 60 * 1000
@@ -271,8 +312,14 @@ const selectedKbName = computed(() => {
 // 当前启用模型名称
 const activeProviderName = computed(() => {
   const provider = providerList.value.find(item => item.id === activeProviderId.value)
-  return provider ? `${provider.name} / ${provider.model}` : '未选择模型'
+  return provider ? formatProviderLabel(provider) : '未选择模型'
 })
+
+// 拼接模型展示名称，他人创建的平台供应商标记为不可切换
+function formatProviderLabel(provider) {
+  const label = `${provider.name} / ${provider.model}`
+  return provider.apiKey ? label : `${label}（平台默认，不可切换）`
+}
 
 onMounted(() => {
   loadSessionList()
@@ -294,6 +341,7 @@ onBeforeUnmount(() => {
   loading.value = false
   waitingForResponse.value = false
   stopPolling()
+  stopInputResize()
 })
 
 watch(messages, () => {
@@ -1080,7 +1128,11 @@ function exportChat() {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow: hidden;
+  /* 父级 grid 固定高度；overflow 改为 visible 后必须显式 min-height:0，
+     否则 grid item 的 min-height:auto 会被内容撑高，把底部输入框顶出视口 */
+  min-height: 0;
+  /* 不能裁切，否则全局"星云流光边框"的外扩云雾层（::after）会被裁掉底边一圈 */
+  overflow: visible;
 }
 
 .chat-header {
@@ -1324,16 +1376,89 @@ function exportChat() {
 
 .chat-input-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 118px;
+  grid-template-columns: minmax(0, 1fr) 44px;
   gap: 14px;
-  align-items: end;
+  align-items: stretch;
   padding: 18px;
   border-top: 1px solid var(--line-color);
   background: rgba(8, 10, 16, 0.42);
+  /* 父级不再裁切，底部两角自己收圆，避免盖住容器的圆角 */
+  border-radius: 0 0 12px 12px;
+  min-height: 110px;
+}
+
+/* 输入框跟随面板高度（拖动分隔条时同步变高/变矮） */
+.chat-input-panel :deep(.el-textarea) {
+  height: 100%;
+}
+
+.chat-input-panel :deep(.el-textarea__inner) {
+  height: 100%;
+  min-height: 0;
+  resize: none;
+}
+
+/* 分隔条：按住上下拖动可调整输入区高度 */
+.chat-resize-handle {
+  flex: 0 0 auto;
+  height: 12px;
+  margin-top: -6px;
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+  position: relative;
+  z-index: 2;
+}
+
+.chat-resize-handle::after {
+  content: "";
+  width: 44px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(247, 245, 242, 0.14);
+  transition:
+    width 0.2s var(--motion-curve),
+    background 0.2s var(--motion-curve);
+}
+
+.chat-resize-handle:hover::after,
+.chat-resize-handle:active::after {
+  width: 84px;
+  background: rgba(157, 107, 255, 0.72);
 }
 
 .send-button {
-  min-height: 72px;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  align-self: end;
+  justify-self: end;
+  border-radius: 10px;
+}
+
+.send-button :deep(.el-icon) {
+  font-size: 18px;
+}
+
+/* 方形图标按钮：平时低调中性灰，与页面其它主按钮共用主色点亮 */
+.chat-input-panel .send-button:not(.is-disabled) {
+  color: rgba(247, 245, 242, 0.88);
+  border: none;
+  background: rgba(247, 245, 242, 0.1);
+}
+
+.chat-input-panel .send-button:not(.is-disabled):hover,
+.chat-input-panel .send-button:not(.is-disabled):focus {
+  color: #0b0c0e;
+  background: var(--primary-color);
+  box-shadow: 0 0 18px -6px rgba(229, 160, 68, 0.6);
+}
+
+/* 未输入内容时按钮是禁用的：走低调的灰，不要 Element Plus 那套浅蓝 */
+.chat-input-panel .send-button.is-disabled {
+  color: rgba(247, 245, 242, 0.26);
+  border: 1px solid rgba(247, 245, 242, 0.08);
+  background: rgba(247, 245, 242, 0.04);
 }
 
 @media (max-width: 1020px) {

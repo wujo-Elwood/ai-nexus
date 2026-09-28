@@ -16,4 +16,10 @@ public interface EvalMapper {
     int insertRun(EvalRun run);
     /** 查询运行历史 */
     List<EvalRun> listRuns(@Param("kbId") Long kbId, @Param("userId") Long userId);
+    /** 删除知识库评测运行明细 */
+    int deleteRunItemsByKbId(@Param("kbId") Long kbId);
+    /** 删除知识库评测运行 */
+    int deleteRunsByKbId(@Param("kbId") Long kbId);
+    /** 删除知识库评测用例 */
+    int deleteCasesByKbId(@Param("kbId") Long kbId);
 }

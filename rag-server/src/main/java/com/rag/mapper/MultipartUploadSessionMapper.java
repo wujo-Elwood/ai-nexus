@@ -34,6 +34,12 @@ public interface MultipartUploadSessionMapper {
     /** 查询已经过期的上传会话 */
     List<MultipartUploadSession> findExpired(@Param("expireTime") LocalDateTime expireTime);
 
+    /** 查询知识库下全部上传会话 */
+    List<MultipartUploadSession> findByKbId(@Param("kbId") Long kbId);
+
     /** 删除上传会话 */
     int deleteByUploadId(@Param("uploadId") String uploadId);
+
+    /** 删除知识库下全部上传会话 */
+    int deleteByKbId(@Param("kbId") Long kbId);
 }

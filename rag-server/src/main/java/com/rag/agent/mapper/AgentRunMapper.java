@@ -32,4 +32,7 @@ public interface AgentRunMapper {
      * 删除当前用户自己的运行记录
      */
     int deleteById(@Param("id") Long id, @Param("createdBy") Long createdBy);
+
+    /** 删除知识库下全部智能体运行记录 */
+    int deleteByKbId(@Param("kbId") Long kbId);
 }

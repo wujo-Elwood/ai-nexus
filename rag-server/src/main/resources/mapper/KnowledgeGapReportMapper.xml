@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.KnowledgeGapReportMapper">
+
+    <!-- 按窗口查询最新报告 -->
+    <select id="findByWindowDays" resultType="com.rag.entity.KnowledgeGapReport">
+        SELECT *
+        FROM kb_gap_report
+        WHERE window_days = #{windowDays}
+    </select>
+
+    <!-- 插入首次生成的报告 -->
+    <insert id="insert" parameterType="com.rag.entity.KnowledgeGapReport" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO kb_gap_report (
+            window_days, sample_count, refusal_count, low_confidence_count,
+            negative_feedback_count, report_json, status, error_message, generated_at
+        ) VALUES (
+            #{windowDays}, #{sampleCount}, #{refusalCount}, #{lowConfidenceCount},
+            #{negativeFeedbackCount}, #{reportJson}, #{status}, #{errorMessage}, #{generatedAt}
+        )
+    </insert>
+
+    <!-- 标记报告正在分析；重复窗口只更新状态，不覆盖历史 JSON -->
+    <insert id="markRunning">
+        INSERT INTO kb_gap_report (window_days, status, error_message, generated_at)
+        VALUES (#{windowDays}, 'RUNNING', NULL, #{generatedAt})
+        ON DUPLICATE KEY UPDATE
+            status = 'RUNNING',
+            error_message = NULL,
+            generated_at = VALUES(generated_at)
+    </insert>
+
+    <!-- 更新成功报告 -->
+    <update id="updateSuccess">
+        UPDATE kb_gap_report
+        SET sample_count = #{report.sampleCount},
+            refusal_count = #{report.refusalCount},
+            low_confidence_count = #{report.lowConfidenceCount},
+            negative_feedback_count = #{report.negativeFeedbackCount},
+            report_json = #{report.reportJson},
+            status = #{report.status},
+            error_message = #{report.errorMessage},
+            generated_at = #{report.generatedAt}
+        WHERE window_days = #{report.windowDays}
+    </update>
+
+    <!-- 更新失败状态，保留最近一次成功报告内容 -->
+    <update id="updateFailure">
+        UPDATE kb_gap_report
+        SET status = #{status},
+            error_message = #{errorMessage},
+            generated_at = #{generatedAt}
+        WHERE window_days = #{windowDays}
+    </update>
+
+</mapper>
