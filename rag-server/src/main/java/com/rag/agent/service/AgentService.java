@@ -24,6 +24,8 @@ public class AgentService {
 
     private static final String knowledgeQualityCode = "knowledge-quality";
     private static final String knowledgeQualityName = "知识库质检智能体";
+    private static final String generalToolCode = "general-tool";
+    private static final String generalToolName = "工具智能体";
 
     private final KnowledgeQualityAgentService knowledgeQualityAgentService;
     private final AgentRunMapper agentRunMapper;
@@ -47,25 +49,37 @@ public class AgentService {
      * 获取智能体列表
      */
     public List<Map<String, Object>> listAgents() {
-        // 第1步：创建智能体列表
+        // 第1步：读取模型设置中当前激活的模型供应商，让页面展示和实际调用保持一致
         List<Map<String, Object>> agents = new ArrayList<>();
-        // 第2步：加入知识库质检智能体
-        Map<String, Object> agent = new LinkedHashMap<>();
-        agent.put("code", knowledgeQualityCode);
-        agent.put("name", knowledgeQualityName);
-        agent.put("description", "检查知识库文件、分片、召回和问答风险，生成质量评分与优化建议。");
-        agent.put("status", "ENABLED");
-        agent.put("version", "1.0");
-        agent.put("scene", "知识库上线前质检、问答效果排查、交付报告生成");
-        // 第3步：读取模型设置中当前激活的模型供应商，让页面展示和实际调用保持一致
         ModelProvider provider = modelProviderService.getActive();
-        agent.put("providerId", provider.getId());
-        agent.put("providerName", provider.getName());
-        agent.put("modelName", provider.getModel());
-        agent.put("modelDisplayName", buildModelDisplayName(provider));
-        agents.add(agent);
+        String modelDisplayName = buildModelDisplayName(provider);
+        // 第2步：加入知识库质检智能体
+        agents.add(buildAgent(knowledgeQualityCode, knowledgeQualityName,
+                "检查知识库文件、分片、召回和问答风险，生成质量评分与优化建议。",
+                "知识库上线前质检、问答效果排查、交付报告生成", provider, modelDisplayName));
+        // 第3步：加入通用工具智能体
+        agents.add(buildAgent(generalToolCode, generalToolName,
+                "自主编排工具调用完成实时任务（当前支持天气查询），每一步执行过程实时可见。",
+                "实时信息查询、多步工具编排、执行过程可视化", provider, modelDisplayName));
         // 第4步：返回智能体列表
         return agents;
+    }
+
+    /** 组装单个智能体卡片数据 */
+    private Map<String, Object> buildAgent(String code, String name, String description,
+                                           String scene, ModelProvider provider, String modelDisplayName) {
+        Map<String, Object> agent = new LinkedHashMap<>();
+        agent.put("code", code);
+        agent.put("name", name);
+        agent.put("description", description);
+        agent.put("status", "ENABLED");
+        agent.put("version", "1.0");
+        agent.put("scene", scene);
+        agent.put("providerId", provider == null ? null : provider.getId());
+        agent.put("providerName", provider == null ? null : provider.getName());
+        agent.put("modelName", provider == null ? null : provider.getModel());
+        agent.put("modelDisplayName", modelDisplayName);
+        return agent;
     }
 
     /**
