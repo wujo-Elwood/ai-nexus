@@ -81,8 +81,11 @@ public class AgentToolService {
             runLoop(model, buildMessages(request), runId, listener);
             listener.onDone(runId);
         } catch (Exception e) {
-            log.warn("通用工具智能体执行失败: {}", e.getMessage());
-            String message = e instanceof BusinessException ? e.getMessage() : "智能体执行失败，请稍后重试";
+            // 把真实失败原因透传给前端（如供应商余额不足、接口不通），避免只看到笼统的重试提示
+            log.warn("通用工具智能体执行失败: {}", e.getMessage(), e);
+            String message = (e.getMessage() == null || e.getMessage().isBlank())
+                    ? "智能体执行失败，请稍后重试"
+                    : e.getMessage();
             sendEvent(emitter, "error", Map.of("runId", runId, "message", message));
             emitter.complete();
         }
