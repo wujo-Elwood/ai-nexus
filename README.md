@@ -63,6 +63,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 文档抽取：文档上传、抽取模板、字段配置、异步任务、人工修正和结果导出。
 - AI 生图：OpenAI 兼容生图供应商、异步生成任务、历史记录、查看、下载和删除。
 - 智能体管理：知识库质检智能体、运行记录、风险项、质量报告和历史报告。
+- 通用工具智能体：模型自主编排工具调用（首个工具为 Open-Meteo 天气查询，无需 API Key），每个工具调用步骤实时推送到前端并落库 `agent_tool_step`，支持事后回放。
 - 能力展示：粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞、水墨等多套 WebGL 视觉展示页。
 
 > 当前不包含图片 OCR、图片语义理解或流程图理解。AI 生图是独立功能，不参与知识库文档检索。
@@ -419,6 +420,7 @@ foreach ($script in $scripts) {
 | `/image` | AI 生图 | 异步生成、历史、查看和下载 |
 | `/agents` | 智能体管理 | 智能体入口和运行记录 |
 | `/agents/kb-quality` | 知识库质检智能体 | 执行质检并查看质量报告 |
+| `/agent-tools` | 工具智能体 | 通用工具调用对话，执行过程逐步可见 |
 | `/knowledge-gaps` | 知识缺口分析 | 查看最近 7 天或 30 天的拒答、低质量问题聚类 |
 | `/rbac` | 权限管理 | 菜单、角色、授权和用户管理 |
 | `/settings` | 模型设置 | 聊天和生图供应商配置 |
@@ -449,6 +451,7 @@ foreach ($script in $scripts) {
 | 文档抽取 | 模板、文档上传、任务、结果修正和导出接口 |
 | AI 生图 | 生成、任务、历史、查看、下载和删除接口 |
 | 智能体 | 智能体列表、知识库质检运行、报告详情和删除 |
+| 工具智能体 | `POST /agent-tools/chat/stream`（SSE：open/step_start/step_result/answer/done/error）、`GET /agent-tools/tools` |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
 | 模型与统计 | 模型供应商增删改查、激活供应商（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
 
@@ -464,7 +467,7 @@ foreach ($script in $scripts) {
 | RAG 评测 | `kb_eval_case`、`kb_eval_run`、`kb_eval_run_item` |
 | 文档抽取 | `extract_document`、`extract_template`、`extract_field`、`extract_task`、`extract_result`、`extract_review_record`、`extract_export_record` |
 | AI 生图 | `ai_image_task`、`ai_image_history` |
-| 智能体 | `agent_run` |
+| 智能体 | `agent_run`、`agent_tool_step` |
 | 知识缺口分析 | `ai_answer_quality`、`kb_gap_report` |
 
 ## 核心流程

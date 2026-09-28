@@ -59,6 +59,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/agent-tools',
+    name: 'AgentTools',
+    component: () => import('../views/agent/AgentToolView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/tasks',
     name: 'TaskCenter',
     component: () => import('../views/task/TaskCenterView.vue'),

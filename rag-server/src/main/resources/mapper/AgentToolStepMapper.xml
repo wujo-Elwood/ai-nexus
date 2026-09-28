@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.agent.mapper.AgentToolStepMapper">
+
+    <insert id="insert" parameterType="com.rag.agent.entity.AgentToolStep" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_tool_step (
+            run_id, step_no, tool_name, arguments, result, status, error_message, cost_ms
+        ) VALUES (
+            #{runId}, #{stepNo}, #{toolName}, #{arguments}, #{result}, #{status}, #{errorMessage}, #{costMs}
+        )
+    </insert>
+
+    <select id="findByRunId" resultType="com.rag.agent.entity.AgentToolStep">
+        SELECT id, run_id, step_no, tool_name, arguments, result, status, error_message, cost_ms, create_time
+        FROM agent_tool_step
+        WHERE run_id = #{runId}
+        ORDER BY step_no ASC
+    </select>
+
+</mapper>
