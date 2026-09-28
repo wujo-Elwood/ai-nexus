@@ -4,6 +4,7 @@ import com.rag.agent.dto.AgentToolChatRequest;
 import com.rag.agent.tools.AgentToolService;
 import com.rag.agent.tools.ToolRegistry;
 import com.rag.common.BusinessException;
+import com.rag.vo.Result;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +50,7 @@ public class AgentToolController {
 
     /** 当前注册的工具清单 */
     @GetMapping("/tools")
-    public List<Map<String, Object>> tools() {
-        return toolRegistry.describe();
+    public Result<List<Map<String, Object>>> tools() {
+        return Result.success(toolRegistry.describe());
     }
 }

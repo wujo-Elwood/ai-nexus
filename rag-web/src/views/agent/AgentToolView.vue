@@ -46,7 +46,7 @@
               </div>
             </div>
             <div class="answer-text">
-              {{ msg.content }}<span v-if="msg.pending" class="cursor">▍</span>
+              <span v-html="renderAnswer(msg.content)"></span><span v-if="msg.pending" class="cursor">▍</span>
             </div>
             <div v-if="msg.errorMsg" class="error-text">{{ msg.errorMsg }}</div>
           </template>
@@ -68,11 +68,18 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import MarkdownIt from 'markdown-it'
 import { listAgentTools, streamAgentChat } from '../../api/agentTool'
+
+const md = new MarkdownIt({ breaks: true, linkify: true })
+
+function renderAnswer(content) {
+  return md.render(content || '')
+}
 
 const router = useRouter()
 const tools = ref([])
@@ -213,7 +220,8 @@ async function send() {
   input.value = ''
   streaming.value = true
   messages.value.push({ role: 'user', content: text })
-  const assistant = { role: 'assistant', content: '', deltaQueue: '', steps: [], stepsOpen: true, pending: true, statusText: '' }
+  // 必须用 reactive 包裹：事件回调持有的是这个引用，直接改原始对象不会触发视图更新
+  const assistant = reactive({ role: 'assistant', content: '', deltaQueue: '', steps: [], stepsOpen: true, pending: true, statusText: '' })
   messages.value.push(assistant)
   scrollBottom()
 

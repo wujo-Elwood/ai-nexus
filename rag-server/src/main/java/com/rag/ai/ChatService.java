@@ -31,8 +31,11 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 /**
  * 聊天服务
@@ -57,6 +60,14 @@ public class ChatService {
     /** 检索候选数量 */
     @Value("${rag.candidate-k:10}")
     private int candidateK = 10;
+
+    /** 是否在正式问答前调用大模型改写检索问题，生产环境默认关闭以减少一次模型请求。 */
+    @Value("${rag.query-rewrite-enabled:false}")
+    private boolean queryRewriteEnabled = false;
+
+    /** 是否调用大模型压缩检索上下文，生产环境默认关闭以减少一次模型请求。 */
+    @Value("${rag.context-compression-enabled:false}")
+    private boolean contextCompressionEnabled = false;
 
     /** 多轮对话：最多加载的历史消息条数 */
     private static final int MAX_HISTORY_MESSAGES = 10;
@@ -95,6 +106,9 @@ public class ChatService {
             + "回答时请在相关语句后用 [来源: 文件名, 第N段] 标注引用来源。\n"
             + "如果没有提供知识库上下文，请直接使用大模型自身知识回答。\n"
             + "回答要简洁、准确、有帮助。";
+
+    /** 匹配模型回答中的内部来源标记，返回给用户前会移除。 */
+    private static final Pattern SOURCE_MARKER_PATTERN = Pattern.compile("\\[来源:\\s*[^\\]]+\\]");
 
     /** 构造注入所有依赖的组件 */
     public ChatService(EmbeddingService embeddingService, QdrantService qdrantService,
@@ -164,8 +178,11 @@ public class ChatService {
             if (kbId != null) {
                 //知识库模式只保存经过来源校验的回答
                 TrustedAnswerResult trusted = trustedAnswerGuard.validate(answer, context);
-                answer = trusted.getContent();
-                Map<String, Object> metrics = AnswerEvidenceMetrics.calculate(answer, trusted.isGrounded(), trusted.getCitations());
+                // 先使用带内部来源标记的文本计算证据覆盖率，再清理标记后返回给用户
+                Map<String, Object> metrics = AnswerEvidenceMetrics.calculate(
+                        trusted.getContent(), trusted.isGrounded(), trusted.getCitations());
+                // 移除仅供内部校验的来源标记，引用仍通过下方参考资料区域展示
+                answer = removeSourceMarkers(trusted.getContent());
                 Long answerMessageId = saveMessage(sessionId, "assistant", answer);
                 // 调用质量事实写入方法，记录同步回答指标
                 recordAnswerQuality(answerMessageId, sessionId, kbId, message,
@@ -317,14 +334,20 @@ public class ChatService {
                     if (context.hasContext()) {
                         //知识库模式在完整回答生成后校验来源，再一次性发送可信回答
                         TrustedAnswerResult trusted = trustedAnswerGuard.validate(answer, context);
-                        answer = trusted.getContent();
-                        Long answerMessageId = saveMessage(sessionId, "assistant", answer);
-                        safeSend(emitter, SseEmitter.event().name("message").data(answer));
+                        // 先使用带内部来源标记的文本计算证据覆盖率，再清理标记后返回给用户
+                        String validatedAnswer = trusted.getContent();
                         // 计算可信回答的置信度、证据覆盖率和引用数量
                         Map<String, Object> answerMeta = new LinkedHashMap<>(AnswerEvidenceMetrics.calculate(
-                                answer, trusted.isGrounded(), trusted.getCitations()));
+                                validatedAnswer, trusted.isGrounded(), trusted.getCitations()));
                         answerMeta.put("grounded", trusted.isGrounded());
                         answerMeta.put("reason", trusted.getReason());
+                        // 移除仅供内部校验的来源标记，引用仍通过下方参考资料区域展示
+                        answer = removeSourceMarkers(validatedAnswer);
+                        // 保存不带来源标记的回答
+                        Long answerMessageId = saveMessage(sessionId, "assistant", answer);
+                        // 推送不带来源标记的回答正文
+                        safeSend(emitter, SseEmitter.event().name("message").data(answer));
+                        // 推送回答元数据
                         safeSendJson(emitter, "answer-meta", answerMeta);
                         // 调用质量事实写入方法，记录流式回答指标
                         recordAnswerQuality(answerMessageId, sessionId, kbId, question,
@@ -423,8 +446,10 @@ public class ChatService {
         // 第1步：构建系统提示词
         String systemContent = SYSTEM_PROMPT;
         if (context.hasContext()) {
-            // 第2步：对检索到的上下文进行压缩，减少 token 消耗
-            String compressedContext = contextCompressor.compress(message, context.getContextWithSources());
+            // 第2步：按配置决定是否调用额外模型压缩上下文，默认直接使用检索结果降低等待时间
+            String compressedContext = contextCompressionEnabled
+                    ? contextCompressor.compress(message, context.getContextWithSources())
+                    : context.getContextWithSources();
             systemContent += "\n\n以下是知识库中的相关内容：\n\n" + compressedContext
                     + "\n\n只能依据以上内容回答，并且必须在相关语句后使用准确的 [来源: 文件名, 第N段] 引用。没有依据时不要补充外部知识。";
         }
@@ -476,32 +501,75 @@ public class ChatService {
             float threshold = strategy != null && strategy.getSimilarityThreshold() != null ? strategy.getSimilarityThreshold().floatValue() : 0.25f;
             float vectorWeight = strategy != null && strategy.getVectorWeight() != null ? strategy.getVectorWeight().floatValue() : 0.6f;
             float keywordWeight = strategy != null && strategy.getKeywordWeight() != null ? strategy.getKeywordWeight().floatValue() : 0.4f;
-            String rewrittenQuery = queryRewriter.rewrite(message);
-            String searchQuery = rewrittenQuery.isEmpty() ? message : rewrittenQuery;
-
-            // 第2步：检查缓存（相同问题 5 分钟内直接返回缓存结果）
+            // 第2步：先用原问题查询缓存，命中时不再调用查询改写模型
+            String searchQuery = message == null ? "" : message.trim();
             List<Long> cachedIds = retrievalCache.get(kbId, searchQuery);
             if (cachedIds != null && !cachedIds.isEmpty()) {
+                // 根据缓存的文本块编号读取当前知识库中的有效文本块
                 List<KbChunk> cachedChunks = findKbChunks(cachedIds, kbId);
                 if (!cachedChunks.isEmpty()) {
+                    // 返回缓存上下文，跳过后续模型和检索请求
                     return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(), Collections.emptySet());
                 }
             }
 
-            // 第3步：向量检索（语义相似度匹配，多取一些用于后续筛选）
+            // 第3步：只有打开开关时才调用查询改写模型
+            if (queryRewriteEnabled) {
+                String rewrittenQuery = queryRewriter.rewrite(message);
+                searchQuery = rewrittenQuery == null || rewrittenQuery.isBlank() ? searchQuery : rewrittenQuery.trim();
+            }
+
+            // 第4步：查询改写后再次检查缓存，兼容历史缓存键
+            if (!searchQuery.equals(message)) {
+                cachedIds = retrievalCache.get(kbId, searchQuery);
+                if (cachedIds != null && !cachedIds.isEmpty()) {
+                    // 根据缓存的文本块编号读取当前知识库中的有效文本块
+                    List<KbChunk> cachedChunks = findKbChunks(cachedIds, kbId);
+                    if (!cachedChunks.isEmpty()) {
+                        // 返回缓存上下文，跳过向量和关键词检索
+                        return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(), Collections.emptySet());
+                    }
+                }
+            }
+
+            // 第5步：生成查询向量，向量检索和关键词检索随后并行执行
             float[] queryEmbedding = embeddingService.embed(searchQuery);
             int effectiveCandidateK = Math.max(candidateK, effectiveTopK * 2);
-            List<SearchResult> vectorResults = qdrantService.searchWithScore(queryEmbedding, effectiveCandidateK, kbId);
+            // 固定最终检索词，供并行任务安全读取
+            String retrievalQuery = searchQuery;
+            // 启动向量检索任务，避免等待关键词数据库查询完成后才开始
+            CompletableFuture<List<SearchResult>> vectorFuture = CompletableFuture.supplyAsync(
+                    () -> qdrantService.searchWithScore(queryEmbedding, effectiveCandidateK, kbId));
+            // 启动关键词检索任务，与向量检索并行执行
+            CompletableFuture<List<KbChunk>> keywordFuture = CompletableFuture.supplyAsync(
+                    () -> keywordSearchService.search(retrievalQuery, kbId, effectiveCandidateK));
+            List<SearchResult> vectorResults;
+            List<KbChunk> keywordChunks;
+            try {
+                // 等待向量检索任务完成并读取结果
+                vectorResults = vectorFuture.get();
+                // 等待关键词检索任务完成并读取结果
+                keywordChunks = keywordFuture.get();
+            } catch (InterruptedException e) {
+                // 恢复线程中断状态，避免吞掉上层取消信号
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Knowledge retrieval interrupted", e);
+            } catch (ExecutionException e) {
+                // 保留向量维度不匹配等业务异常的原始类型
+                if (e.getCause() instanceof BusinessException businessException) {
+                    throw businessException;
+                }
+                throw new RuntimeException(e.getCause());
+            }
             List<Long> vectorIds = vectorResults.stream().map(r -> r.id).collect(Collectors.toList());
             Set<Long> vectorIdSet = new HashSet<>(vectorIds);
             Map<Long, Float> vectorScoreById = vectorResults.stream()
                     .collect(Collectors.toMap(result -> result.id, result -> result.score, Math::max));
 
-            // 第4步：关键词检索（多个关键词分别查询后合并）
-            List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, effectiveCandidateK);
+            // 第6步：整理关键词检索结果并合并去重
             Set<Long> keywordIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
 
-            // 第5步：合并去重（向量结果 + 关键词结果，去掉重复的 chunk）
+            // 第7步：合并去重（向量结果 + 关键词结果，去掉重复的 chunk）
             Set<Long> allIds = new LinkedHashSet<>(vectorIds);
             List<KbChunk> vectorChunks = findKbChunks(vectorIds, kbId);
             for (KbChunk chunk : keywordChunks) {
@@ -521,7 +589,7 @@ public class ChatService {
                 return KnowledgeContext.empty();
             }
 
-            // 第6步：融合分数、过滤低分结果并去除高度重复片段
+            // 第8步：融合分数、过滤低分结果并去除高度重复片段
             List<RetrievalCandidate> candidates = new ArrayList<>();
             for (KbChunk chunk : vectorChunks) {
                 boolean keywordMatched = keywordIds.contains(chunk.getId());
@@ -539,7 +607,7 @@ public class ChatService {
                 return KnowledgeContext.empty();
             }
 
-            // 第7步：写入缓存（下次相同问题直接命中）
+            // 第9步：写入缓存（下次相同问题直接命中）
             List<Long> selectedIds = selected.stream().map(candidate -> candidate.getChunk().getId()).collect(Collectors.toList());
             retrievalCache.put(kbId, searchQuery, selectedIds);
 
@@ -624,6 +692,20 @@ public class ChatService {
         }
         String normalized = content.replace("\r", " ").replace("\n", " ").trim();
         return normalized.length() <= 160 ? normalized : normalized.substring(0, 160) + "...";
+    }
+
+    /**
+     * 移除模型回答中的内部来源标记，避免把技术校验文本展示给用户。
+     *
+     * @param answer 已通过来源校验的回答文本
+     * @return 不包含来源标记的回答文本
+     */
+    private String removeSourceMarkers(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return answer == null ? "" : answer;
+        }
+        // 清理来源标记后保留模型原有的正文和 Markdown 结构
+        return SOURCE_MARKER_PATTERN.matcher(answer).replaceAll("").trim();
     }
 
     /**
