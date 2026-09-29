@@ -1412,15 +1412,15 @@ function exportChat() {
   height: 100%;
   min-height: 0;
   resize: none;
-  padding-bottom: 46px;
+  padding: 10px 90px 50px 14px;
 }
 
-/* 输入框底部工具行：模型选择芯片与发送按钮靠右成组 */
+/* 输入框底部工具行：模型选择芯片与发送按钮靠右成组，与边缘留出呼吸空间 */
 .input-toolbar {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 10px;
+  left: 22px;
+  right: 22px;
+  bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
