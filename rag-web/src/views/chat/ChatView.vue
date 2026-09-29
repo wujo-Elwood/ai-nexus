@@ -222,7 +222,7 @@
             :disabled="!inputMessage.trim()"
             @click="sendMessage"
           >
-            <el-icon><ArrowUpBold /></el-icon>
+            <el-icon><Promotion /></el-icon>
           </el-button>
         </div>
       </div>
@@ -234,7 +234,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowUpBold, ChatDotRound, Delete, Download, Monitor, Refresh, User } from '@element-plus/icons-vue'
+import { ChatDotRound, Delete, Download, Monitor, Promotion, Refresh, User } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
 import { getKbList } from '../../api/kb'
 import { deleteSession, getChatHistory, recallTest, submitFeedback } from '../../api/chat'
@@ -1415,7 +1415,7 @@ function exportChat() {
   padding-bottom: 46px;
 }
 
-/* 输入框底部工具行：左侧模型选择芯片，右侧圆形发送按钮 */
+/* 输入框底部工具行：模型选择芯片与发送按钮靠右成组 */
 .input-toolbar {
   position: absolute;
   left: 16px;
@@ -1423,8 +1423,8 @@ function exportChat() {
   bottom: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 10px;
   z-index: 5;
 }
 
@@ -1477,22 +1477,22 @@ function exportChat() {
 }
 
 .send-button {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 38px;
+  height: 34px;
+  min-height: 34px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 10px;
 }
 
 .send-button :deep(.el-icon) {
   font-size: 18px;
 }
 
-/* 圆形发送按钮：常亮浅色圆底 + 深色箭头，悬停点亮为主题橙 */
+/* 发送按钮：平时低调中性灰，悬停点亮为主题橙 */
 .chat-input-panel .send-button:not(.is-disabled) {
-  color: #0b0c0e;
+  color: rgba(247, 245, 242, 0.88);
   border: none;
-  background: rgba(247, 245, 242, 0.92);
+  background: rgba(247, 245, 242, 0.1);
 }
 
 .chat-input-panel .send-button:not(.is-disabled):hover,
@@ -1502,11 +1502,11 @@ function exportChat() {
   box-shadow: 0 0 18px -6px rgba(229, 160, 68, 0.6);
 }
 
-/* 未输入内容时按钮半透明置灰，但仍保持圆形轮廓 */
+/* 未输入内容时按钮半透明置灰 */
 .chat-input-panel .send-button.is-disabled {
-  color: rgba(11, 12, 14, 0.45);
+  color: rgba(247, 245, 242, 0.26);
   border: none;
-  background: rgba(247, 245, 242, 0.32);
+  background: rgba(247, 245, 242, 0.04);
 }
 
 @media (max-width: 1020px) {
