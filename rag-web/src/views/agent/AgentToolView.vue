@@ -65,7 +65,7 @@
               </div>
             </div>
             <div class="answer-text">
-              <span v-html="renderAnswer(msg.content)"></span><span v-if="msg.pending" class="cursor">▍</span>
+              <span v-html="renderAnswer(msg.content)"></span><el-icon v-if="msg.pending" class="loading-spinner"><Loading /></el-icon>
             </div>
             <div v-if="msg.errorMsg" class="error-text">{{ msg.errorMsg }}</div>
           </template>
@@ -145,7 +145,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Picture } from '@element-plus/icons-vue'
+import { ArrowLeft, Loading, Picture } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
 import { activateModelProvider, getModelProviderList } from '../../api/modelProvider'
 import { listAgentTools, streamAgentChat } from '../../api/agentTool'
@@ -835,14 +835,19 @@ function stop() {
   color: var(--text-primary);
 }
 
-.cursor {
-  animation: blink 1s step-end infinite;
+.loading-spinner {
   color: var(--accent-color);
+  font-size: 16px;
+  vertical-align: -3px;
+  animation: loading-spin 0.9s linear infinite;
 }
 
-@keyframes blink {
-  50% {
-    opacity: 0;
+@keyframes loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 
