@@ -830,6 +830,7 @@ function stop() {
 }
 
 .input-row {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -846,7 +847,7 @@ function stop() {
 .input-row :deep(.el-textarea__inner) {
   height: 100%;
   min-height: 56px;
-  padding: 10px 12px;
+  padding: 10px 84px 10px 12px;
   background: #15161a;
   border-color: #232428;
   color: var(--text-primary);
@@ -859,6 +860,9 @@ function stop() {
 }
 
 .input-actions {
-  padding-bottom: 2px;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
 }
 </style>
