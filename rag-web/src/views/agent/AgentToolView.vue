@@ -108,6 +108,21 @@
           @keydown.enter.exact="onEnterKey"
         />
         <div class="input-actions">
+          <el-select
+            v-model="activeProviderId"
+            class="model-chip"
+            placeholder="选择模型"
+            filterable
+            @change="handleSwitchProvider"
+          >
+            <el-option
+              v-for="provider in providerList"
+              :key="provider.id"
+              :label="formatProviderLabel(provider)"
+              :value="provider.id"
+              :disabled="!provider.apiKey"
+            />
+          </el-select>
           <el-button v-if="!streaming" type="primary" :disabled="!input.trim() && !pendingImages.length" @click="send">发送</el-button>
           <el-button v-else type="warning" @click="stop">停止</el-button>
         </div>
@@ -125,11 +140,12 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Picture } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
+import { activateModelProvider, getModelProviderList } from '../../api/modelProvider'
 import { listAgentTools, streamAgentChat } from '../../api/agentTool'
 
 const md = new MarkdownIt({ breaks: true, linkify: true })
@@ -240,6 +256,42 @@ function removeImage(index) {
   pendingImages.value.splice(index, 1)
 }
 
+// 模型供应商选择：切换即全局激活，智能体对话随即使用新模型
+const providerList = ref([])
+const activeProviderId = ref(null)
+
+const activeProviderName = computed(() => {
+  const provider = providerList.value.find((item) => item.id === activeProviderId.value)
+  return provider ? formatProviderLabel(provider) : ''
+})
+
+function formatProviderLabel(provider) {
+  const label = `${provider.name} / ${provider.model}`
+  return provider.apiKey ? label : `${label}（平台默认，不可切换）`
+}
+
+async function loadProviders() {
+  try {
+    const res = await getModelProviderList()
+    providerList.value = res.data || []
+    const active = providerList.value.find((provider) => provider.isActive === 1)
+    if (active) activeProviderId.value = active.id
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function handleSwitchProvider(providerId) {
+  try {
+    await activateModelProvider(providerId)
+    activeProviderId.value = providerId
+    const provider = providerList.value.find((item) => item.id === providerId)
+    ElMessage.success(`已切换到 ${provider?.name || '当前模型'}`)
+  } catch (error) {
+    ElMessage.error('切换失败')
+  }
+}
+
 // 拖动调整尺寸：视觉智能体（左右布局）调左栏宽度，其他智能体调输入框高度
 const leftWidth = ref(380)
 
@@ -319,6 +371,7 @@ function flushTypewriter() {
 }
 
 onMounted(async () => {
+  loadProviders()
   try {
     const res = await listAgentTools(agentCode)
     tools.value = Array.isArray(res) ? res : res.data || []
@@ -847,7 +900,7 @@ function stop() {
 .input-row :deep(.el-textarea__inner) {
   height: 100%;
   min-height: 56px;
-  padding: 10px 84px 10px 12px;
+  padding: 10px 84px 44px 12px;
   background: #15161a;
   border-color: #232428;
   color: var(--text-primary);
@@ -864,5 +917,27 @@ function stop() {
   right: 10px;
   bottom: 10px;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-chip {
+  width: auto;
+  min-width: 150px;
+  max-width: 260px;
+}
+
+.model-chip :deep(.el-select__wrapper) {
+  min-height: 30px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(247, 245, 242, 0.06);
+  box-shadow: 0 0 0 1px rgba(247, 245, 242, 0.14) inset;
+  font-size: 12px;
+}
+
+.model-chip :deep(.el-select__wrapper.is-hovering) {
+  box-shadow: 0 0 0 1px rgba(229, 160, 68, 0.55) inset;
 }
 </style>

@@ -13,21 +13,6 @@
         >
           <el-option v-for="kb in kbList" :key="kb.id" :label="kb.name" :value="kb.id" />
         </el-select>
-        <el-select
-          v-model="activeProviderId"
-          class="side-control"
-          placeholder="选择模型"
-          filterable
-          @change="handleSwitchProvider"
-        >
-          <el-option
-            v-for="provider in providerList"
-            :key="provider.id"
-            :label="formatProviderLabel(provider)"
-            :value="provider.id"
-            :disabled="!provider.apiKey"
-          />
-        </el-select>
         <div class="mode-card">
           <span>当前模式</span>
           <strong>{{ selectedKbId ? '知识库问答' : '通用对话' }}</strong>
@@ -213,16 +198,33 @@
           placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
           @keydown.enter.exact="handleEnter"
         />
-        <el-button
-          type="primary"
-          class="send-button"
-          title="发送（Enter）"
-          :loading="loading"
-          :disabled="!inputMessage.trim()"
-          @click="sendMessage"
-        >
-          <el-icon><Promotion /></el-icon>
-        </el-button>
+        <div class="input-toolbar">
+          <el-select
+            v-model="activeProviderId"
+            class="model-chip"
+            placeholder="选择模型"
+            filterable
+            @change="handleSwitchProvider"
+          >
+            <el-option
+              v-for="provider in providerList"
+              :key="provider.id"
+              :label="formatProviderLabel(provider)"
+              :value="provider.id"
+              :disabled="!provider.apiKey"
+            />
+          </el-select>
+          <el-button
+            type="primary"
+            class="send-button"
+            title="发送（Enter）"
+            :loading="loading"
+            :disabled="!inputMessage.trim()"
+            @click="sendMessage"
+          >
+            <el-icon><ArrowUpBold /></el-icon>
+          </el-button>
+        </div>
       </div>
     </section>
   </div>
@@ -232,7 +234,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ChatDotRound, Delete, Download, Monitor, Promotion, Refresh, User } from '@element-plus/icons-vue'
+import { ArrowUpBold, ChatDotRound, Delete, Download, Monitor, Refresh, User } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
 import { getKbList } from '../../api/kb'
 import { deleteSession, getChatHistory, recallTest, submitFeedback } from '../../api/chat'
@@ -1389,11 +1391,10 @@ function exportChat() {
 }
 
 .chat-input-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  gap: 14px;
-  align-items: stretch;
-  padding: 18px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 12px;
   border-top: 1px solid var(--line-color);
   background: rgba(8, 10, 16, 0.42);
   /* 父级不再裁切，底部两角自己收圆，避免盖住容器的圆角 */
@@ -1403,13 +1404,46 @@ function exportChat() {
 
 /* 输入框跟随面板高度（拖动分隔条时同步变高/变矮） */
 .chat-input-panel :deep(.el-textarea) {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .chat-input-panel :deep(.el-textarea__inner) {
   height: 100%;
   min-height: 0;
   resize: none;
+  padding-bottom: 46px;
+}
+
+/* 输入框底部工具行：左侧模型选择芯片，右侧圆形发送按钮 */
+.input-toolbar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 5;
+}
+
+.model-chip {
+  width: auto;
+  max-width: 300px;
+}
+
+.model-chip :deep(.el-select__wrapper) {
+  min-height: 30px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(247, 245, 242, 0.06);
+  box-shadow: 0 0 0 1px rgba(247, 245, 242, 0.14) inset;
+  font-size: 12px;
+}
+
+.model-chip :deep(.el-select__wrapper.is-hovering) {
+  box-shadow: 0 0 0 1px rgba(229, 160, 68, 0.55) inset;
 }
 
 /* 分隔条：按住上下拖动可调整输入区高度 */
@@ -1442,12 +1476,11 @@ function exportChat() {
 }
 
 .send-button {
-  width: 40px;
-  min-height: 40px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
-  align-self: end;
-  justify-self: end;
-  border-radius: 10px;
+  border-radius: 50%;
 }
 
 .send-button :deep(.el-icon) {
