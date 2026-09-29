@@ -92,8 +92,15 @@ class AgentToolDataTest {
                 Map.of("id", "1", "name", "测试"),
                 Map.of("id", "2", "name", "演示"));
         String rendered = support.renderTable(rows);
-        assertTrue(rendered.startsWith("| id | name |"), rendered);
-        assertTrue(rendered.contains("| 1 | 测试 |"), rendered);
+        //Map.of 是无序 Map，列顺序由实现决定，这里只断言表格结构、单元格内容和行数统计
+        String header = rendered.split("\n", 2)[0];
+        assertTrue(header.startsWith("| "), rendered);
+        assertTrue(header.contains("id"), rendered);
+        assertTrue(header.contains("name"), rendered);
+        assertTrue(rendered.contains("| 1 |"), rendered);
+        assertTrue(rendered.contains("测试"), rendered);
+        assertTrue(rendered.contains("| 2 |"), rendered);
+        assertTrue(rendered.contains("演示"), rendered);
         assertTrue(rendered.contains("共 2 行"), rendered);
     }
 

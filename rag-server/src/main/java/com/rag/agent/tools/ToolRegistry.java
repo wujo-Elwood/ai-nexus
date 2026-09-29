@@ -2,8 +2,6 @@ package com.rag.agent.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.agent.tool.JsonSchemaProperty;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -41,31 +39,38 @@ public class ToolRegistry {
         return agentCode == null ? null : AGENT_TOOLS.get(agentCode);
     }
 
-    /** 生成给模型看的工具规范列表 */
-    public List<ToolSpecification> specifications() {
-        return specifications(null);
-    }
-
-    /** 生成指定工具名子集的规范列表，names 为空时返回全部 */
-    public List<ToolSpecification> specifications(Collection<String> names) {
-        List<ToolSpecification> specs = new ArrayList<>();
+    /** 生成 OpenAI function 格式的工具定义列表，names 为空时返回全部 */
+    public List<Map<String, Object>> openAiTools(Collection<String> names) {
+        List<Map<String, Object>> specs = new ArrayList<>();
         for (AgentTool tool : tools.values()) {
             if (names != null && !names.isEmpty() && !names.contains(tool.name())) {
                 continue;
             }
-            ToolSpecification.Builder builder = ToolSpecification.builder()
-                    .name(tool.name())
-                    .description(tool.description());
+            Map<String, Object> properties = new LinkedHashMap<>();
+            List<String> required = new ArrayList<>();
             for (AgentTool.ToolParam param : tool.params()) {
-                JsonSchemaProperty type = typeProperty(param.type());
-                JsonSchemaProperty description = new JsonSchemaProperty("description", param.description());
+                Map<String, Object> property = new LinkedHashMap<>();
+                property.put("type", param.type() == null ? "string" : param.type().toLowerCase());
+                property.put("description", param.description());
+                properties.put(param.name(), property);
                 if (param.required()) {
-                    builder.addParameter(param.name(), type, description);
-                } else {
-                    builder.addOptionalParameter(param.name(), type, description);
+                    required.add(param.name());
                 }
             }
-            specs.add(builder.build());
+            Map<String, Object> parameters = new LinkedHashMap<>();
+            parameters.put("type", "object");
+            parameters.put("properties", properties);
+            if (!required.isEmpty()) {
+                parameters.put("required", required);
+            }
+            Map<String, Object> function = new LinkedHashMap<>();
+            function.put("name", tool.name());
+            function.put("description", tool.description());
+            function.put("parameters", parameters);
+            Map<String, Object> spec = new LinkedHashMap<>();
+            spec.put("type", "function");
+            spec.put("function", function);
+            specs.add(spec);
         }
         return specs;
     }
@@ -113,16 +118,4 @@ public class ToolRegistry {
     }
 
     /** 参数类型字符串映射为 JSON Schema 类型声明 */
-    private JsonSchemaProperty typeProperty(String type) {
-        switch (type == null ? "" : type.toLowerCase()) {
-            case "number":
-                return JsonSchemaProperty.NUMBER;
-            case "integer":
-                return JsonSchemaProperty.INTEGER;
-            case "boolean":
-                return JsonSchemaProperty.BOOLEAN;
-            default:
-                return JsonSchemaProperty.STRING;
-        }
-    }
 }

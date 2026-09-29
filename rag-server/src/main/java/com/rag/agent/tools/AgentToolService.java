@@ -8,22 +8,17 @@ import com.rag.common.BusinessException;
 import com.rag.entity.ModelProvider;
 import com.rag.service.ModelProviderService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.StreamingResponseHandler;
-import dev.langchain4j.model.chat.StreamingChatLanguageModel;
-import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.model.output.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 通用工具智能体服务（全流式）
- * 使用低阶 StreamingChatLanguageModel API 手写工具调用循环：
- * 模型文本逐字流式推送给前端；本轮流出了工具调用时清空前导文本、执行工具并实时推送步骤，
- * 工具结果回填消息列表后进入下一轮，直到模型给出最终回答
+ * 使用自建 OpenAI 兼容流式客户端执行工具调用循环：
+ * 每轮流式输出文本增量；本轮流出了工具调用时清空前导文本、执行工具并实时推送步骤，
+ * 工具结果回填消息列表后进入下一轮，直到模型给出最终回答。
+ * 自建客户端的请求体完全自主，支持 reasoning_effort 等扩展参数
  */
 @Slf4j
 @Service
@@ -57,10 +53,6 @@ public class AgentToolService {
             + "换算前必须先用 get_exchange_rate 查询实时汇率，再用 calculate 计算金额，不要凭空编造数据。"
             + "币种使用 3 位 ISO 代码（如 CNY、USD、EUR、JPY）。回答用简洁的中文，说明换算过程和结果。";
 
-    private static final String DEFAULT_PROMPT = "你是 AI Nexus 的工具智能体。"
-            + "你可以调用提供的工具获取实时信息；当问题需要实时数据时必须调用工具，不要凭空编造。"
-            + "回答使用简洁的中文，并基于工具返回的真实数据。";
-
     private static final String VISION_PROMPT = "你是 AI Nexus 的视觉智能体。"
             + "仔细观察用户上传的图片，回答关于图片内容、文字和物体的问题，不要凭空编造图里没有的信息。"
             + "如果图中包含需要计算的数字（如金额合计、数量统计），可调用 calculate 工具。回答使用简洁的中文。";
@@ -72,21 +64,28 @@ public class AgentToolService {
             + "流程：不确定表结构时先调用 list_tables 或 describe_table，再编写 SELECT 查询；只查 rag_db 中的表，"
             + "禁止任何写入操作。数字必须来自查询结果，不要编造；回答用简洁的中文并说明数据口径。";
 
+    private static final String DEFAULT_PROMPT = "你是 AI Nexus 的工具智能体。"
+            + "你可以调用提供的工具获取实时信息；当问题需要实时数据时必须调用工具，不要凭空编造。"
+            + "回答使用简洁的中文，并基于工具返回的真实数据。";
+
     private final ToolRegistry toolRegistry;
     private final ModelProviderService modelProviderService;
     private final AgentToolStepMapper stepMapper;
     private final ObjectMapper objectMapper;
+    private final OpenAiCompatStreamClient streamClient;
     private final Executor chatStreamExecutor;
 
     public AgentToolService(ToolRegistry toolRegistry,
                             ModelProviderService modelProviderService,
                             AgentToolStepMapper stepMapper,
                             ObjectMapper objectMapper,
+                            OpenAiCompatStreamClient streamClient,
                             @Qualifier("chatStreamExecutor") Executor chatStreamExecutor) {
         this.toolRegistry = toolRegistry;
         this.modelProviderService = modelProviderService;
         this.stepMapper = stepMapper;
         this.objectMapper = objectMapper;
+        this.streamClient = streamClient;
         this.chatStreamExecutor = chatStreamExecutor;
     }
 
@@ -102,15 +101,28 @@ public class AgentToolService {
         String runId = UUID.randomUUID().toString().replace("-", "");
         try {
             ModelProvider provider = modelProviderService.getActive();
-            StreamingChatLanguageModel model = buildStreamingModel(provider);
             SseEmitterListener listener = new SseEmitterListener(runId, emitter);
             List<String> allowedTools = toolRegistry.toolsForAgent(request.getAgentCode());
-            listener.onOpen(runId, toolRegistry.describe(allowedTools));
-            runStreamLoop(model, buildMessages(request, resolvePrompt(request.getAgentCode())), runId, listener,
-                    0, new AtomicInteger(), toolRegistry.specifications(allowedTools));
+            List<Map<String, Object>> tools = toolRegistry.openAiTools(allowedTools);
+            listener.onOpen(runId, tools);
+            // 推理强度未指定时默认高档
+            String reasoningEffort = request.getReasoningEffort() == null || request.getReasoningEffort().isBlank()
+                    ? "high" : request.getReasoningEffort();
+            AgentModel model = (messages, modelTools, deltas) -> streamClient.chatStream(
+                    new OpenAiCompatStreamClient.StreamOptions(
+                            normalizeOpenAiBaseUrl(provider.getBaseUrl()),
+                            provider.getApiKey(),
+                            provider.getModel(),
+                            0.3,
+                            reasoningEffort,
+                            messages,
+                            modelTools),
+                    deltas);
+            runStreamLoop(model, buildMessages(request, resolvePrompt(request.getAgentCode())),
+                    runId, listener, new AtomicInteger(), tools);
         } catch (Exception e) {
             // 把真实失败原因透传给前端（如供应商余额不足、接口不通），避免只看到笼统的重试提示
-            log.warn("通用工具智能体执行失败: {}", e.getMessage(), e);
+            log.warn("智能体执行失败: {}", e.getMessage(), e);
             String message = (e.getMessage() == null || e.getMessage().isBlank())
                     ? "智能体执行失败，请稍后重试"
                     : e.getMessage();
@@ -121,61 +133,43 @@ public class AgentToolService {
 
     /**
      * 流式工具调用主循环
-     * 每轮流式输出文本增量；onComplete 时如果本轮流出了工具调用，则清空前导文本、
-     * 在执行线程中执行工具并回填结果，再递归进入下一轮
+     * 每轮流式输出文本增量；本轮流出了工具调用时清空前导文本、执行工具并回填结果，再进入下一轮
      * 包内可见，便于测试时注入假模型
      */
-    void runStreamLoop(StreamingChatLanguageModel model, List<ChatMessage> messages, String runId,
-                       AgentToolListener listener, int round, AtomicInteger stepCounter,
-                       List<ToolSpecification> tools) {
-        listener.onStatus(round == 0 ? "正在分析问题，决定是否调用工具…" : "正在结合工具结果思考…");
-        model.generate(messages, tools, new StreamingResponseHandler<AiMessage>() {
-
-            @Override
-            public void onNext(String token) {
-                listener.onAnswerDelta(token);
+    String runStreamLoop(AgentModel model, List<ChatMessage> messages, String runId,
+                         AgentToolListener listener, AtomicInteger stepCounter,
+                         List<Map<String, Object>> tools) {
+        int round = 0;
+        while (true) {
+            listener.onStatus(round == 0 ? "正在分析问题，决定是否调用工具…" : "正在结合工具结果思考…");
+            Response<AiMessage> response;
+            try {
+                response = model.stream(messages, tools, listener::onAnswerDelta);
+            } catch (Exception e) {
+                throw new RuntimeException("模型调用失败：" + (e.getMessage() == null ? "未知错误" : e.getMessage()), e);
             }
-
-            @Override
-            public void onComplete(Response<AiMessage> response) {
-                AiMessage aiMessage = response.content();
-                messages.add(aiMessage);
-                if (!aiMessage.hasToolExecutionRequests()) {
-                    String answer = aiMessage.text() == null ? "" : aiMessage.text();
-                    listener.onStatus(null);
-                    listener.onAnswer(answer);
-                    listener.onDone(runId);
-                    return;
-                }
-                // 本轮流出了工具调用：刚流出的文本只是前导思考，前端需要清空
-                listener.onAnswerReset();
-                listener.onStatus("正在调用工具…");
-                // 工具执行可能耗时（HTTP 调用、落库），放回执行线程，不阻塞模型客户端回调线程
-                chatStreamExecutor.execute(() -> {
-                    try {
-                        executeToolCalls(messages, runId, listener, aiMessage, stepCounter);
-                        if (round + 1 >= MAX_ROUNDS) {
-                            listener.onStatus(null);
-                            listener.onAnswer("已连续调用工具 " + MAX_ROUNDS + " 轮仍未得到最终回答，已停止执行，请调整问题后重试。");
-                            listener.onDone(runId);
-                            return;
-                        }
-                        runStreamLoop(model, messages, runId, listener, round + 1, stepCounter, tools);
-                    } catch (Exception e) {
-                        log.warn("通用工具智能体工具执行失败: {}", e.getMessage(), e);
-                        listener.onError(e.getMessage() == null || e.getMessage().isBlank() ? "工具执行失败" : e.getMessage());
-                    }
-                });
+            AiMessage aiMessage = response.content();
+            messages.add(aiMessage);
+            if (!aiMessage.hasToolExecutionRequests()) {
+                listener.onStatus(null);
+                String answer = aiMessage.text() == null ? "" : aiMessage.text();
+                listener.onAnswer(answer);
+                listener.onDone(runId);
+                return answer;
             }
-
-            @Override
-            public void onError(Throwable error) {
-                log.warn("通用工具智能体流式调用失败: {}", error.getMessage(), error);
-                listener.onError(error.getMessage() == null || error.getMessage().isBlank()
-                        ? "模型调用失败，请稍后重试"
-                        : error.getMessage());
+            // 本轮流出了工具调用：刚流出的文本只是前导思考，前端需要清空
+            listener.onAnswerReset();
+            listener.onStatus("正在调用工具…");
+            executeToolCalls(messages, runId, listener, aiMessage, stepCounter);
+            round++;
+            if (round >= MAX_ROUNDS) {
+                listener.onStatus(null);
+                String answer = "已连续调用工具 " + MAX_ROUNDS + " 轮仍未得到最终回答，已停止执行，请调整问题后重试。";
+                listener.onAnswer(answer);
+                listener.onDone(runId);
+                return answer;
             }
-        });
+        }
     }
 
     /** 执行本轮全部工具调用：步骤事件、落库、结果回填消息列表 */
@@ -251,7 +245,7 @@ public class AgentToolService {
                     continue;
                 }
                 if (image.length() > MAX_IMAGE_LENGTH) {
-                    throw new BusinessException(400, "图片过大，请压缩后重试（单张不超过约 5MB）");
+                    throw new BusinessException(400, "图片过大，请压缩后重试（单张不超过约 11MB）");
                 }
                 parts.add(toImageContent(image));
                 count++;
@@ -263,12 +257,12 @@ public class AgentToolService {
         return messages;
     }
 
-    /** 把 dataURL 或裸 base64 转成 LangChain4j 图片内容 */
+    /** 把 dataURL 或裸 base64 转成 langchain4j 图片内容 */
     private dev.langchain4j.data.message.ImageContent toImageContent(String image) {
         if (image.startsWith("data:")) {
             int semi = image.indexOf(';');
             int comma = image.indexOf(',');
-            String mime = (semi > 5 ? image.substring(5, semi) : "image/png");
+            String mime = semi > 5 ? image.substring(5, semi) : "image/png";
             return dev.langchain4j.data.message.ImageContent.from(image.substring(comma + 1), mime);
         }
         return dev.langchain4j.data.message.ImageContent.from(image, "image/png");
@@ -289,18 +283,6 @@ public class AgentToolService {
             return WEATHER_PROMPT;
         }
         return DEFAULT_PROMPT;
-    }
-
-    /** 按激活供应商创建流式聊天模型，与聊天服务保持一致的地址归一化规则 */
-    private StreamingChatLanguageModel buildStreamingModel(ModelProvider provider) {
-        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
-        return OpenAiStreamingChatModel.builder()
-                .baseUrl(baseUrl)
-                .apiKey(provider.getApiKey())
-                .modelName(provider.getModel())
-                .temperature(0.3)
-                .timeout(Duration.ofSeconds(180))
-                .build();
     }
 
     /** 规范化 OpenAI 兼容接口地址，兼容用户填写完整 chat/completions 地址 */

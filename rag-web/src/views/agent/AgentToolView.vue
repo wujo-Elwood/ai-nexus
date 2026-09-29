@@ -111,6 +111,14 @@
         />
         <div class="input-actions">
           <el-select
+            v-model="reasoningEffort"
+            class="effort-chip"
+            title="推理强度：越高回答越深入，耗时越长"
+            @change="saveReasoningEffort"
+          >
+            <el-option v-for="opt in reasoningOptions" :key="opt.value" :label="'推理 ' + opt.label" :value="opt.value" />
+          </el-select>
+          <el-select
             v-model="activeProviderId"
             class="model-chip"
             placeholder="选择模型"
@@ -177,8 +185,19 @@ const inputHeight = ref(110)
 const fileInputRef = ref(null)
 const pendingImages = ref([])
 const dragOver = ref(false)
+const reasoningOptions = [
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' }
+]
+const reasoningEffort = ref(localStorage.getItem('agent-reasoning-effort') || 'high')
 let abortController = null
 let typewriterTimer = null
+
+function saveReasoningEffort(value) {
+  reasoningEffort.value = value
+  localStorage.setItem('agent-reasoning-effort', value)
+}
 
 function triggerPickImage() {
   if (fileInputRef.value) fileInputRef.value.click()
@@ -484,7 +503,7 @@ async function send() {
   abortController = new AbortController()
   try {
     await streamAgentChat(
-      { message: messageText, history, agentCode, images: images.length ? images : undefined },
+      { message: messageText, history, agentCode, reasoningEffort: reasoningEffort.value, images: images.length ? images : undefined },
       { signal: abortController.signal, onEvent: (event, data) => handleEvent(assistant, event, data) }
     )
   } catch (e) {
@@ -928,6 +947,25 @@ function stop() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.effort-chip {
+  width: auto;
+  min-width: 92px;
+  max-width: 120px;
+}
+
+.effort-chip :deep(.el-select__wrapper) {
+  min-height: 30px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(247, 245, 242, 0.06);
+  box-shadow: 0 0 0 1px rgba(247, 245, 242, 0.14) inset;
+  font-size: 12px;
+}
+
+.effort-chip :deep(.el-select__wrapper.is-hovering) {
+  box-shadow: 0 0 0 1px rgba(229, 160, 68, 0.55) inset;
 }
 
 .model-chip {

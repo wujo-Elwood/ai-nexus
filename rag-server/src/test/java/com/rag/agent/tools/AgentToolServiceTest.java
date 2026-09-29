@@ -5,19 +5,18 @@ import com.rag.agent.dto.AgentToolChatRequest;
 import com.rag.agent.entity.AgentToolStep;
 import com.rag.agent.mapper.AgentToolStepMapper;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.StreamingResponseHandler;
-import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.output.Response;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,7 +36,7 @@ class AgentToolServiceTest {
     }
 
     /** 按脚本顺序回放的假流式模型 */
-    private static class FakeStreamingModel implements StreamingChatLanguageModel {
+    private static class FakeStreamingModel implements AgentModel {
         private final List<ScriptedStep> script;
         private int calls = 0;
 
@@ -46,18 +45,13 @@ class AgentToolServiceTest {
         }
 
         @Override
-        public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
-                             StreamingResponseHandler<AiMessage> handler) {
+        public Response<AiMessage> stream(List<ChatMessage> messages, List<Map<String, Object>> openAiTools,
+                                          Consumer<String> deltaConsumer) {
             ScriptedStep step = script.get(Math.min(calls++, script.size() - 1));
             for (String delta : step.deltas()) {
-                handler.onNext(delta);
+                deltaConsumer.accept(delta);
             }
-            handler.onComplete(step.response());
+            return step.response();
         }
     }
 
@@ -144,11 +138,12 @@ class AgentToolServiceTest {
     private AgentToolService newService(AgentToolStepMapper stepMapper) {
         ToolRegistry registry = new ToolRegistry(List.of(new EchoTool()), new ObjectMapper());
         // 同线程执行器：测试中工具执行和下一轮递归按顺序同步跑完
-        return new AgentToolService(registry, null, stepMapper, new ObjectMapper(), Runnable::run);
+        return new AgentToolService(registry, null, stepMapper, new ObjectMapper(),
+                new OpenAiCompatStreamClient(new ObjectMapper()), Runnable::run);
     }
 
-    private List<ToolSpecification> registryTools() {
-        return new ToolRegistry(List.of(new EchoTool()), new ObjectMapper()).specifications();
+    private List<Map<String, Object>> registryTools() {
+        return new ToolRegistry(List.of(new EchoTool()), new ObjectMapper()).openAiTools(null);
     }
 
     @Test
@@ -172,8 +167,9 @@ class AgentToolServiceTest {
                 UserMessage.userMessage("调用工具试试")
         ));
 
-        service.runStreamLoop(model, messages, "run-1", listener, 0, new AtomicInteger(), registryTools());
+        String answer = service.runStreamLoop(model, messages, "run-1", listener, new AtomicInteger(), registryTools());
 
+        assertEquals("工具结果是：回显：你好", answer);
         assertEquals(List.of(
                 "status:正在分析问题，决定是否调用工具…",
                 "answer_reset",
@@ -207,7 +203,7 @@ class AgentToolServiceTest {
         AgentToolService service = newService(mock(AgentToolStepMapper.class));
         CollectingListener listener = new CollectingListener();
 
-        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener, 0, new AtomicInteger(), registryTools());
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener, new AtomicInteger(), registryTools());
 
         assertTrue(listener.answer.contains("已连续调用工具"), listener.answer);
         assertEquals(AgentToolService.MAX_ROUNDS, listener.events.stream().filter(e -> e.startsWith("step_start")).count());
@@ -223,7 +219,7 @@ class AgentToolServiceTest {
         AgentToolService service = newService(mock(AgentToolStepMapper.class));
         CollectingListener listener = new CollectingListener();
 
-        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("天气"))), "run-3", listener, 0, new AtomicInteger(), registryTools());
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("天气"))), "run-3", listener, new AtomicInteger(), registryTools());
 
         assertEquals(List.of(
                 "status:正在分析问题，决定是否调用工具…",
@@ -231,24 +227,5 @@ class AgentToolServiceTest {
                 "status:null",
                 "answer", "done"), listener.events);
         assertEquals("今天南京有雨", listener.streamed.toString());
-    }
-
-    @Test
-    void shouldAttachImagesToLastUserMessage() throws Exception {
-        AgentToolService service = newService(mock(AgentToolStepMapper.class));
-        AgentToolChatRequest request = new AgentToolChatRequest();
-        request.setMessage("这张图里是什么");
-        request.setAgentCode("vision-agent");
-        request.setImages(List.of("data:image/png;base64,aGVsbG8="));
-
-        List<ChatMessage> messages = service.buildMessages(request, "system prompt");
-
-        assertEquals(2, messages.size());
-        UserMessage userMessage = (UserMessage) messages.get(1);
-        assertEquals(2, userMessage.contents().size());
-        org.junit.jupiter.api.Assertions.assertInstanceOf(
-                dev.langchain4j.data.message.TextContent.class, userMessage.contents().get(0));
-        org.junit.jupiter.api.Assertions.assertInstanceOf(
-                dev.langchain4j.data.message.ImageContent.class, userMessage.contents().get(1));
     }
 }

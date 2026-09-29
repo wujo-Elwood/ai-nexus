@@ -17,6 +17,9 @@ public class AgentToolChatRequest {
     /** 智能体编码，决定本次对话可用的工具子集（如 general-tool、currency-converter） */
     private String agentCode;
 
+    /** 推理强度：low/medium/high，为空时默认 high */
+    private String reasoningEffort;
+
     /** 随最后一条用户消息发送的图片，元素为 base64 或 dataURL（仅视觉智能体使用） */
     private List<String> images;
 

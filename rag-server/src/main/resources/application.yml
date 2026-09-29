@@ -54,6 +54,14 @@ file:
     max-attempts: ${FILE_PROCESS_MAX_ATTEMPTS:3}
     retry-delay-seconds: ${FILE_PROCESS_RETRY_DELAY_SECONDS:60}
     retry-interval-ms: ${FILE_PROCESS_RETRY_INTERVAL_MS:60000}
+  # 视觉解析：开启开关后图片内容（扫描页、大图页、内嵌图、独立图片）送视觉模型转 Markdown
+  vision:
+    max-vision-pages: ${FILE_VISION_MAX_PAGES:50}
+    min-text-chars: ${FILE_VISION_MIN_TEXT_CHARS:30}
+    image-area-ratio: ${FILE_VISION_IMAGE_AREA_RATIO:0.5}
+    dpi: ${FILE_VISION_DPI:144}
+    max-image-edge: ${FILE_VISION_MAX_IMAGE_EDGE:2000}
+    timeout-seconds: ${FILE_VISION_TIMEOUT_SECONDS:180}
   multipart:
     max-file-size: ${FILE_MULTIPART_MAX_SIZE:2147483648}
     chunk-size: ${FILE_MULTIPART_CHUNK_SIZE:10485760}
