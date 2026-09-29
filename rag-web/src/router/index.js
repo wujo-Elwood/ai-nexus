@@ -53,12 +53,6 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/agents/kb-quality',
-    name: 'KnowledgeQualityAgent',
-    component: () => import('../views/agent/KnowledgeQualityAgentView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/agent-tools',
     name: 'AgentTools',
     component: () => import('../views/agent/AgentToolView.vue'),

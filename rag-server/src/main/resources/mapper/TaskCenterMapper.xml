@@ -20,10 +20,6 @@
                    IF(task_status IN ('PENDING','RUNNING'), TRUE, FALSE)
             FROM extract_task WHERE created_by = #{userId}
             UNION ALL
-            SELECT 'AGENT', CAST(id AS CHAR), agent_name, run_status, IF(run_status = 'SUCCESS', 100, 0),
-                   COALESCE(error_message, summary), create_time, IF(run_status = 'FAILED', TRUE, FALSE), FALSE
-            FROM agent_run WHERE created_by = #{userId}
-            UNION ALL
             SELECT 'IMAGE', CAST(id AS CHAR), prompt, task_status, COALESCE(progress, 0),
                    COALESCE(error_message, task_message), create_time, IF(task_status = 'FAILED', TRUE, FALSE),
                    IF(task_status IN ('PENDING','RUNNING'), TRUE, FALSE)
