@@ -1430,6 +1430,7 @@ function exportChat() {
 
 .model-chip {
   width: auto;
+  min-width: 150px;
   max-width: 300px;
 }
 
@@ -1487,11 +1488,11 @@ function exportChat() {
   font-size: 18px;
 }
 
-/* 方形图标按钮：平时低调中性灰，与页面其它主按钮共用主色点亮 */
+/* 圆形发送按钮：常亮浅色圆底 + 深色箭头，悬停点亮为主题橙 */
 .chat-input-panel .send-button:not(.is-disabled) {
-  color: rgba(247, 245, 242, 0.88);
+  color: #0b0c0e;
   border: none;
-  background: rgba(247, 245, 242, 0.1);
+  background: rgba(247, 245, 242, 0.92);
 }
 
 .chat-input-panel .send-button:not(.is-disabled):hover,
@@ -1501,11 +1502,11 @@ function exportChat() {
   box-shadow: 0 0 18px -6px rgba(229, 160, 68, 0.6);
 }
 
-/* 未输入内容时按钮是禁用的：走低调的灰，不要 Element Plus 那套浅蓝 */
+/* 未输入内容时按钮半透明置灰，但仍保持圆形轮廓 */
 .chat-input-panel .send-button.is-disabled {
-  color: rgba(247, 245, 242, 0.26);
-  border: 1px solid rgba(247, 245, 242, 0.08);
-  background: rgba(247, 245, 242, 0.04);
+  color: rgba(11, 12, 14, 0.45);
+  border: none;
+  background: rgba(247, 245, 242, 0.32);
 }
 
 @media (max-width: 1020px) {
