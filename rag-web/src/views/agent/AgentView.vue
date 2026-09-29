@@ -80,15 +80,6 @@ const loading = ref(false)
 
 const fallbackAgentList = [
   {
-    code: 'knowledge-quality',
-    name: '知识库质检智能体',
-    description: '检查知识库文件、分片、召回和问答风险，生成质量评分与优化建议。',
-    status: 'ENABLED',
-    version: '1.0',
-    scene: '知识库上线前质检、问答效果排查、交付报告生成',
-    modelDisplayName: '跟随模型设置'
-  },
-  {
     code: 'general-tool',
     name: '天气查询智能体',
     description: '调用天气定位与查询工具回答实时天气问题，每一步执行过程实时可见。',
@@ -126,10 +117,6 @@ async function loadAgents() {
 
 // 进入选中的智能体详情页
 function openAgent(agent) {
-  if (agent.code === 'knowledge-quality') {
-    router.push('/agents/kb-quality')
-    return
-  }
   if (agent.code === 'general-tool') {
     router.push('/agent-tools')
     return
@@ -158,9 +145,6 @@ function getStatusTagType(status) {
 
 // 获取智能体能力标签
 function getAgentTags(agent) {
-  if (agent.code === 'knowledge-quality') {
-    return ['文件检查', '分片分析', '召回测试', '报告生成']
-  }
   if (agent.code === 'general-tool') {
     return ['天气查询', '坐标定位', '步骤可视', '实时数据']
   }
