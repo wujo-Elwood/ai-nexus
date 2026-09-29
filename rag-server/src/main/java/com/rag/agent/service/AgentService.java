@@ -53,15 +53,11 @@ public class AgentService {
         List<Map<String, Object>> agents = new ArrayList<>();
         ModelProvider provider = modelProviderService.getActive();
         String modelDisplayName = buildModelDisplayName(provider);
-        // 第2步：加入知识库质检智能体
-        agents.add(buildAgent(knowledgeQualityCode, knowledgeQualityName,
-                "检查知识库文件、分片、召回和问答风险，生成质量评分与优化建议。",
-                "知识库上线前质检、问答效果排查、交付报告生成", provider, modelDisplayName));
-        // 第3步：加入天气查询智能体
+        // 第2步：加入天气查询智能体
         agents.add(buildAgent(generalToolCode, generalToolName,
                 "调用天气定位与查询工具回答实时天气问题，每一步执行过程实时可见。",
                 "实时天气查询、坐标定位、执行过程可视化", provider, modelDisplayName));
-        // 第4步：返回智能体列表
+        // 第3步：返回智能体列表
         return agents;
     }
 
