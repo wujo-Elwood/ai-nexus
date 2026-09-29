@@ -44,8 +44,8 @@ public class AgentToolService {
     /** 最大工具调用轮数，防止模型死循环 */
     static final int MAX_ROUNDS = 10;
 
-    /** 单张图片 base64 大小上限（约 5MB） */
-    private static final int MAX_IMAGE_LENGTH = 7_000_000;
+    /** 单张图片 base64 大小上限（约 11MB，对应原始图片 10MB） */
+    private static final int MAX_IMAGE_LENGTH = 15_000_000;
     /** 单次最多携带图片数 */
     private static final int MAX_IMAGES = 4;
 

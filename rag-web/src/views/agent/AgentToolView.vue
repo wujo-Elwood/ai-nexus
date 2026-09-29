@@ -1,5 +1,11 @@
 <template>
-  <div class="agent-tool-page">
+  <div
+    class="agent-tool-page"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
+    <div v-if="dragOver" class="drop-overlay">松开鼠标上传图片</div>
     <div class="page-header">
       <div>
         <div class="header-back">
@@ -133,6 +139,7 @@ const chatWindowRef = ref(null)
 const inputHeight = ref(110)
 const fileInputRef = ref(null)
 const pendingImages = ref([])
+const dragOver = ref(false)
 let abortController = null
 let typewriterTimer = null
 
@@ -141,18 +148,40 @@ function triggerPickImage() {
 }
 
 function onPickImage(event) {
-  const files = [...(event.target.files || [])]
+  addImageFiles([...(event.target.files || [])])
   event.target.value = ''
+}
+
+// 统一处理选择/拖拽进来的图片文件
+function addImageFiles(files) {
   for (const file of files) {
     if (!file.type.startsWith('image/')) continue
-    if (file.size > 4 * 1024 * 1024) {
-      ElMessage.error('图片不能超过 4MB')
+    if (file.size > 10 * 1024 * 1024) {
+      ElMessage.error('图片不能超过 10MB')
       continue
     }
     const reader = new FileReader()
     reader.onload = () => pendingImages.value.push({ name: file.name, dataUrl: reader.result })
     reader.readAsDataURL(file)
   }
+}
+
+// 拖拽上传：仅视觉智能体启用
+function onDragOver(event) {
+  if (agentCode !== 'vision-agent') return
+  event.preventDefault()
+  dragOver.value = true
+}
+
+function onDragLeave(event) {
+  if (agentCode !== 'vision-agent') return
+  if (!event.relatedTarget) dragOver.value = false
+}
+
+function onDrop(event) {
+  if (agentCode !== 'vision-agent') return
+  dragOver.value = false
+  addImageFiles([...(event.dataTransfer?.files || [])])
 }
 
 function removeImage(index) {
@@ -356,7 +385,24 @@ function stop() {
 </script>
 
 <style scoped>
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-color);
+  background: rgba(11, 12, 14, 0.72);
+  border: 2px dashed var(--accent-color);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
 .agent-tool-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
