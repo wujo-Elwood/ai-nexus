@@ -42,22 +42,33 @@
             {{ row.createdByName || '—' }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="120" align="center">
+        <el-table-column label="状态" width="150" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.isActive === 1 ? 'success' : 'info'" size="small">
-              {{ row.isActive === 1 ? '使用中' : '未启用' }}
-            </el-tag>
+            <div class="status-tags">
+              <el-tag :type="row.isActive === 1 ? 'success' : 'info'" size="small">
+                {{ row.isActive === 1 ? '聊天使用中' : '未启用' }}
+              </el-tag>
+              <el-tag v-if="row.imageActive === 1" type="warning" size="small">
+                生图使用中
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="230" align="center">
           <template #default="{ row }">
-            <el-button v-if="row.isActive !== 1" type="primary" link :disabled="isReadonlyRow(row)" @click="handleActivate(row)">
-              激活
+            <el-button
+              v-if="row.imageActive !== 1"
+              type="primary"
+              link
+              :disabled="isReadonlyRow(row)"
+              @click="handleActivateImage(row)"
+            >
+              设为生图
             </el-button>
             <el-button type="primary" link :disabled="isReadonlyRow(row)" @click="openDialog(row)">
               编辑
             </el-button>
-            <el-button type="danger" link :disabled="isReadonlyRow(row) || row.isActive === 1" @click="handleDelete(row)">
+            <el-button type="danger" link :disabled="isReadonlyRow(row) || row.isActive === 1 || row.imageActive === 1" @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -115,7 +126,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import {
-  activateModelProvider,
+  activateImageModelProvider,
   createModelProvider,
   deleteModelProvider,
   getModelProviderList,
@@ -239,14 +250,15 @@ function isReadonlyRow(row) {
 }
 
 // 激活供应商
-async function handleActivate(row) {
+// 设为生图供应商：与聊天模型切换解耦，生图固定使用该供应商
+async function handleActivateImage(row) {
   try {
-    await activateModelProvider(row.id)
-    ElMessage.success(`已切换到 ${row.name}`)
+    await activateImageModelProvider(row.id)
+    ElMessage.success(`生图已切换到 ${row.name}`)
     loadList()
   } catch (error) {
     console.error(error)
-    ElMessage.error('切换失败')
+    ElMessage.error('设置失败')
   }
 }
 
@@ -368,6 +380,13 @@ async function handleDelete(row) {
 .image-section {
   border-color: rgba(229, 160, 68, 0.24);
   background: rgba(229, 160, 68, 0.055);
+}
+
+.status-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 @media (max-width: 760px) {

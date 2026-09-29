@@ -98,7 +98,8 @@ CREATE TABLE IF NOT EXISTS ai_model_provider (
     image_base_url VARCHAR(255) COMMENT '生图 API 地址，为空时沿用普通 API 地址',
     image_api_key VARCHAR(255) COMMENT '生图 API 密钥，为空时沿用普通 API 密钥',
     image_model VARCHAR(100) COMMENT '生图模型名称，为空时沿用普通模型名称',
-    is_active TINYINT DEFAULT 0 COMMENT '是否激活：1=激活，0=未激活',
+    is_active TINYINT DEFAULT 0 COMMENT '是否激活：1=激活（聊天/智能体使用），0=未激活',
+    image_active TINYINT DEFAULT 0 COMMENT '生图供应商标记：1=当前生图使用，0=未使用',
     created_by BIGINT COMMENT '创建人用户ID，为空表示历史数据或系统预置，仅管理员可见',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_model_provider_creator (created_by)

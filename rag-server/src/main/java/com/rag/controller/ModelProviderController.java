@@ -78,6 +78,14 @@ public class ModelProviderController {
         return Result.success();
     }
 
+    /** 设置生图供应商（与聊天激活解耦，生图固定使用该供应商） */
+    @PutMapping("/{id}/activate-image")
+    public Result<Void> activateImage(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = currentUserId(request);
+        modelProviderService.activateImage(id, userId, isAdmin(userId));
+        return Result.success();
+    }
+
     /** 从认证拦截器写入的请求属性中取当前登录用户。 */
     private Long currentUserId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");

@@ -131,7 +131,7 @@ public class ImageGenerateService {
      */
     public ImageGenerateResponse generate(ImageGenerateRequest request, Long userId) {
         ImageGenerateRequest safeRequest = buildSafeRequest(request);
-        ModelProvider provider = modelProviderService.getActive();
+        ModelProvider provider = modelProviderService.getActiveForImage();
         return doGenerateWithProvider(safeRequest, provider, userId);
     }
 
@@ -191,7 +191,7 @@ public class ImageGenerateService {
      */
     private void runImageTask(Long taskId, ImageGenerateRequest safeRequest, Long userId) {
         try {
-            ModelProvider provider = modelProviderService.getActive();
+            ModelProvider provider = modelProviderService.getActiveForImage();
             imageTaskMapper.markStarted(taskId, provider.getName(), getImageModel(provider));
             imageTaskMapper.updateProgress(taskId, "模型正在生成图片", 35);
             ImageGenerateResponse response = doGenerateWithProvider(safeRequest, provider, userId);

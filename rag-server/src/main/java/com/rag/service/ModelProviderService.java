@@ -110,6 +110,20 @@ public class ModelProviderService {
         modelProviderMapper.activate(id);
     }
 
+    /** 设置生图供应商：与聊天激活解耦，聊天切模型不再影响生图；权限规则与激活一致 */
+    @Transactional
+    public void activateImage(Long id, Long userId, boolean admin) {
+        getOwnedById(id, userId, admin);
+        modelProviderMapper.deactivateAllImages();
+        modelProviderMapper.activateImage(id);
+    }
+
+    /** 查询生图使用的供应商：优先取生图标记，未设置时回落到聊天激活供应商，保持升级前行为 */
+    public ModelProvider getActiveForImage() {
+        ModelProvider provider = modelProviderMapper.findImageActive();
+        return provider != null ? provider : getActive();
+    }
+
     /** 判断供应商是否属于当前用户，归属为空的历史数据视为管理员资产。 */
     private boolean isOwned(ModelProvider provider, Long userId) {
         return provider.getCreatedBy() != null && provider.getCreatedBy().equals(userId);

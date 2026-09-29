@@ -27,6 +27,8 @@ public class ModelProvider {
     private String imageModel;
     /** 是否激活：1=激活，0=未激活 */
     private Integer isActive;
+    /** 生图供应商标记：1=当前生图使用，0=未使用；与 is_active 解耦，聊天切模型不影响生图 */
+    private Integer imageActive;
     /** 创建人用户ID，历史数据为空 */
     private Long createdBy;
     /** 创建人用户名，查询时联表带出，仅用于展示 */

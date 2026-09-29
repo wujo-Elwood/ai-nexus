@@ -310,7 +310,7 @@ jwt:
 
 启动后在“模型设置”页面新增 OpenAI 兼容供应商并激活。聊天需要 `base_url`、`api_key` 和 `model`；AI 生图可单独配置 `image_base_url`、`image_api_key` 和 `image_model`，留空时沿用聊天配置。
 
-供应商会记录创建人：普通用户只看到并只能修改、删除、激活自己创建的供应商，管理员可以看到并操作全部，列表额外展示创建人。`is_active` 仍是全局单值，全系统共用同一个激活供应商，因此普通用户列表中会出现一项只读的“平台供应商”用于展示当前正在使用的模型，其密钥不下发。
+供应商会记录创建人：普通用户只看到并只能修改、删除自己创建的供应商，管理员可以看到并操作全部，列表额外展示创建人。聊天模型在 AI 聊天和智能体页面的输入框右下角切换（全局激活一个供应商）；生图供应商在模型设置页单独”设为生图”（`image_active`），未单独设置时生图回落到聊天激活的供应商。普通用户列表中会出现一项只读的”平台供应商”用于展示当前正在使用的模型，其密钥不下发。
 
 ### 7. 启动后端
 
@@ -362,6 +362,7 @@ npm run dev
 | 10 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
 | 11 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
 | 12 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
+| 13 | `image_active_upgrade.sql` | 生图供应商标记，解耦生图与聊天模型切换 |
 
 普通终端示例：
 
@@ -452,7 +453,7 @@ foreach ($script in $scripts) {
 | 智能体 | 智能体列表 |
 | 天气查询智能体 | `POST /agent-tools/chat/stream`（SSE：open/step_start/step_result/answer/done/error）、`GET /agent-tools/tools` |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
-| 模型与统计 | 模型供应商增删改查、激活供应商（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
+| 模型与统计 | 模型供应商增删改查、激活与设为生图（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
 
 ## 主要数据库表
 

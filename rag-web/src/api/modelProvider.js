@@ -23,3 +23,7 @@ export function deleteModelProvider(id) {
 export function activateModelProvider(id) {
   return request.put(`/api/model-provider/${id}/activate`)
 }
+
+export function activateImageModelProvider(id) {
+  return request.put(`/api/model-provider/${id}/activate-image`)
+}
