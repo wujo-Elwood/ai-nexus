@@ -50,7 +50,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 
 ### 企业管理能力
 
-- 统一任务中心：聚合文件处理、分片上传、文档抽取、智能体和生图任务；支持文件任务重试和分片上传取消。
+- 统一任务中心：聚合文件处理、分片上传、文档抽取和生图任务；支持文件任务重试和分片上传取消。
 - RAG 评测中心：维护测试集，执行召回评测，统计命中、引用命中和平均耗时。
 - 系统健康面板：检查 MySQL、Qdrant、Embedding、LLM、磁盘空间和线程池状态。
 - RBAC：菜单、角色、角色菜单、用户角色和用户管理。
@@ -62,7 +62,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 
 - 文档抽取：文档上传、抽取模板、字段配置、异步任务、人工修正和结果导出。
 - AI 生图：OpenAI 兼容生图供应商、异步生成任务、历史记录、查看、下载和删除。
-- 智能体管理：智能体入口总览（当前为天气查询智能体）；知识库质检智能体保留独立页面、运行记录和质量报告。
+- 智能体管理：智能体入口总览（当前为天气查询智能体）。
 - 天气查询智能体：模型自主调用城市定位与天气查询工具（Open-Meteo，无需 API Key），每个执行步骤实时推送到前端并落库 `agent_tool_step`，支持事后回放。
 - 能力展示：粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞、水墨等多套 WebGL 视觉展示页。
 
@@ -104,7 +104,7 @@ ai-nexus
 ├── docs/                             # 设计、计划和模块说明
 ├── rag-server/
 │   └── src/main/java/com/rag/
-│       ├── agent/                    # 智能体和知识库质检
+│       ├── agent/                    # 智能体与工具调用框架
 │       ├── ai/                       # 聊天、Embedding 和模型调用
 │       ├── backup/                   # 知识库导入导出与恢复
 │       ├── catalog/                  # 文件夹和标签
@@ -350,17 +350,16 @@ npm run dev
 | --- | --- | --- |
 | 1 | `extract_v2_upgrade.sql` | 抽取模板创建人、任务进度、失败原因和结果修正字段 |
 | 2 | `rbac_management.sql` | 菜单、角色、用户角色和角色菜单表结构 |
-| 3 | `agent_management.sql` | 智能体运行与质检报告记录 |
-| 4 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
-| 5 | `image_history.sql` | 生图异步任务和历史记录 |
-| 6 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
-| 7 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
-| 8 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
-| 9 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
-| 10 | `system_health_upgrade.sql` | 系统健康面板相关表结构 |
-| 11 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
-| 12 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
-| 13 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
+| 3 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
+| 4 | `image_history.sql` | 生图异步任务和历史记录 |
+| 5 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
+| 6 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
+| 7 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
+| 8 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
+| 9 | `system_health_upgrade.sql` | 系统健康面板相关表结构 |
+| 10 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
+| 11 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
+| 12 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
 
 普通终端示例：
 
@@ -383,7 +382,6 @@ Windows PowerShell 批量升级：
 $scripts = @(
   'extract_v2_upgrade.sql',
   'rbac_management.sql',
-  'agent_management.sql',
   'image_model_provider_upgrade.sql',
   'image_history.sql',
   'kb_file_process_upgrade.sql',
@@ -418,8 +416,7 @@ foreach ($script in $scripts) {
 | `/health` | 系统健康 | MySQL、Qdrant、Embedding、LLM、磁盘和线程池 |
 | `/extract` | 文档抽取 | 模板、字段、任务、审核和导出 |
 | `/image` | AI 生图 | 异步生成、历史、查看和下载 |
-| `/agents` | 智能体管理 | 智能体入口和运行记录 |
-| `/agents/kb-quality` | 知识库质检智能体 | 执行质检并查看质量报告 |
+| `/agents` | 智能体管理 | 智能体入口总览 |
 | `/agent-tools` | 天气查询智能体 | 实时天气查询对话，执行过程逐步可见 |
 | `/knowledge-gaps` | 知识缺口分析 | 查看最近 7 天或 30 天的拒答、低质量问题聚类 |
 | `/rbac` | 权限管理 | 菜单、角色、授权和用户管理 |
@@ -450,7 +447,7 @@ foreach ($script in $scripts) {
 | 系统健康 | `GET /system-health/overview` |
 | 文档抽取 | 模板、文档上传、任务、结果修正和导出接口 |
 | AI 生图 | 生成、任务、历史、查看、下载和删除接口 |
-| 智能体 | 智能体列表、知识库质检运行、报告详情和删除 |
+| 智能体 | 智能体列表 |
 | 天气查询智能体 | `POST /agent-tools/chat/stream`（SSE：open/step_start/step_result/answer/done/error）、`GET /agent-tools/tools` |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
 | 模型与统计 | 模型供应商增删改查、激活供应商（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
@@ -467,7 +464,7 @@ foreach ($script in $scripts) {
 | RAG 评测 | `kb_eval_case`、`kb_eval_run`、`kb_eval_run_item` |
 | 文档抽取 | `extract_document`、`extract_template`、`extract_field`、`extract_task`、`extract_result`、`extract_review_record`、`extract_export_record` |
 | AI 生图 | `ai_image_task`、`ai_image_history` |
-| 智能体 | `agent_run`、`agent_tool_step` |
+| 智能体工具步骤 | `agent_tool_step` |
 | 知识缺口分析 | `ai_answer_quality`、`kb_gap_report` |
 
 ## 核心流程

@@ -16,7 +16,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { cancelTask, getTasks, retryTask } from '../../api/tasks'
 import { getGlobalRebuildStatus } from '../../api/kb'
-const loading=ref(false); const tasks=ref([]); const rebuildStatus=ref({status:'COMPLETED',progress:100}); const filters=reactive({status:'',taskType:''}); const types=[{value:'FILE',label:'文件处理'},{value:'UPLOAD',label:'分片上传'},{value:'EXTRACT',label:'文档抽取'},{value:'AGENT',label:'智能体'},{value:'IMAGE',label:'AI 生图'}]; let rebuildTimer=null
+const loading=ref(false); const tasks=ref([]); const rebuildStatus=ref({status:'COMPLETED',progress:100}); const filters=reactive({status:'',taskType:''}); const types=[{value:'FILE',label:'文件处理'},{value:'UPLOAD',label:'分片上传'},{value:'EXTRACT',label:'文档抽取'},{value:'IMAGE',label:'AI 生图'}]; let rebuildTimer=null
 onMounted(async()=>{await Promise.all([loadTasks(),loadRebuildStatus()]); rebuildTimer=window.setInterval(loadRebuildStatus,2000)})
 onBeforeUnmount(()=>{if(rebuildTimer){window.clearInterval(rebuildTimer);rebuildTimer=null}})
 // 加载统一任务

@@ -17,7 +17,6 @@ import com.rag.rag.RetrievalCache;
 import com.rag.rag.TextSplitter;
 import com.rag.rbac.service.RbacService;
 import com.rag.eval.EvalMapper;
-import com.rag.agent.mapper.AgentRunMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -65,8 +64,6 @@ public class FileService {
     private MultipartUploadSessionMapper multipartUploadSessionMapper;
     @Autowired
     private EvalMapper evalMapper;
-    @Autowired
-    private AgentRunMapper agentRunMapper;
     @Autowired
     private DocumentParser documentParser;
     @Autowired
@@ -722,9 +719,6 @@ public class FileService {
             evalMapper.deleteRunItemsByKbId(kbId);
             evalMapper.deleteRunsByKbId(kbId);
             evalMapper.deleteCasesByKbId(kbId);
-        }
-        if (agentRunMapper != null) {
-            agentRunMapper.deleteByKbId(kbId);
         }
         chunkMapper.deleteByKbId(kbId);
         fileMapper.deleteVersionsByKbId(kbId);

@@ -12,7 +12,6 @@ import com.rag.mapper.KnowledgeBaseMapper;
 import com.rag.mapper.MultipartUploadChunkMapper;
 import com.rag.mapper.MultipartUploadSessionMapper;
 import com.rag.eval.EvalMapper;
-import com.rag.agent.mapper.AgentRunMapper;
 import com.rag.rag.DocumentParser;
 import com.rag.rag.QdrantService;
 import com.rag.rag.RetrievalCache;
@@ -369,7 +368,6 @@ class FileServiceTest {
         MultipartUploadChunkMapper uploadChunkMapper = mock(MultipartUploadChunkMapper.class);
         MultipartUploadSessionMapper uploadSessionMapper = mock(MultipartUploadSessionMapper.class);
         EvalMapper evalMapper = mock(EvalMapper.class);
-        AgentRunMapper agentRunMapper = mock(AgentRunMapper.class);
         QdrantService qdrantService = mock(QdrantService.class);
         RetrievalCache retrievalCache = mock(RetrievalCache.class);
         MultipartUploadSession session = new MultipartUploadSession();
@@ -384,7 +382,7 @@ class FileServiceTest {
         ReflectionTestUtils.setField(service, "multipartUploadChunkMapper", uploadChunkMapper);
         ReflectionTestUtils.setField(service, "multipartUploadSessionMapper", uploadSessionMapper);
         ReflectionTestUtils.setField(service, "evalMapper", evalMapper);
-        ReflectionTestUtils.setField(service, "agentRunMapper", agentRunMapper);
+        ReflectionTestUtils.setField(service, "evalMapper", evalMapper);
         ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
         ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
@@ -397,7 +395,6 @@ class FileServiceTest {
         verify(evalMapper).deleteRunItemsByKbId(3L);
         verify(evalMapper).deleteRunsByKbId(3L);
         verify(evalMapper).deleteCasesByKbId(3L);
-        verify(agentRunMapper).deleteByKbId(3L);
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(partDirectory));
     }
 
