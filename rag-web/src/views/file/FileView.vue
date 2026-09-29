@@ -54,11 +54,11 @@
             :on-error="handleUploadError"
             :before-upload="beforeUpload"
             :show-file-list="false"
-            accept=".pdf,.doc,.docx,.txt,.xlsx,.md"
+            accept=".pdf,.doc,.docx,.txt,.xlsx,.md,.png,.jpg,.jpeg,.gif,.webp"
           >
             <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <div class="upload-title">拖拽文件到这里，或点击上传</div>
-            <div class="upload-tip">支持 PDF、DOC、DOCX、TXT、XLSX、Markdown，单个文件不超过 2GB</div>
+            <div class="upload-tip">支持 PDF、DOC、DOCX、TXT、XLSX、Markdown 和 PNG/JPG 等图片（开启视觉解析后自动识别图片内容），单个文件不超过 2GB</div>
           </el-upload>
           <div v-if="activeUpload" class="multipart-progress">
             <div class="multipart-progress-head">
@@ -714,14 +714,18 @@ function beforeUpload(file) {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/plain',
     'text/markdown',
-    'text/x-markdown'
+    'text/x-markdown',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp'
   ]
   // 第2步：兼容浏览器识别不到 MIME 类型的情况
-  const allowedExts = ['.pdf', '.doc', '.docx', '.txt', '.xlsx', '.md']
+  const allowedExts = ['.pdf', '.doc', '.docx', '.txt', '.xlsx', '.md', '.png', '.jpg', '.jpeg', '.gif', '.webp']
   const ext = file.name ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase() : ''
   // 第3步：校验文件格式
   if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
-    ElMessage.error('只支持 PDF、DOC、DOCX、TXT、XLSX、Markdown 格式的文件')
+    ElMessage.error('只支持 PDF、DOC、DOCX、TXT、XLSX、Markdown 和 PNG/JPG 等图片格式的文件')
     return false
   }
   // 第4步：校验文件大小

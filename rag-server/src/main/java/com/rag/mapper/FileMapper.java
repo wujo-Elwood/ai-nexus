@@ -78,6 +78,9 @@ public interface FileMapper {
                              @Param("processAttempts") Integer processAttempts,
                              @Param("nextRetryTime") LocalDateTime nextRetryTime);
 
+    /** 记录视觉解析溯源：哪些页或图走了视觉模型、用了哪个模型；传空时清空旧记录 */
+    int updateImageContext(@Param("id") Long id, @Param("imageContext") String imageContext);
+
     /** 查询已经到达重试时间的失败文件 */
     List<KbFile> findRetryableFiles(@Param("now") LocalDateTime now,
                                     @Param("maxAttempts") Integer maxAttempts,

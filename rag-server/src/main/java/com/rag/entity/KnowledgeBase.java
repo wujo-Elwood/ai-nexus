@@ -37,6 +37,8 @@ public class KnowledgeBase {
     private Integer headingSplitEnabled;
     /** 表格保留策略 */
     private String tableKeepStrategy;
+    /** 是否开启图片视觉解析：1=开启，图片内容走视觉模型入库 */
+    private Integer visionParseEnabled;
     /** 当前知识库的文档摘要 */
     private String summary;
     /** 摘要最后生成时间 */

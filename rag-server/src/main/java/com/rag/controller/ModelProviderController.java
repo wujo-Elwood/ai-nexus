@@ -86,6 +86,14 @@ public class ModelProviderController {
         return Result.success();
     }
 
+    /** 设置视觉供应商（与聊天激活解耦，文档图片内容入库解析固定使用该供应商） */
+    @PutMapping("/{id}/activate-vision")
+    public Result<Void> activateVision(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = currentUserId(request);
+        modelProviderService.activateVision(id, userId, isAdmin(userId));
+        return Result.success();
+    }
+
     /** 从认证拦截器写入的请求属性中取当前登录用户。 */
     private Long currentUserId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");

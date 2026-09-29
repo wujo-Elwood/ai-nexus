@@ -19,6 +19,8 @@ public interface ModelProviderMapper {
 
     ModelProvider findImageActive();
 
+    ModelProvider findVisionActive();
+
     int insert(ModelProvider provider);
 
     int update(ModelProvider provider);
@@ -32,4 +34,8 @@ public interface ModelProviderMapper {
     int deactivateAllImages();
 
     int activateImage(@Param("id") Long id);
+
+    int deactivateAllVisions();
+
+    int activateVision(@Param("id") Long id);
 }

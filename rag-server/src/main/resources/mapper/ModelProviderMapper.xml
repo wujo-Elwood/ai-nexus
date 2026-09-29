@@ -7,7 +7,8 @@
     <sql id="providerColumns">
         p.id, p.name, p.base_url, p.api_key, p.model,
         p.image_base_url, p.image_api_key, p.image_model,
-        p.is_active, p.image_active, p.created_by, p.create_time
+        p.vision_base_url, p.vision_api_key, p.vision_model,
+        p.is_active, p.image_active, p.vision_active, p.created_by, p.create_time
     </sql>
 
     <select id="findAll" resultType="com.rag.entity.ModelProvider">
@@ -46,9 +47,22 @@
         WHERE p.image_active = 1 LIMIT 1
     </select>
 
+    <select id="findVisionActive" resultType="com.rag.entity.ModelProvider">
+        SELECT <include refid="providerColumns"/>, u.username AS created_by_name
+        FROM ai_model_provider p
+        LEFT JOIN sys_user u ON u.id = p.created_by
+        WHERE p.vision_active = 1 LIMIT 1
+    </select>
+
     <insert id="insert" parameterType="com.rag.entity.ModelProvider" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO ai_model_provider (name, base_url, api_key, model, image_base_url, image_api_key, image_model, is_active, created_by, create_time)
-        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{imageBaseUrl}, #{imageApiKey}, #{imageModel}, #{isActive}, #{createdBy}, NOW())
+        INSERT INTO ai_model_provider (name, base_url, api_key, model,
+            image_base_url, image_api_key, image_model,
+            vision_base_url, vision_api_key, vision_model,
+            is_active, created_by, create_time)
+        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model},
+            #{imageBaseUrl}, #{imageApiKey}, #{imageModel},
+            #{visionBaseUrl}, #{visionApiKey}, #{visionModel},
+            #{isActive}, #{createdBy}, NOW())
     </insert>
 
     <update id="update" parameterType="com.rag.entity.ModelProvider">
@@ -59,7 +73,10 @@
             model = #{model},
             image_base_url = #{imageBaseUrl},
             image_api_key = #{imageApiKey},
-            image_model = #{imageModel}
+            image_model = #{imageModel},
+            vision_base_url = #{visionBaseUrl},
+            vision_api_key = #{visionApiKey},
+            vision_model = #{visionModel}
         WHERE id = #{id}
     </update>
 
@@ -81,6 +98,14 @@
 
     <update id="activateImage">
         UPDATE ai_model_provider SET image_active = 1 WHERE id = #{id}
+    </update>
+
+    <update id="deactivateAllVisions">
+        UPDATE ai_model_provider SET vision_active = 0
+    </update>
+
+    <update id="activateVision">
+        UPDATE ai_model_provider SET vision_active = 1 WHERE id = #{id}
     </update>
 
 </mapper>

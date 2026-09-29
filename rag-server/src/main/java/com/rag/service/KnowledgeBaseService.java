@@ -47,6 +47,7 @@ public class KnowledgeBaseService {
         kb.setKeywordWeight(null);
         kb.setHeadingSplitEnabled(null);
         kb.setTableKeepStrategy(null);
+        kb.setVisionParseEnabled(null);
         knowledgeBaseMapper.insert(kb);
         return kb;
     }
@@ -163,6 +164,7 @@ public class KnowledgeBaseService {
         kb.setHeadingSplitEnabled(request.getHeadingSplitEnabled() == null ? 0 : (request.getHeadingSplitEnabled() == 1 ? 1 : 0));
         String tableStrategy = request.getTableKeepStrategy();
         kb.setTableKeepStrategy("SUMMARY".equals(tableStrategy) ? "SUMMARY" : "FULL");
+        kb.setVisionParseEnabled(request.getVisionParseEnabled() == null ? 0 : (request.getVisionParseEnabled() == 1 ? 1 : 0));
         knowledgeBaseMapper.update(kb);
         return getById(kbId);
     }

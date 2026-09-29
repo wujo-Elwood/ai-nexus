@@ -27,3 +27,7 @@ export function activateModelProvider(id) {
 export function activateImageModelProvider(id) {
   return request.put(`/api/model-provider/${id}/activate-image`)
 }
+
+export function activateVisionModelProvider(id) {
+  return request.put(`/api/model-provider/${id}/activate-vision`)
+}

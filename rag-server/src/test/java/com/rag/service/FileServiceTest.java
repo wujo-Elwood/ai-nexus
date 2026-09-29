@@ -13,6 +13,7 @@ import com.rag.mapper.MultipartUploadChunkMapper;
 import com.rag.mapper.MultipartUploadSessionMapper;
 import com.rag.eval.EvalMapper;
 import com.rag.rag.DocumentParser;
+import com.rag.rag.HybridDocumentParser;
 import com.rag.rag.QdrantService;
 import com.rag.rag.RetrievalCache;
 import com.rag.rag.TextSplitter;
@@ -56,6 +57,7 @@ class FileServiceTest {
         FileMapper fileMapper = mock(FileMapper.class);
         ChunkMapper chunkMapper = mock(ChunkMapper.class);
         DocumentParser documentParser = mock(DocumentParser.class);
+        KnowledgeBaseMapper knowledgeBaseMapper = mock(KnowledgeBaseMapper.class);
         TextSplitter textSplitter = mock(TextSplitter.class);
         EmbeddingService embeddingService = mock(EmbeddingService.class);
         QdrantService qdrantService = mock(QdrantService.class);
@@ -74,6 +76,11 @@ class FileServiceTest {
         ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
         ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);
         ReflectionTestUtils.setField(service, "documentParser", documentParser);
+        //混合解析器委托同一个假解析器；知识库策略返回空即关闭视觉解析，保持原有纯文本失败路径
+        HybridDocumentParser hybridDocumentParser = new HybridDocumentParser();
+        ReflectionTestUtils.setField(hybridDocumentParser, "documentParser", documentParser);
+        ReflectionTestUtils.setField(service, "hybridDocumentParser", hybridDocumentParser);
+        ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
         ReflectionTestUtils.setField(service, "textSplitter", textSplitter);
         ReflectionTestUtils.setField(service, "embeddingService", embeddingService);
         ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
@@ -348,6 +355,10 @@ class FileServiceTest {
         ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
         ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
         ReflectionTestUtils.setField(service, "documentParser", documentParser);
+        //混合解析器委托同一个假解析器，保证解析真实执行后由删除标记拦停
+        HybridDocumentParser hybridDocumentParser = new HybridDocumentParser();
+        ReflectionTestUtils.setField(hybridDocumentParser, "documentParser", documentParser);
+        ReflectionTestUtils.setField(service, "hybridDocumentParser", hybridDocumentParser);
         ReflectionTestUtils.setField(service, "chunkMapper", chunkMapper);
         ReflectionTestUtils.setField(service, "qdrantService", qdrantService);
         ReflectionTestUtils.setField(service, "retrievalCache", retrievalCache);

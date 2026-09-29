@@ -5,7 +5,7 @@
         <span class="eyebrow">Model Providers</span>
         <h1 class="section-title">模型供应商配置</h1>
         <p class="section-desc">
-          统一管理大模型 API 地址、密钥和模型名称。AI 生图可以单独配置生图地址、密钥和模型；不填写时沿用当前供应商的普通模型配置。
+          统一管理大模型 API 地址、密钥和模型名称。AI 生图可以单独配置生图地址、密钥和模型；文档视觉解析可以单独配置视觉模型；不填写时沿用当前供应商的普通模型配置。
         </p>
       </div>
       <el-button type="primary" size="large" @click="openDialog()">
@@ -26,18 +26,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="model" label="对话模型" width="180" show-overflow-tooltip />
-        <el-table-column prop="imageModel" label="生图模型" width="180" show-overflow-tooltip>
+        <el-table-column prop="imageModel" label="生图模型" width="160" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.imageModel || '沿用对话模型' }}
           </template>
         </el-table-column>
-        <el-table-column prop="baseUrl" label="API 地址" min-width="240" show-overflow-tooltip />
-        <el-table-column prop="imageBaseUrl" label="生图 API 地址" min-width="240" show-overflow-tooltip>
+        <el-table-column prop="visionModel" label="视觉模型" width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.imageBaseUrl || '沿用普通 API 地址' }}
+            {{ row.visionModel || '沿用对话模型' }}
           </template>
         </el-table-column>
-        <el-table-column prop="createdByName" label="创建人" width="120" show-overflow-tooltip>
+        <el-table-column prop="baseUrl" label="API 地址" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="createdByName" label="创建人" width="110" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.createdByName || '—' }}
           </template>
@@ -50,6 +50,9 @@
               </el-tag>
               <el-tag v-if="row.imageActive === 1" type="warning" size="small">
                 生图使用中
+              </el-tag>
+              <el-tag v-if="row.visionActive === 1" type="warning" size="small">
+                视觉使用中
               </el-tag>
             </div>
           </template>
@@ -65,10 +68,24 @@
             >
               设为生图
             </el-button>
+            <el-button
+              v-if="row.visionActive !== 1"
+              type="primary"
+              link
+              :disabled="isReadonlyRow(row)"
+              @click="handleActivateVision(row)"
+            >
+              设为视觉
+            </el-button>
             <el-button type="primary" link :disabled="isReadonlyRow(row)" @click="openDialog(row)">
               编辑
             </el-button>
-            <el-button type="danger" link :disabled="isReadonlyRow(row) || row.isActive === 1 || row.imageActive === 1" @click="handleDelete(row)">
+            <el-button
+              type="danger"
+              link
+              :disabled="isReadonlyRow(row) || row.isActive === 1 || row.imageActive === 1 || row.visionActive === 1"
+              @click="handleDelete(row)"
+            >
               删除
             </el-button>
           </template>
@@ -112,6 +129,20 @@
             <el-input v-model="form.imageModel" placeholder="默认：gpt-image-2" />
           </el-form-item>
         </div>
+
+        <div class="form-section vision-section">
+          <h3>视觉解析配置</h3>
+          <p>这里专门给文档入库的图片视觉解析使用（扫描页、图表、内嵌图）。不填地址或密钥时，会沿用上面的普通 API 地址和密钥；模型必须是支持图片输入的视觉模型。</p>
+          <el-form-item label="视觉 API 地址">
+            <el-input v-model="form.visionBaseUrl" placeholder="不填则沿用普通 API 地址" />
+          </el-form-item>
+          <el-form-item label="视觉 API 密钥">
+            <el-input v-model="form.visionApiKey" type="password" show-password placeholder="不填则沿用普通 API Key" />
+          </el-form-item>
+          <el-form-item label="视觉模型名称">
+            <el-input v-model="form.visionModel" placeholder="例如：qwen-vl-max、glm-4v-flash、gpt-4o-mini" />
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -127,6 +158,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import {
   activateImageModelProvider,
+  activateVisionModelProvider,
   createModelProvider,
   deleteModelProvider,
   getModelProviderList,
@@ -162,7 +194,10 @@ function createEmptyForm() {
     model: '',
     imageBaseUrl: '',
     imageApiKey: '',
-    imageModel: 'gpt-image-2'
+    imageModel: 'gpt-image-2',
+    visionBaseUrl: '',
+    visionApiKey: '',
+    visionModel: ''
   }
 }
 
@@ -188,7 +223,10 @@ function openDialog(row) {
       model: row.model || '',
       imageBaseUrl: row.imageBaseUrl || '',
       imageApiKey: row.imageApiKey || '',
-      imageModel: row.imageModel || 'gpt-image-2'
+      imageModel: row.imageModel || 'gpt-image-2',
+      visionBaseUrl: row.visionBaseUrl || '',
+      visionApiKey: row.visionApiKey || '',
+      visionModel: row.visionModel || ''
     }
   } else {
     editingId.value = null
@@ -229,7 +267,10 @@ function normalizePayload(data) {
     ...data,
     imageBaseUrl: cleanBlank(data.imageBaseUrl),
     imageApiKey: cleanBlank(data.imageApiKey),
-    imageModel: cleanBlank(data.imageModel) || 'gpt-image-2'
+    imageModel: cleanBlank(data.imageModel) || 'gpt-image-2',
+    visionBaseUrl: cleanBlank(data.visionBaseUrl),
+    visionApiKey: cleanBlank(data.visionApiKey),
+    visionModel: cleanBlank(data.visionModel)
   }
 }
 
@@ -255,6 +296,18 @@ async function handleActivateImage(row) {
   try {
     await activateImageModelProvider(row.id)
     ElMessage.success(`生图已切换到 ${row.name}`)
+    loadList()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('设置失败')
+  }
+}
+
+// 设为视觉供应商：与聊天激活解耦，文档入库的图片视觉解析固定使用该供应商
+async function handleActivateVision(row) {
+  try {
+    await activateVisionModelProvider(row.id)
+    ElMessage.success(`视觉解析已切换到 ${row.name}`)
     loadList()
   } catch (error) {
     console.error(error)
@@ -380,6 +433,11 @@ async function handleDelete(row) {
 .image-section {
   border-color: rgba(229, 160, 68, 0.24);
   background: rgba(229, 160, 68, 0.055);
+}
+
+.vision-section {
+  border-color: rgba(64, 158, 255, 0.24);
+  background: rgba(64, 158, 255, 0.055);
 }
 
 .status-tags {

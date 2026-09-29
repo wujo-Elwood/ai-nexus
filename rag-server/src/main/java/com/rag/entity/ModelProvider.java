@@ -25,10 +25,18 @@ public class ModelProvider {
     private String imageApiKey;
     /** 生图模型名称，为空时沿用普通模型名称 */
     private String imageModel;
+    /** 视觉模型 API 地址，为空时沿用普通 API 基础地址 */
+    private String visionBaseUrl;
+    /** 视觉模型 API 密钥，为空时沿用普通 API 密钥 */
+    private String visionApiKey;
+    /** 视觉模型名称，为空时沿用普通模型名称 */
+    private String visionModel;
     /** 是否激活：1=激活，0=未激活 */
     private Integer isActive;
     /** 生图供应商标记：1=当前生图使用，0=未使用；与 is_active 解耦，聊天切模型不影响生图 */
     private Integer imageActive;
+    /** 视觉供应商标记：1=当前文档视觉解析使用，0=未使用；与 is_active 解耦，切聊天模型不影响入库解析 */
+    private Integer visionActive;
     /** 创建人用户ID，历史数据为空 */
     private Long createdBy;
     /** 创建人用户名，查询时联表带出，仅用于展示 */

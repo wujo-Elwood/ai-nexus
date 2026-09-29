@@ -17,9 +17,11 @@
 
     <insert id="insert" parameterType="com.rag.entity.KnowledgeBase" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO kb_knowledge_base (name, description, create_user, visibility, chunk_size, chunk_overlap,
-            top_k, similarity_threshold, vector_weight, keyword_weight, heading_split_enabled, table_keep_strategy, create_time)
+            top_k, similarity_threshold, vector_weight, keyword_weight, heading_split_enabled, table_keep_strategy,
+            vision_parse_enabled, create_time)
         VALUES (#{name}, #{description}, #{createUser}, #{visibility}, #{chunkSize}, #{chunkOverlap},
-            #{topK}, #{similarityThreshold}, #{vectorWeight}, #{keywordWeight}, #{headingSplitEnabled}, #{tableKeepStrategy}, NOW())
+            #{topK}, #{similarityThreshold}, #{vectorWeight}, #{keywordWeight}, #{headingSplitEnabled}, #{tableKeepStrategy},
+            #{visionParseEnabled}, NOW())
     </insert>
 
     <!-- 修改知识库名称、描述和可见范围 -->
@@ -35,7 +37,8 @@
             vector_weight = #{vectorWeight},
             keyword_weight = #{keywordWeight},
             heading_split_enabled = #{headingSplitEnabled},
-            table_keep_strategy = #{tableKeepStrategy}
+            table_keep_strategy = #{tableKeepStrategy},
+            vision_parse_enabled = #{visionParseEnabled}
         WHERE id = #{id}
     </update>
 

@@ -112,6 +112,13 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 记录视觉解析溯源，纯文本解析时由服务层传空清空旧记录 -->
+    <update id="updateImageContext">
+        UPDATE kb_file
+        SET image_context = #{imageContext}
+        WHERE id = #{id}
+    </update>
+
     <select id="findRetryableFiles" resultType="com.rag.entity.KbFile">
         SELECT * FROM kb_file
         WHERE status = 'FAILED'

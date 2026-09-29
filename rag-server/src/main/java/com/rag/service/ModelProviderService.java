@@ -92,6 +92,9 @@ public class ModelProviderService {
         existing.setImageBaseUrl(cleanBlank(provider.getImageBaseUrl()));
         existing.setImageApiKey(cleanBlank(provider.getImageApiKey()));
         existing.setImageModel(cleanBlank(provider.getImageModel()));
+        existing.setVisionBaseUrl(cleanBlank(provider.getVisionBaseUrl()));
+        existing.setVisionApiKey(cleanBlank(provider.getVisionApiKey()));
+        existing.setVisionModel(cleanBlank(provider.getVisionModel()));
         modelProviderMapper.update(existing);
         return existing;
     }
@@ -112,10 +115,24 @@ public class ModelProviderService {
 
     /** 设置生图供应商：与聊天激活解耦，聊天切模型不再影响生图；权限规则与激活一致 */
     @Transactional
+    public void activateVision(Long id, Long userId, boolean admin) {
+        getOwnedById(id, userId, admin);
+        modelProviderMapper.deactivateAllVisions();
+        modelProviderMapper.activateVision(id);
+    }
+
+    /** 设置生图供应商：与聊天激活解耦，聊天切模型不再影响生图；权限规则与激活一致 */
+    @Transactional
     public void activateImage(Long id, Long userId, boolean admin) {
         getOwnedById(id, userId, admin);
         modelProviderMapper.deactivateAllImages();
         modelProviderMapper.activateImage(id);
+    }
+
+    /** 查询视觉解析使用的供应商：优先取视觉标记，未设置时回落到聊天激活供应商，保持升级前行为 */
+    public ModelProvider getActiveForVision() {
+        ModelProvider provider = modelProviderMapper.findVisionActive();
+        return provider != null ? provider : getActive();
     }
 
     /** 查询生图使用的供应商：优先取生图标记，未设置时回落到聊天激活供应商，保持升级前行为 */
@@ -137,18 +154,22 @@ public class ModelProviderService {
         // 第2步：抹掉密钥和归属人后返回
         view.setApiKey(null);
         view.setImageApiKey(null);
+        view.setVisionApiKey(null);
         view.setCreatedByName(null);
         return view;
     }
 
     /**
-     * 清理生图配置中的空字符串
+     * 清理生图与视觉配置中的空字符串
      */
     private void cleanImageConfig(ModelProvider provider) {
-        // 第1步：空字符串统一转成 null，后续生图时才能正确走默认配置
+        // 第1步：空字符串统一转成 null，后续生图和视觉解析时才能正确走默认配置
         provider.setImageBaseUrl(cleanBlank(provider.getImageBaseUrl()));
         provider.setImageApiKey(cleanBlank(provider.getImageApiKey()));
         provider.setImageModel(cleanBlank(provider.getImageModel()));
+        provider.setVisionBaseUrl(cleanBlank(provider.getVisionBaseUrl()));
+        provider.setVisionApiKey(cleanBlank(provider.getVisionApiKey()));
+        provider.setVisionModel(cleanBlank(provider.getVisionModel()));
     }
 
     /**

@@ -26,6 +26,7 @@
           <el-form-item label="关键词权重"><el-input-number v-model="form.keywordWeight" :min="0" :max="1" :step="0.05" :precision="2" controls-position="right" /></el-form-item>
           <el-form-item label="表格保留"><el-select v-model="form.tableKeepStrategy"><el-option label="完整表格" value="FULL" /><el-option label="摘要表格" value="SUMMARY" /></el-select></el-form-item>
           <el-form-item label="标题层级切片"><el-switch v-model="headingEnabled" /></el-form-item>
+          <el-form-item label="图片视觉解析"><el-switch v-model="visionParseEnabled" /></el-form-item>
         </el-form>
         <div class="strategy-note">留空策略会沿用系统默认值；保存后重新处理文件才会应用新的切片参数。</div>
       </article>
@@ -72,8 +73,10 @@ const summaryLoading = ref(false)
 const stats = ref({})
 const summary = ref('')
 const summaryUpdatedAt = ref(null)
-const form = reactive({ chunkSize: null, chunkOverlap: null, topK: null, similarityThreshold: null, vectorWeight: null, keywordWeight: null, headingSplitEnabled: 0, tableKeepStrategy: 'FULL' })
+const form = reactive({ chunkSize: null, chunkOverlap: null, topK: null, similarityThreshold: null, vectorWeight: null, keywordWeight: null, headingSplitEnabled: 0, tableKeepStrategy: 'FULL', visionParseEnabled: 0 })
 const headingEnabled = computed({ get: () => form.headingSplitEnabled === 1, set: value => { form.headingSplitEnabled = value ? 1 : 0 } })
+// 视觉解析开关：开启后图片内容（扫描页、大图页、内嵌图、独立图片）走视觉模型入库
+const visionEnabled = computed({ get: () => form.visionParseEnabled === 1, set: value => { form.visionParseEnabled = value ? 1 : 0 } })
 const metrics = [
   { key: 'fileCount', label: '当前文件' }, { key: 'totalBytes', label: '总大小' }, { key: 'chunkCount', label: '切片数' },
   { key: 'vectorReadyCount', label: '向量就绪' }, { key: 'processingFailureCount', label: '处理失败' }, { key: 'duplicateFileCount', label: '重复文件' }, { key: 'lowQualityChunkCount', label: '低质量切片' }

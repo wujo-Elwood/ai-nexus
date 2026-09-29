@@ -12,6 +12,7 @@ import com.rag.mapper.KnowledgeBaseMapper;
 import com.rag.mapper.MultipartUploadChunkMapper;
 import com.rag.mapper.MultipartUploadSessionMapper;
 import com.rag.rag.DocumentParser;
+import com.rag.rag.HybridDocumentParser;
 import com.rag.rag.QdrantService;
 import com.rag.rag.RetrievalCache;
 import com.rag.rag.TextSplitter;
@@ -66,6 +67,8 @@ public class FileService {
     private EvalMapper evalMapper;
     @Autowired
     private DocumentParser documentParser;
+    @Autowired
+    private HybridDocumentParser hybridDocumentParser;
     @Autowired
     private TextSplitter textSplitter;
     @Autowired
@@ -260,9 +263,25 @@ public class FileService {
             fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
                     kbFile.getProgress(), kbFile.getErrorMessage());
             File file = new File(kbFile.getFilePath());
-            //提取文件内容为字符串
-            String content = documentParser.parse(file);
+            //按知识库独立策略决定是否走视觉解析，未配置时沿用纯文本解析
+            com.rag.entity.KnowledgeBase strategy = knowledgeBaseMapper.findById(kbFile.getKbId());
+            boolean visionParseEnabled = strategy != null && Integer.valueOf(1).equals(strategy.getVisionParseEnabled());
+            if (visionParseEnabled) {
+                //视觉解析单独报阶段，任务中心可见当前正在识别图片内容
+                kbFile.setProcessStage("VISION_PARSING");
+                kbFile.setProgress(30);
+                fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
+                        kbFile.getProgress(), null);
+            }
+            //提取文件内容为字符串：纯文本走 Tika，图片内容走视觉模型
+            HybridDocumentParser.ParseResult parseResult = hybridDocumentParser.parse(file, visionParseEnabled);
+            String content = parseResult.getContent();
             log.info("Parsed document, content length: {}", content.length());
+            //记录视觉解析溯源：哪些页或图走了视觉、用了哪个模型；纯文本解析时清空旧记录
+            if (visionParseEnabled) {
+                kbFile.setImageContext(parseResult.getVisionTrace());
+                fileMapper.updateImageContext(kbFile.getId(), parseResult.getVisionTrace());
+            }
             if (!isProcessingAllowed(kbFile)) {
                 return;
             }
@@ -272,8 +291,7 @@ public class FileService {
             fileMapper.updateProcessInfo(kbFile.getId(), kbFile.getStatus(), kbFile.getProcessStage(),
                     kbFile.getProgress(), null);
             //按自适应策略分割文本
-            // 按知识库独立策略切片，未配置时继续使用系统默认值
-            com.rag.entity.KnowledgeBase strategy = knowledgeBaseMapper.findById(kbFile.getKbId());
+            // 知识库策略已在解析阶段加载，未配置时继续使用系统默认值
             int configuredChunkSize = strategy != null && strategy.getChunkSize() != null ? strategy.getChunkSize() : 500;
             int configuredOverlap = strategy != null && strategy.getChunkOverlap() != null ? strategy.getChunkOverlap() : 100;
             boolean headingSplit = strategy != null && Integer.valueOf(1).equals(strategy.getHeadingSplitEnabled());
