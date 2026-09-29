@@ -1,6 +1,8 @@
 <template>
   <div
     class="agent-tool-page"
+    :class="{ 'vision-split': agentCode === 'vision-agent' }"
+    :style="agentCode === 'vision-agent' ? { gridTemplateColumns: leftWidth + 'px 1fr' } : null"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
@@ -29,7 +31,7 @@
         {{ agentCode === 'currency-converter'
           ? '试试输入："1000 人民币能换多少美元和日元？"'
           : agentCode === 'vision-agent'
-            ? '点击左下角图片按钮上传截图或照片，我来分析内容'
+            ? '把图片拖到左侧面板或点击上传，我来分析内容'
             : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
       </div>
       <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
@@ -69,23 +71,34 @@
       </div>
     </div>
 
-      <div v-if="pendingImages.length" class="image-previews">
+      <!-- 视觉智能体：左侧大块上传区（点击/拖拽均可），位于左栏顶部 -->
+      <div
+        v-if="agentCode === 'vision-agent'"
+        class="image-panel"
+        :class="{ 'has-images': pendingImages.length }"
+        title="点击选择图片，也可以把图片拖拽到页面任意位置"
+        @click="triggerPickImage"
+      >
+        <template v-if="pendingImages.length">
+          <div v-for="(img, index) in pendingImages" :key="index" class="image-thumb">
+            <img :src="img.dataUrl" alt="" />
+            <span class="thumb-remove" @click.stop="removeImage(index)">×</span>
+          </div>
+        </template>
+        <template v-else>
+          <el-icon><Picture /></el-icon>
+          <span>点击选择图片<br />或把图片拖拽到这里</span>
+        </template>
+      </div>
+      <div v-if="pendingImages.length && agentCode !== 'vision-agent'" class="image-previews">
         <div v-for="(img, index) in pendingImages" :key="index" class="image-thumb">
           <img :src="img.dataUrl" alt="" />
           <span class="thumb-remove" @click="removeImage(index)">×</span>
         </div>
       </div>
       <div class="input-bar" :style="{ height: inputHeight + 'px' }">
-        <div class="resize-handle" title="拖动调整输入框高度" @mousedown="startResize"><span></span></div>
+        <div class="resize-handle" :title="agentCode === 'vision-agent' ? '拖动调整左栏宽度' : '拖动调整输入框高度'" @mousedown="startResize"><span></span></div>
       <div class="input-row">
-        <el-button
-          v-if="agentCode === 'vision-agent'"
-          class="image-btn"
-          title="上传图片"
-          @click="triggerPickImage"
-        >
-          <el-icon><Picture /></el-icon>
-        </el-button>
         <el-input
           v-model="input"
           type="textarea"
@@ -227,20 +240,36 @@ function removeImage(index) {
   pendingImages.value.splice(index, 1)
 }
 
-// 拖动调整输入框高度：向上拖变高，向下拖变矮
+// 拖动调整尺寸：视觉智能体（左右布局）调左栏宽度，其他智能体调输入框高度
+const leftWidth = ref(380)
+
 function startResize(event) {
   event.preventDefault()
+  if (agentCode === 'vision-agent') {
+    const startX = event.clientX
+    const startWidth = leftWidth.value
+    const onMoveWidth = (e) => {
+      leftWidth.value = Math.min(640, Math.max(300, startWidth - (e.clientX - startX)))
+    }
+    const onUpWidth = () => {
+      window.removeEventListener('mousemove', onMoveWidth)
+      window.removeEventListener('mouseup', onUpWidth)
+    }
+    window.addEventListener('mousemove', onMoveWidth)
+    window.addEventListener('mouseup', onUpWidth)
+    return
+  }
   const startY = event.clientY
   const startHeight = inputHeight.value
-  const onMove = (e) => {
+  const onMoveHeight = (e) => {
     inputHeight.value = Math.min(420, Math.max(72, startHeight + (startY - e.clientY)))
   }
-  const onUp = () => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
+  const onUpHeight = () => {
+    window.removeEventListener('mousemove', onMoveHeight)
+    window.removeEventListener('mouseup', onUpHeight)
   }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
+  window.addEventListener('mousemove', onMoveHeight)
+  window.addEventListener('mouseup', onUpHeight)
 }
 
 // 中文输入法选词时的回车不触发发送
@@ -448,6 +477,62 @@ function stop() {
   box-sizing: border-box;
 }
 
+/* 视觉智能体左右布局：左栏=上传图片+描述，右栏=执行结果 */
+.agent-tool-page.vision-split {
+  display: grid;
+  grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
+  grid-template-areas:
+    "header chat"
+    "panel chat"
+    "bar chat";
+  column-gap: 16px;
+}
+
+.vision-split .page-header {
+  grid-area: header;
+}
+
+.vision-split .image-panel {
+  grid-area: panel;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  align-content: center;
+}
+
+.vision-split .image-panel.has-images {
+  align-content: flex-start;
+}
+
+.vision-split .image-thumb {
+  width: 72px;
+  height: 72px;
+}
+
+.vision-split .input-bar {
+  grid-area: bar;
+  height: auto !important;
+}
+
+.vision-split .input-row {
+  flex: 1;
+  min-height: 140px;
+  align-items: stretch;
+}
+
+.vision-split .chat-window {
+  grid-area: chat;
+}
+
+.vision-split .resize-handle {
+  cursor: ew-resize;
+}
+
+.vision-split .resize-handle span {
+  width: 4px;
+  height: 46px;
+}
+
 .page-header {
   display: flex;
   align-items: flex-end;
@@ -534,9 +619,40 @@ function stop() {
   color: var(--text-primary);
 }
 
-.image-btn {
-  height: auto;
+.image-panel {
+  width: 168px;
+  flex-shrink: 0;
   align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px dashed #3a3b40;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.image-panel:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.image-panel .el-icon {
+  font-size: 24px;
+}
+
+.image-panel.has-images {
+  align-content: flex-start;
+  justify-content: flex-start;
 }
 
 .image-previews {
