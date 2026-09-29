@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rag.agent.dto.AgentToolChatRequest;
 import com.rag.agent.entity.AgentToolStep;
 import com.rag.agent.mapper.AgentToolStepMapper;
+import com.rag.common.BusinessException;
 import com.rag.entity.ModelProvider;
 import com.rag.service.ModelProviderService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -43,6 +44,11 @@ public class AgentToolService {
     /** 最大工具调用轮数，防止模型死循环 */
     static final int MAX_ROUNDS = 10;
 
+    /** 单张图片 base64 大小上限（约 5MB） */
+    private static final int MAX_IMAGE_LENGTH = 7_000_000;
+    /** 单次最多携带图片数 */
+    private static final int MAX_IMAGES = 4;
+
     private static final String WEATHER_PROMPT = "你是 AI Nexus 的天气查询智能体。"
             + "回答天气相关问题前必须先调用 search_city_location 获取城市坐标，再用 get_weather 查询天气，不要凭空编造数据。"
             + "回答使用简洁的中文，并基于工具返回的真实数据。";
@@ -54,6 +60,10 @@ public class AgentToolService {
     private static final String DEFAULT_PROMPT = "你是 AI Nexus 的工具智能体。"
             + "你可以调用提供的工具获取实时信息；当问题需要实时数据时必须调用工具，不要凭空编造。"
             + "回答使用简洁的中文，并基于工具返回的真实数据。";
+
+    private static final String VISION_PROMPT = "你是 AI Nexus 的视觉智能体。"
+            + "仔细观察用户上传的图片，回答关于图片内容、文字和物体的问题，不要凭空编造图里没有的信息。"
+            + "如果图中包含需要计算的数字（如金额合计、数量统计），可调用 calculate 工具。回答使用简洁的中文。";
 
     private final ToolRegistry toolRegistry;
     private final ModelProviderService modelProviderService;
@@ -204,8 +214,8 @@ public class AgentToolService {
         }
     }
 
-    /** 组装消息列表：系统提示 + 历史对话（最多保留 20 条）+ 本次输入 */
-    private List<ChatMessage> buildMessages(AgentToolChatRequest request, String systemPrompt) {
+    /** 组装消息列表：系统提示 + 历史对话（最多保留 20 条）+ 本次输入（可携带图片，构成多模态消息） */
+    List<ChatMessage> buildMessages(AgentToolChatRequest request, String systemPrompt) {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.systemMessage(systemPrompt));
         if (request.getHistory() != null && !request.getHistory().isEmpty()) {
@@ -222,14 +232,48 @@ public class AgentToolService {
                 }
             }
         }
-        messages.add(UserMessage.userMessage(request.getMessage()));
+        String text = request.getMessage();
+        List<String> images = request.getImages();
+        if (images != null && !images.isEmpty()) {
+            // 有图片时构造多模态消息：文本 + 每张图片一个 ImageContent
+            List<dev.langchain4j.data.message.Content> parts = new ArrayList<>();
+            parts.add(dev.langchain4j.data.message.TextContent.from(text));
+            int count = 0;
+            for (String image : images) {
+                if (image == null || image.isBlank() || count >= MAX_IMAGES) {
+                    continue;
+                }
+                if (image.length() > MAX_IMAGE_LENGTH) {
+                    throw new BusinessException(400, "图片过大，请压缩后重试（单张不超过约 5MB）");
+                }
+                parts.add(toImageContent(image));
+                count++;
+            }
+            messages.add(new UserMessage(parts));
+        } else {
+            messages.add(UserMessage.userMessage(text));
+        }
         return messages;
+    }
+
+    /** 把 dataURL 或裸 base64 转成 LangChain4j 图片内容 */
+    private dev.langchain4j.data.message.ImageContent toImageContent(String image) {
+        if (image.startsWith("data:")) {
+            int semi = image.indexOf(';');
+            int comma = image.indexOf(',');
+            String mime = (semi > 5 ? image.substring(5, semi) : "image/png");
+            return dev.langchain4j.data.message.ImageContent.from(image.substring(comma + 1), mime);
+        }
+        return dev.langchain4j.data.message.ImageContent.from(image, "image/png");
     }
 
     /** 按智能体编码选择系统提示词 */
     private String resolvePrompt(String agentCode) {
         if ("currency-converter".equals(agentCode)) {
             return CURRENCY_PROMPT;
+        }
+        if ("vision-agent".equals(agentCode)) {
+            return VISION_PROMPT;
         }
         if ("general-tool".equals(agentCode)) {
             return WEATHER_PROMPT;

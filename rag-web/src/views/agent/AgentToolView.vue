@@ -22,7 +22,9 @@
       <div v-if="messages.length === 0" class="empty-hint">
         {{ agentCode === 'currency-converter'
           ? '试试输入："1000 人民币能换多少美元和日元？"'
-          : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
+          : agentCode === 'vision-agent'
+            ? '点击左下角图片按钮上传截图或照片，我来分析内容'
+            : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
       </div>
       <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
         <div class="msg-bubble">
@@ -58,7 +60,21 @@
 
     <div class="input-bar" :style="{ height: inputHeight + 'px' }">
       <div class="resize-handle" title="拖动调整输入框高度" @mousedown="startResize"><span></span></div>
+      <div v-if="pendingImages.length" class="image-previews">
+        <div v-for="(img, index) in pendingImages" :key="index" class="image-thumb">
+          <img :src="img.dataUrl" alt="" />
+          <span class="thumb-remove" @click="removeImage(index)">×</span>
+        </div>
+      </div>
       <div class="input-row">
+        <el-button
+          v-if="agentCode === 'vision-agent'"
+          class="image-btn"
+          title="上传图片"
+          @click="triggerPickImage"
+        >
+          <el-icon><Picture /></el-icon>
+        </el-button>
         <el-input
           v-model="input"
           type="textarea"
@@ -68,10 +84,18 @@
           @keydown.enter.exact="onEnterKey"
         />
         <div class="input-actions">
-          <el-button v-if="!streaming" type="primary" :disabled="!input.trim()" @click="send">发送</el-button>
+          <el-button v-if="!streaming" type="primary" :disabled="!input.trim() && !pendingImages.length" @click="send">发送</el-button>
           <el-button v-else type="warning" @click="stop">停止</el-button>
         </div>
       </div>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/*"
+        multiple
+        style="display: none"
+        @change="onPickImage"
+      />
     </div>
   </div>
 </template>
@@ -80,7 +104,7 @@
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Picture } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
 import { listAgentTools, streamAgentChat } from '../../api/agentTool'
 
@@ -94,7 +118,11 @@ const route = useRoute()
 const router = useRouter()
 
 // 当前进入的智能体：决定可用工具子集与页面标题
-const AGENT_NAMES = { 'general-tool': '天气查询智能体', 'currency-converter': '货币换算智能体' }
+const AGENT_NAMES = {
+  'general-tool': '天气查询智能体',
+  'currency-converter': '货币换算智能体',
+  'vision-agent': '视觉智能体'
+}
 const agentCode = String(route.query.agent || 'general-tool')
 const agentName = AGENT_NAMES[agentCode] || '天气查询智能体'
 const tools = ref([])
@@ -103,8 +131,33 @@ const input = ref('')
 const streaming = ref(false)
 const chatWindowRef = ref(null)
 const inputHeight = ref(110)
+const fileInputRef = ref(null)
+const pendingImages = ref([])
 let abortController = null
 let typewriterTimer = null
+
+function triggerPickImage() {
+  if (fileInputRef.value) fileInputRef.value.click()
+}
+
+function onPickImage(event) {
+  const files = [...(event.target.files || [])]
+  event.target.value = ''
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue
+    if (file.size > 4 * 1024 * 1024) {
+      ElMessage.error('图片不能超过 4MB')
+      continue
+    }
+    const reader = new FileReader()
+    reader.onload = () => pendingImages.value.push({ name: file.name, dataUrl: reader.result })
+    reader.readAsDataURL(file)
+  }
+}
+
+function removeImage(index) {
+  pendingImages.value.splice(index, 1)
+}
 
 // 拖动调整输入框高度：向上拖变高，向下拖变矮
 function startResize(event) {
@@ -259,7 +312,7 @@ function handleEvent(msg, event, data) {
 
 async function send() {
   const text = input.value.trim()
-  if (!text || streaming.value) return
+  if ((!text && !pendingImages.value.length) || streaming.value) return
   input.value = ''
   streaming.value = true
   messages.value.push({ role: 'user', content: text })
@@ -273,10 +326,13 @@ async function send() {
     .filter((m) => m.content)
     .map((m) => ({ role: m.role, content: m.content }))
 
+  const images = pendingImages.value.map((item) => item.dataUrl)
+  const messageText = text || (images.length ? '请分析这张图片' : '')
+
   abortController = new AbortController()
   try {
     await streamAgentChat(
-      { message: text, history, agentCode },
+      { message: messageText, history, agentCode, images: images.length ? images : undefined },
       { signal: abortController.signal, onEvent: (event, data) => handleEvent(assistant, event, data) }
     )
   } catch (e) {
@@ -288,6 +344,7 @@ async function send() {
     assistant.pending = false
     streaming.value = false
     abortController = null
+    pendingImages.value = []
     scrollBottom()
   }
 }
@@ -391,6 +448,48 @@ function stop() {
   background: #15161a;
   border: 1px solid #232428;
   color: var(--text-primary);
+}
+
+.image-btn {
+  height: auto;
+  align-self: stretch;
+}
+
+.image-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.image-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border: 1px solid #2a2b30;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  border-bottom-left-radius: 6px;
 }
 
 .stream-status {

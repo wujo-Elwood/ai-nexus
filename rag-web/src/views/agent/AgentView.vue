@@ -117,7 +117,7 @@ async function loadAgents() {
 
 // 进入选中的智能体详情页
 function openAgent(agent) {
-  if (agent.code === 'general-tool' || agent.code === 'currency-converter') {
+  if (['general-tool', 'currency-converter', 'vision-agent'].includes(agent.code)) {
     router.push('/agent-tools?agent=' + agent.code)
     return
   }
@@ -147,6 +147,9 @@ function getStatusTagType(status) {
 function getAgentTags(agent) {
   if (agent.code === 'general-tool') {
     return ['天气查询', '坐标定位', '步骤可视', '实时数据']
+  }
+  if (agent.code === 'vision-agent') {
+    return ['图片识别', '文字提取', '金额合计', '多模态']
   }
   return [agent.scene || '智能体']
 }

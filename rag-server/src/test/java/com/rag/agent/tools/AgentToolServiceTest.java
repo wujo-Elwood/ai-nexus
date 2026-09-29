@@ -1,6 +1,7 @@
 package com.rag.agent.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rag.agent.dto.AgentToolChatRequest;
 import com.rag.agent.entity.AgentToolStep;
 import com.rag.agent.mapper.AgentToolStepMapper;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -230,5 +231,24 @@ class AgentToolServiceTest {
                 "status:null",
                 "answer", "done"), listener.events);
         assertEquals("今天南京有雨", listener.streamed.toString());
+    }
+
+    @Test
+    void shouldAttachImagesToLastUserMessage() throws Exception {
+        AgentToolService service = newService(mock(AgentToolStepMapper.class));
+        AgentToolChatRequest request = new AgentToolChatRequest();
+        request.setMessage("这张图里是什么");
+        request.setAgentCode("vision-agent");
+        request.setImages(List.of("data:image/png;base64,aGVsbG8="));
+
+        List<ChatMessage> messages = service.buildMessages(request, "system prompt");
+
+        assertEquals(2, messages.size());
+        UserMessage userMessage = (UserMessage) messages.get(1);
+        assertEquals(2, userMessage.contents().size());
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+                dev.langchain4j.data.message.TextContent.class, userMessage.contents().get(0));
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+                dev.langchain4j.data.message.ImageContent.class, userMessage.contents().get(1));
     }
 }

@@ -17,6 +17,9 @@ public class AgentToolChatRequest {
     /** 智能体编码，决定本次对话可用的工具子集（如 general-tool、currency-converter） */
     private String agentCode;
 
+    /** 随最后一条用户消息发送的图片，元素为 base64 或 dataURL（仅视觉智能体使用） */
+    private List<String> images;
+
     /** 历史对话（可选），role 取值 user/assistant */
     private List<HistoryTurn> history;
 
