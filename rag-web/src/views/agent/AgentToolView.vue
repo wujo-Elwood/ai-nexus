@@ -34,7 +34,12 @@
       </div>
       <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
         <div class="msg-bubble">
-          <template v-if="msg.role === 'user'">{{ msg.content }}</template>
+          <template v-if="msg.role === 'user'">
+            {{ msg.content }}
+            <div v-if="msg.images && msg.images.length" class="msg-images">
+              <img v-for="(src, index) in msg.images" :key="index" :src="src" alt="" />
+            </div>
+          </template>
           <template v-else>
             <div v-if="msg.statusText" class="stream-status">{{ msg.statusText }}</div>
             <div v-if="msg.steps.length" class="steps-panel">
@@ -64,14 +69,14 @@
       </div>
     </div>
 
-    <div class="input-bar" :style="{ height: inputHeight + 'px' }">
-      <div class="resize-handle" title="拖动调整输入框高度" @mousedown="startResize"><span></span></div>
       <div v-if="pendingImages.length" class="image-previews">
         <div v-for="(img, index) in pendingImages" :key="index" class="image-thumb">
           <img :src="img.dataUrl" alt="" />
           <span class="thumb-remove" @click="removeImage(index)">×</span>
         </div>
       </div>
+      <div class="input-bar" :style="{ height: inputHeight + 'px' }">
+        <div class="resize-handle" title="拖动调整输入框高度" @mousedown="startResize"><span></span></div>
       <div class="input-row">
         <el-button
           v-if="agentCode === 'vision-agent'"
@@ -378,7 +383,9 @@ async function send() {
   if ((!text && !pendingImages.value.length) || streaming.value) return
   input.value = ''
   streaming.value = true
-  messages.value.push({ role: 'user', content: text })
+  const images = pendingImages.value.map((item) => item.dataUrl)
+  const messageText = text || (images.length ? '请分析这张图片' : '')
+  messages.value.push({ role: 'user', content: messageText, images: images.length ? images : undefined })
   // 必须用 reactive 包裹：事件回调持有的是这个引用，直接改原始对象不会触发视图更新
   const assistant = reactive({ role: 'assistant', content: '', deltaQueue: '', steps: [], stepsOpen: true, pending: true, statusText: '' })
   messages.value.push(assistant)
@@ -388,9 +395,6 @@ async function send() {
     .slice(0, -2)
     .filter((m) => m.content)
     .map((m) => ({ role: m.role, content: m.content }))
-
-  const images = pendingImages.value.map((item) => item.dataUrl)
-  const messageText = text || (images.length ? '请分析这张图片' : '')
 
   abortController = new AbortController()
   try {
