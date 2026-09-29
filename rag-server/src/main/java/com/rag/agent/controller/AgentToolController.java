@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -48,9 +49,9 @@ public class AgentToolController {
         return ResponseEntity.ok(agentToolService.chat(request));
     }
 
-    /** 当前注册的工具清单 */
+    /** 当前注册的工具清单，可按智能体编码过滤 */
     @GetMapping("/tools")
-    public Result<List<Map<String, Object>>> tools() {
-        return Result.success(toolRegistry.describe());
+    public Result<List<Map<String, Object>>> tools(@RequestParam(required = false) String agent) {
+        return Result.success(toolRegistry.describe(toolRegistry.toolsForAgent(agent)));
     }
 }

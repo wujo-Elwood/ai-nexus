@@ -117,8 +117,8 @@ async function loadAgents() {
 
 // 进入选中的智能体详情页
 function openAgent(agent) {
-  if (agent.code === 'general-tool') {
-    router.push('/agent-tools')
+  if (agent.code === 'general-tool' || agent.code === 'currency-converter') {
+    router.push('/agent-tools?agent=' + agent.code)
     return
   }
   ElMessage.info('这个智能体详情页还没有接入')

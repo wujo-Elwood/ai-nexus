@@ -146,6 +146,10 @@ class AgentToolServiceTest {
         return new AgentToolService(registry, null, stepMapper, new ObjectMapper(), Runnable::run);
     }
 
+    private List<ToolSpecification> registryTools() {
+        return new ToolRegistry(List.of(new EchoTool()), new ObjectMapper()).specifications();
+    }
+
     @Test
     void shouldExecuteToolAndStreamAnswer() {
         ToolExecutionRequest request = ToolExecutionRequest.builder()
@@ -167,7 +171,7 @@ class AgentToolServiceTest {
                 UserMessage.userMessage("调用工具试试")
         ));
 
-        service.runStreamLoop(model, messages, "run-1", listener, 0, new AtomicInteger());
+        service.runStreamLoop(model, messages, "run-1", listener, 0, new AtomicInteger(), registryTools());
 
         assertEquals(List.of(
                 "status:正在分析问题，决定是否调用工具…",
@@ -202,7 +206,7 @@ class AgentToolServiceTest {
         AgentToolService service = newService(mock(AgentToolStepMapper.class));
         CollectingListener listener = new CollectingListener();
 
-        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener, 0, new AtomicInteger());
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("hi"))), "run-2", listener, 0, new AtomicInteger(), registryTools());
 
         assertTrue(listener.answer.contains("已连续调用工具"), listener.answer);
         assertEquals(AgentToolService.MAX_ROUNDS, listener.events.stream().filter(e -> e.startsWith("step_start")).count());
@@ -218,7 +222,7 @@ class AgentToolServiceTest {
         AgentToolService service = newService(mock(AgentToolStepMapper.class));
         CollectingListener listener = new CollectingListener();
 
-        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("天气"))), "run-3", listener, 0, new AtomicInteger());
+        service.runStreamLoop(model, new ArrayList<>(List.of(UserMessage.userMessage("天气"))), "run-3", listener, 0, new AtomicInteger(), registryTools());
 
         assertEquals(List.of(
                 "status:正在分析问题，决定是否调用工具…",

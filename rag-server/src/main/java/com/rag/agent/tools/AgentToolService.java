@@ -41,9 +41,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AgentToolService {
 
     /** 最大工具调用轮数，防止模型死循环 */
-    static final int MAX_ROUNDS = 6;
+    static final int MAX_ROUNDS = 10;
 
-    private static final String SYSTEM_PROMPT = "你是 AI Nexus 的通用工具智能体。"
+    private static final String WEATHER_PROMPT = "你是 AI Nexus 的天气查询智能体。"
+            + "回答天气相关问题前必须先调用 search_city_location 获取城市坐标，再用 get_weather 查询天气，不要凭空编造数据。"
+            + "回答使用简洁的中文，并基于工具返回的真实数据。";
+
+    private static final String CURRENCY_PROMPT = "你是 AI Nexus 的货币换算智能体。"
+            + "换算前必须先用 get_exchange_rate 查询实时汇率，再用 calculate 计算金额，不要凭空编造数据。"
+            + "币种使用 3 位 ISO 代码（如 CNY、USD、EUR、JPY）。回答用简洁的中文，说明换算过程和结果。";
+
+    private static final String DEFAULT_PROMPT = "你是 AI Nexus 的工具智能体。"
             + "你可以调用提供的工具获取实时信息；当问题需要实时数据时必须调用工具，不要凭空编造。"
             + "回答使用简洁的中文，并基于工具返回的真实数据。";
 
@@ -79,8 +87,10 @@ public class AgentToolService {
             ModelProvider provider = modelProviderService.getActive();
             StreamingChatLanguageModel model = buildStreamingModel(provider);
             SseEmitterListener listener = new SseEmitterListener(runId, emitter);
-            listener.onOpen(runId, toolRegistry.describe());
-            runStreamLoop(model, buildMessages(request), runId, listener, 0, new AtomicInteger());
+            List<String> allowedTools = toolRegistry.toolsForAgent(request.getAgentCode());
+            listener.onOpen(runId, toolRegistry.describe(allowedTools));
+            runStreamLoop(model, buildMessages(request, resolvePrompt(request.getAgentCode())), runId, listener,
+                    0, new AtomicInteger(), toolRegistry.specifications(allowedTools));
         } catch (Exception e) {
             // 把真实失败原因透传给前端（如供应商余额不足、接口不通），避免只看到笼统的重试提示
             log.warn("通用工具智能体执行失败: {}", e.getMessage(), e);
@@ -99,9 +109,9 @@ public class AgentToolService {
      * 包内可见，便于测试时注入假模型
      */
     void runStreamLoop(StreamingChatLanguageModel model, List<ChatMessage> messages, String runId,
-                       AgentToolListener listener, int round, AtomicInteger stepCounter) {
+                       AgentToolListener listener, int round, AtomicInteger stepCounter,
+                       List<ToolSpecification> tools) {
         listener.onStatus(round == 0 ? "正在分析问题，决定是否调用工具…" : "正在结合工具结果思考…");
-        List<ToolSpecification> tools = toolRegistry.specifications();
         model.generate(messages, tools, new StreamingResponseHandler<AiMessage>() {
 
             @Override
@@ -133,7 +143,7 @@ public class AgentToolService {
                             listener.onDone(runId);
                             return;
                         }
-                        runStreamLoop(model, messages, runId, listener, round + 1, stepCounter);
+                        runStreamLoop(model, messages, runId, listener, round + 1, stepCounter, tools);
                     } catch (Exception e) {
                         log.warn("通用工具智能体工具执行失败: {}", e.getMessage(), e);
                         listener.onError(e.getMessage() == null || e.getMessage().isBlank() ? "工具执行失败" : e.getMessage());
@@ -195,9 +205,9 @@ public class AgentToolService {
     }
 
     /** 组装消息列表：系统提示 + 历史对话（最多保留 20 条）+ 本次输入 */
-    private List<ChatMessage> buildMessages(AgentToolChatRequest request) {
+    private List<ChatMessage> buildMessages(AgentToolChatRequest request, String systemPrompt) {
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(SystemMessage.systemMessage(SYSTEM_PROMPT));
+        messages.add(SystemMessage.systemMessage(systemPrompt));
         if (request.getHistory() != null && !request.getHistory().isEmpty()) {
             List<AgentToolChatRequest.HistoryTurn> history = request.getHistory();
             int from = Math.max(0, history.size() - 20);
@@ -214,6 +224,17 @@ public class AgentToolService {
         }
         messages.add(UserMessage.userMessage(request.getMessage()));
         return messages;
+    }
+
+    /** 按智能体编码选择系统提示词 */
+    private String resolvePrompt(String agentCode) {
+        if ("currency-converter".equals(agentCode)) {
+            return CURRENCY_PROMPT;
+        }
+        if ("general-tool".equals(agentCode)) {
+            return WEATHER_PROMPT;
+        }
+        return DEFAULT_PROMPT;
     }
 
     /** 按激活供应商创建流式聊天模型，与聊天服务保持一致的地址归一化规则 */

@@ -8,8 +8,8 @@
             返回智能体管理
           </el-button>
         </div>
-        <h2 class="page-title">天气查询智能体</h2>
-        <p class="page-desc">模型自主调用天气工具完成任务，每一步调用过程实时可见</p>
+        <h2 class="page-title">{{ agentName }}</h2>
+        <p class="page-desc">模型自主调用工具完成任务，每一步调用过程实时可见</p>
       </div>
       <div class="tool-chips">
         <span v-for="tool in tools" :key="tool.name" class="tool-chip" :title="tool.description">
@@ -20,7 +20,9 @@
 
     <div ref="chatWindowRef" class="chat-window">
       <div v-if="messages.length === 0" class="empty-hint">
-        试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"
+        {{ agentCode === 'currency-converter'
+          ? '试试输入："1000 人民币能换多少美元和日元？"'
+          : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
       </div>
       <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
         <div class="msg-bubble">
@@ -61,7 +63,7 @@
           v-model="input"
           type="textarea"
           resize="none"
-          placeholder="输入天气问题，自动调用工具查询（Enter 发送，Shift+Enter 换行）"
+          placeholder="输入问题，自动调用工具查询（Enter 发送，Shift+Enter 换行）"
           :disabled="streaming"
           @keydown.enter.exact="onEnterKey"
         />
@@ -76,7 +78,7 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
@@ -88,7 +90,13 @@ function renderAnswer(content) {
   return md.render(content || '')
 }
 
+const route = useRoute()
 const router = useRouter()
+
+// 当前进入的智能体：决定可用工具子集与页面标题
+const AGENT_NAMES = { 'general-tool': '天气查询智能体', 'currency-converter': '货币换算智能体' }
+const agentCode = String(route.query.agent || 'general-tool')
+const agentName = AGENT_NAMES[agentCode] || '天气查询智能体'
 const tools = ref([])
 const messages = ref([])
 const input = ref('')
@@ -162,7 +170,7 @@ function flushTypewriter() {
 
 onMounted(async () => {
   try {
-    const res = await listAgentTools()
+    const res = await listAgentTools(agentCode)
     tools.value = Array.isArray(res) ? res : res.data || []
   } catch (e) {
     // 工具清单加载失败不阻塞聊天
@@ -195,6 +203,10 @@ function handleEvent(msg, event, data) {
   switch (event) {
     case 'open':
       msg.runId = data.runId
+      // 以本次会话实际下发的工具为准，同步页签展示
+      if (Array.isArray(data.tools) && data.tools.length) {
+        tools.value = data.tools
+      }
       break
     case 'status':
       msg.statusText = data.message || ''
@@ -264,7 +276,7 @@ async function send() {
   abortController = new AbortController()
   try {
     await streamAgentChat(
-      { message: text, history },
+      { message: text, history, agentCode },
       { signal: abortController.signal, onEvent: (event, data) => handleEvent(assistant, event, data) }
     )
   } catch (e) {

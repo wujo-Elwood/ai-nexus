@@ -14,6 +14,9 @@ public class AgentToolChatRequest {
     /** 用户本次输入 */
     private String message;
 
+    /** 智能体编码，决定本次对话可用的工具子集（如 general-tool、currency-converter） */
+    private String agentCode;
+
     /** 历史对话（可选），role 取值 user/assistant */
     private List<HistoryTurn> history;
 

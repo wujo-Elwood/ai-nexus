@@ -18,6 +18,8 @@ public class AgentService {
 
     private static final String generalToolCode = "general-tool";
     private static final String generalToolName = "天气查询智能体";
+    private static final String currencyToolCode = "currency-converter";
+    private static final String currencyToolName = "货币换算智能体";
 
     private final ModelProviderService modelProviderService;
 
@@ -40,7 +42,11 @@ public class AgentService {
         agents.add(buildAgent(generalToolCode, generalToolName,
                 "调用天气定位与查询工具回答实时天气问题，每一步执行过程实时可见。",
                 "实时天气查询、坐标定位、执行过程可视化", provider, modelDisplayName));
-        // 第3步：返回智能体列表
+        // 第3步：加入货币换算智能体
+        agents.add(buildAgent(currencyToolCode, currencyToolName,
+                "查询实时汇率并结合计算器完成多币种金额换算，每一步执行过程实时可见。",
+                "实时汇率查询、多币种换算、执行过程可视化", provider, modelDisplayName));
+        // 第4步：返回智能体列表
         return agents;
     }
 

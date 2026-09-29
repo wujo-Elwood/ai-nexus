@@ -1,8 +1,9 @@
 import request from '../utils/request'
 
-// 获取当前注册的工具清单
-export function listAgentTools() {
-  return request.get('/api/agent-tools/tools')
+// 获取当前注册的工具清单，可按智能体编码过滤
+export function listAgentTools(agentCode) {
+  const params = agentCode ? { agent: agentCode } : {}
+  return request.get('/api/agent-tools/tools', { params })
 }
 
 // 工具智能体流式对话：通过 onEvent(event, data) 回调每一步

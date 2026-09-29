@@ -7,6 +7,7 @@ import dev.langchain4j.agent.tool.ToolSpecification;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,10 @@ import java.util.stream.Collectors;
 @Component
 public class ToolRegistry {
 
+    private static final Map<String, List<String>> AGENT_TOOLS = Map.of(
+            "general-tool", List.of("search_city_location", "get_weather"),
+            "currency-converter", List.of("get_exchange_rate", "calculate"));
+
     private final Map<String, AgentTool> tools;
     private final ObjectMapper objectMapper;
 
@@ -29,10 +34,23 @@ public class ToolRegistry {
         this.objectMapper = objectMapper;
     }
 
+    /** 按智能体编码解析可用工具子集；未登记的编码返回 null 表示不限制 */
+    public List<String> toolsForAgent(String agentCode) {
+        return agentCode == null ? null : AGENT_TOOLS.get(agentCode);
+    }
+
     /** 生成给模型看的工具规范列表 */
     public List<ToolSpecification> specifications() {
+        return specifications(null);
+    }
+
+    /** 生成指定工具名子集的规范列表，names 为空时返回全部 */
+    public List<ToolSpecification> specifications(Collection<String> names) {
         List<ToolSpecification> specs = new ArrayList<>();
         for (AgentTool tool : tools.values()) {
+            if (names != null && !names.isEmpty() && !names.contains(tool.name())) {
+                continue;
+            }
             ToolSpecification.Builder builder = ToolSpecification.builder()
                     .name(tool.name())
                     .description(tool.description());
@@ -52,8 +70,16 @@ public class ToolRegistry {
 
     /** 工具清单，用于前端展示当前可用工具 */
     public List<Map<String, Object>> describe() {
+        return describe(null);
+    }
+
+    /** 工具清单（指定子集），names 为空时返回全部 */
+    public List<Map<String, Object>> describe(Collection<String> names) {
         List<Map<String, Object>> list = new ArrayList<>();
         for (AgentTool tool : tools.values()) {
+            if (names != null && !names.isEmpty() && !names.contains(tool.name())) {
+                continue;
+            }
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("name", tool.name());
             item.put("description", tool.description());
