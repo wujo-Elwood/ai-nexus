@@ -32,7 +32,9 @@
           ? '试试输入："1000 人民币能换多少美元和日元？"'
           : agentCode === 'vision-agent'
             ? '把图片拖到左侧面板或点击上传，我来分析内容'
-            : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
+            : agentCode === 'data-agent'
+              ? '试试输入："系统里有多少个用户和知识库？"'
+              : '试试输入："北京今天天气怎么样？" 或 "对比北京和上海的气温"' }}
       </div>
       <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
         <div class="msg-bubble">
@@ -161,7 +163,8 @@ const router = useRouter()
 const AGENT_NAMES = {
   'general-tool': '天气查询智能体',
   'currency-converter': '货币换算智能体',
-  'vision-agent': '视觉智能体'
+  'vision-agent': '视觉智能体',
+  'data-agent': '数据问答智能体'
 }
 const agentCode = String(route.query.agent || 'general-tool')
 const agentName = AGENT_NAMES[agentCode] || '天气查询智能体'

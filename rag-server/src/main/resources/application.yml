@@ -41,6 +41,12 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+# 数据问答智能体：只读数据库账号（建议单独创建仅有 SELECT 权限的账号）
+data-agent:
+  jdbc-url: ${DATA_AGENT_JDBC_URL:jdbc:mysql://localhost:3306/rag_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+  username: ${DATA_AGENT_DB_USER:rag_readonly}
+  password: ${DATA_AGENT_DB_PASSWORD:AgentRead#2026}
+
 # 文件存储目录
 file:
   upload-dir: ${FILE_UPLOAD_DIR:D:/workspace/ai-nexus/uploads}

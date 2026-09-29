@@ -87,6 +87,33 @@ const fallbackAgentList = [
     version: '1.0',
     scene: '实时天气查询、坐标定位、执行过程可视化',
     modelDisplayName: '跟随模型设置'
+  },
+  {
+    code: 'currency-converter',
+    name: '货币换算智能体',
+    description: '查询实时汇率并结合计算器完成多币种金额换算，每一步执行过程实时可见。',
+    status: 'ENABLED',
+    version: '1.0',
+    scene: '实时汇率查询、多币种换算、执行过程可视化',
+    modelDisplayName: '跟随模型设置'
+  },
+  {
+    code: 'vision-agent',
+    name: '视觉智能体',
+    description: '上传图片进行识别与分析（截图、照片中的文字与物体），结合计算工具完成图中金额合计等多步分析。',
+    status: 'ENABLED',
+    version: '1.0',
+    scene: '图片识别、文字提取、结合计算的多步分析',
+    modelDisplayName: '跟随模型设置'
+  },
+  {
+    code: 'data-agent',
+    name: '数据问答智能体',
+    description: '只读查询系统数据库，回答用户、知识库、调用量等数据统计问题，每一步 SQL 与结果实时可见。',
+    status: 'ENABLED',
+    version: '1.0',
+    scene: '数据统计、业务问答、只读查询、SQL 过程可视化',
+    modelDisplayName: '跟随模型设置'
   }
 ]
 
@@ -117,7 +144,7 @@ async function loadAgents() {
 
 // 进入选中的智能体详情页
 function openAgent(agent) {
-  if (['general-tool', 'currency-converter', 'vision-agent'].includes(agent.code)) {
+  if (['general-tool', 'currency-converter', 'vision-agent', 'data-agent'].includes(agent.code)) {
     router.push('/agent-tools?agent=' + agent.code)
     return
   }
@@ -150,6 +177,9 @@ function getAgentTags(agent) {
   }
   if (agent.code === 'vision-agent') {
     return ['图片识别', '文字提取', '金额合计', '多模态']
+  }
+  if (agent.code === 'data-agent') {
+    return ['只读查询', '统计分析', 'SQL 可见', '实时数据']
   }
   return [agent.scene || '智能体']
 }

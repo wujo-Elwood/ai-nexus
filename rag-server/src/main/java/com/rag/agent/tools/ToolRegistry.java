@@ -24,7 +24,8 @@ public class ToolRegistry {
     private static final Map<String, List<String>> AGENT_TOOLS = Map.of(
             "general-tool", List.of("search_city_location", "get_weather"),
             "currency-converter", List.of("get_exchange_rate", "calculate"),
-            "vision-agent", List.of("calculate"));
+            "vision-agent", List.of("calculate"),
+            "data-agent", List.of("list_tables", "describe_table", "query_database"));
 
     private final Map<String, AgentTool> tools;
     private final ObjectMapper objectMapper;

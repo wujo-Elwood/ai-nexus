@@ -65,6 +65,13 @@ public class AgentToolService {
             + "仔细观察用户上传的图片，回答关于图片内容、文字和物体的问题，不要凭空编造图里没有的信息。"
             + "如果图中包含需要计算的数字（如金额合计、数量统计），可调用 calculate 工具。回答使用简洁的中文。";
 
+    private static final String DATA_PROMPT = "你是 AI Nexus 的数据问答智能体，可以只读查询系统数据库 rag_db。"
+            + "常用表：sys_user(用户)、kb_knowledge_base(知识库：id,name,create_user)、kb_file(文件：id,kb_id,file_name,status)、"
+            + "ai_chat_message(聊天消息)、ai_usage_log(调用统计：model,prompt_tokens,completion_tokens)、ai_image_task(生图任务)、"
+            + "ai_model_provider(模型供应商)。"
+            + "流程：不确定表结构时先调用 list_tables 或 describe_table，再编写 SELECT 查询；只查 rag_db 中的表，"
+            + "禁止任何写入操作。数字必须来自查询结果，不要编造；回答用简洁的中文并说明数据口径。";
+
     private final ToolRegistry toolRegistry;
     private final ModelProviderService modelProviderService;
     private final AgentToolStepMapper stepMapper;
@@ -85,7 +92,7 @@ public class AgentToolService {
 
     /** 创建 SSE 会话并在独立线程中启动智能体流式循环 */
     public SseEmitter chat(AgentToolChatRequest request) {
-        SseEmitter emitter = new SseEmitter(180_000L);
+        SseEmitter emitter = new SseEmitter(300_000L);
         emitter.onTimeout(emitter::complete);
         chatStreamExecutor.execute(() -> doChat(request, emitter));
         return emitter;
@@ -275,6 +282,9 @@ public class AgentToolService {
         if ("vision-agent".equals(agentCode)) {
             return VISION_PROMPT;
         }
+        if ("data-agent".equals(agentCode)) {
+            return DATA_PROMPT;
+        }
         if ("general-tool".equals(agentCode)) {
             return WEATHER_PROMPT;
         }
@@ -289,7 +299,7 @@ public class AgentToolService {
                 .apiKey(provider.getApiKey())
                 .modelName(provider.getModel())
                 .temperature(0.3)
-                .timeout(Duration.ofSeconds(60))
+                .timeout(Duration.ofSeconds(180))
                 .build();
     }
 

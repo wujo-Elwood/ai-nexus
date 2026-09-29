@@ -22,6 +22,8 @@ public class AgentService {
     private static final String currencyToolName = "货币换算智能体";
     private static final String visionToolCode = "vision-agent";
     private static final String visionToolName = "视觉智能体";
+    private static final String dataToolCode = "data-agent";
+    private static final String dataToolName = "数据问答智能体";
 
     private final ModelProviderService modelProviderService;
 
@@ -52,7 +54,11 @@ public class AgentService {
         agents.add(buildAgent(visionToolCode, visionToolName,
                 "上传图片进行识别与分析（截图、照片中的文字与物体），结合计算工具完成图中金额合计等多步分析。",
                 "图片识别、文字提取、结合计算的多步分析", provider, modelDisplayName));
-        // 第5步：返回智能体列表
+        // 第5步：加入数据问答智能体
+        agents.add(buildAgent(dataToolCode, dataToolName,
+                "只读查询系统数据库，回答用户、知识库、调用量等数据统计问题，每一步 SQL 与结果实时可见。",
+                "数据统计、业务问答、只读查询、SQL 过程可视化", provider, modelDisplayName));
+        // 第6步：返回智能体列表
         return agents;
     }
 
