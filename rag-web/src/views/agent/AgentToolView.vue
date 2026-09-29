@@ -152,18 +152,52 @@ function onPickImage(event) {
   event.target.value = ''
 }
 
-// 统一处理选择/拖拽进来的图片文件
+// 统一处理选择/拖拽进来的图片文件；超大图自动压缩到模型友好的尺寸
 function addImageFiles(files) {
   for (const file of files) {
     if (!file.type.startsWith('image/')) continue
-    if (file.size > 10 * 1024 * 1024) {
-      ElMessage.error('图片不能超过 10MB')
+    if (file.size > 50 * 1024 * 1024) {
+      ElMessage.error('图片不能超过 50MB')
       continue
     }
-    const reader = new FileReader()
-    reader.onload = () => pendingImages.value.push({ name: file.name, dataUrl: reader.result })
-    reader.readAsDataURL(file)
+    compressImage(file)
+      .then((dataUrl) => pendingImages.value.push({ name: file.name, dataUrl }))
+      .catch(() => ElMessage.error('图片读取失败，请使用 JPG/PNG/WebP 格式'))
   }
+}
+
+/**
+ * 压缩图片：超过 1.5MB 或长边超过 2048px 的图，等比缩放后转 JPEG（质量 0.85）；
+ * 视觉模型对超高分辨率并不受益，压缩可把几十 MB 的原图降到几百 KB
+ */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const original = reader.result
+      const img = new Image()
+      img.onload = () => {
+        const maxEdge = Math.max(img.width, img.height)
+        if (file.size <= 1.5 * 1024 * 1024 && maxEdge <= 2048) {
+          resolve(original)
+          return
+        }
+        const scale = Math.min(1, 2048 / maxEdge)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(img.width * scale))
+        canvas.height = Math.max(1, Math.round(img.height * scale))
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = () => reject(new Error('decode failed'))
+      img.src = original
+    }
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
 }
 
 // 拖拽上传：仅视觉智能体启用
