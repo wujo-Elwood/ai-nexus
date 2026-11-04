@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.ChatMessageMapper">
+
+    <!-- 按用户和会话编号查询聊天消息列表 -->
+    <select id="findByUserIdAndSessionId" resultType="com.rag.entity.ChatMessage">
+        SELECT *
+        FROM ai_chat_message
+        WHERE user_id = #{userId}
+          AND session_id = #{sessionId}
+        ORDER BY create_time
+    </select>
+
+    <!-- 新增聊天消息 -->
+    <insert id="insert" parameterType="com.rag.entity.ChatMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_chat_message (user_id, session_id, role, content, create_time)
+        VALUES (#{userId}, #{sessionId}, #{role}, #{content}, NOW())
+    </insert>
+
+    <!-- 按用户和会话编号删除聊天消息 -->
+    <delete id="deleteByUserIdAndSessionId">
+        DELETE FROM ai_chat_message
+        WHERE user_id = #{userId}
+          AND session_id = #{sessionId}
+    </delete>
+
+    <!-- 反馈只允许绑定到当前用户的助手消息 -->
+    <select id="countAssistantMessagesByUserIdAndMessageId" resultType="int">
+        SELECT COUNT(*)
+        FROM ai_chat_message
+        WHERE user_id = #{userId}
+          AND id = #{messageId}
+          AND role = 'assistant'
+    </select>
+</mapper>

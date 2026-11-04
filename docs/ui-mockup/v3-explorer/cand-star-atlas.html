@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>A · 星图年鉴 STAR ATLAS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #ece9e1;
+    background: #02030a;
+    min-width: 1280px;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: "JetBrains Mono", Consolas, monospace; }
+  .serif { font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif; }
+
+  /* 星空背景（同源静态化） */
+  .cosmos { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(ellipse 42% 34% at 72% 18%, rgba(48, 73, 139, 0.18), transparent 66%),
+      radial-gradient(ellipse 34% 28% at 22% 78%, rgba(229, 160, 68, 0.05), transparent 62%),
+      radial-gradient(ellipse 86% 70% at 50% 52%, rgba(12, 20, 48, 0.42), transparent 76%),
+      linear-gradient(180deg, #050711 0%, #02030a 52%, #000105 100%);
+  }
+  .stars, .stars.s2, .stars.s3 { position: absolute; inset: 0; background-repeat: repeat; opacity: .72; }
+  .stars {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.85) 0 .8px, transparent 1.2px),
+      radial-gradient(circle, rgba(156,192,255,.6) 0 .9px, transparent 1.3px);
+    background-position: 0 0, 44px 58px;
+    background-size: 58px 54px, 104px 94px;
+    animation: drift 120s linear infinite;
+  }
+  .stars.s2 {
+    background-image: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px);
+    background-position: 20px 26px; background-size: 130px 118px; animation: drift 95s linear infinite;
+  }
+  .stars.s3 {
+    background-image: radial-gradient(circle, rgba(236,233,225,.85) 0 1.3px, transparent 2px);
+    background-position: 34px 44px; background-size: 230px 210px; animation: drift 75s linear infinite;
+  }
+  @keyframes drift { to { transform: translate3d(34px, 22px, 0); } }
+
+  :root {
+    --ink-1: #ece9e1; --ink-2: #9a9890; --ink-3: #5d5b55;
+    --signal: #ff6b57;
+    --rule: rgba(236, 233, 225, 0.10);
+    --rule-strong: rgba(236, 233, 225, 0.22);
+    --row-hover: rgba(236, 233, 225, 0.04);
+  }
+
+  .sheet { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 40px 48px; min-height: 100vh;
+    background: rgba(2, 3, 10, 0.45);
+    box-shadow: 0 0 0 100vmax rgba(2, 3, 10, 0.45);
+    clip-path: inset(0 -100vmax);
+  }
+  .plate-foot { display: flex; align-items: baseline; gap: 22px; margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--rule-strong);
+    color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; letter-spacing: .18em; }
+  .plate-foot .right { margin-left: auto; }
+
+  /* 页眉：编号横排索引（无侧栏） */
+  .masthead-nav {
+    display: flex; align-items: baseline; gap: 26px;
+    padding: 22px 0 16px; border-bottom: 1px solid var(--rule);
+  }
+  .brand { font-size: 13px; font-weight: 700; letter-spacing: .06em; margin-right: 8px; }
+  .brand small { display: block; color: var(--ink-3); font-size: 9px; letter-spacing: .34em; margin-top: 2px; }
+  .nav-i { display: inline-flex; align-items: baseline; gap: 6px; color: var(--ink-2); font-size: 13px; padding: 2px 0; }
+  .nav-i i { font-style: normal; font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; color: var(--ink-3); }
+  .nav-i:hover { color: var(--ink-1); }
+  .nav-i.on { color: var(--ink-1); position: relative; }
+  .nav-i.on i { color: var(--signal); }
+  .nav-i.on::after { content: ""; position: absolute; left: 0; right: auto; bottom: -17px; width: 100%; height: 2px; background: var(--signal); }
+  .masthead-nav .coords {
+    margin-left: auto; color: var(--ink-3);
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 10px; letter-spacing: .12em;
+  }
+  .masthead-nav .coords b { color: var(--ink-2); font-weight: 500; }
+
+  /* 图幅头：衬线标题 + mono 读数带 */
+  .plate-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding: 34px 0 22px; }
+  .kicker { color: var(--signal); font-size: 10px; letter-spacing: .4em; font-family: "JetBrains Mono", Consolas, monospace; margin-bottom: 12px; }
+  h1 { font-size: 36px; font-weight: 700; letter-spacing: .02em; line-height: 1.15; }
+  .plate-desc { margin-top: 8px; color: var(--ink-2); font-size: 13px; }
+  .plate-readout { text-align: right; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; line-height: 2; letter-spacing: .08em; white-space: nowrap; }
+  .plate-readout b { color: var(--ink-1); font-weight: 500; font-size: 15px; margin-left: 6px; }
+  .plate-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+
+  .rule { height: 1px; background: var(--rule-strong); }
+  .rebuild { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--ink-3); font-size: 11px; }
+  .rebuild .line { position: relative; flex: 1; height: 1px; background: var(--rule); }
+  .rebuild .line i { position: absolute; left: 0; top: -0.5px; height: 2px; width: 66%; background: var(--ink-1); }
+  .rebuild .mono { color: var(--ink-2); }
+
+  /* 图版目录：编号 + 衬线名 + 点线 + 读数 */
+  .toc-head { display: flex; align-items: baseline; padding: 26px 0 10px; }
+  .toc-head .cap { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+  .toc-head .filters { margin-left: auto; display: flex; gap: 20px; }
+  .toc-head .filters a { color: var(--ink-2); font-size: 12px; }
+  .toc-head .filters a.on { color: var(--ink-1); border-bottom: 1px solid var(--signal); padding-bottom: 2px; }
+
+  .entry { position: relative; display: flex; align-items: baseline; gap: 18px; padding: 22px 0 20px; border-bottom: 1px solid var(--rule); transition: background .15s var(--motion, ease); }
+  .entry:hover { background: var(--row-hover); }
+  .e-no { width: 34px; flex: 0 0 auto; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; }
+  .e-main { flex: 0 1 auto; min-width: 0; }
+  .e-name { font-size: 21px; font-weight: 700; letter-spacing: .01em; display: flex; align-items: baseline; gap: 14px; }
+  .e-name .st { color: var(--ink-3); font-size: 11px; letter-spacing: .1em; white-space: nowrap; }
+  .e-name .st::before { content: "●"; font-size: 8px; margin-right: 7px; vertical-align: 2px; }
+  .e-name .st.busy::before { content: "◐"; font-size: 11px; }
+  .e-name .st.bad::before { content: "×"; font-size: 12px; }
+  .e-name .st.busy { color: var(--ink-2); }
+  .e-desc { margin-top: 6px; color: var(--ink-2); font-size: 12.5px; max-width: 560px; line-height: 1.7; }
+
+  /* 点线引导：名称区与读数区之间 */
+  .leaders { flex: 1; min-width: 40px; border-bottom: 1px dotted rgba(236,233,225,.32); transform: translateY(-4px); }
+  .e-readout { flex: 0 0 auto; text-align: right; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; line-height: 1.9; letter-spacing: .06em; white-space: nowrap; }
+  .e-readout b { color: var(--ink-1); font-weight: 500; }
+  .e-act { flex: 0 0 auto; display: flex; gap: 14px; align-items: baseline; }
+  .e-act a { color: var(--ink-2); font-size: 12.5px; border-bottom: 1px solid transparent; padding-bottom: 2px; }
+  .e-act a:hover { color: var(--ink-1); border-bottom-color: var(--rule-strong); }
+  .e-act a.go { color: var(--ink-1); }
+  .e-act a.go:hover { color: var(--signal); border-bottom-color: var(--signal); }
+
+  /* 按钮：方角 */
+  .btn { display: inline-flex; align-items: center; height: 36px; padding: 0 20px; border: 1px solid var(--rule-strong); color: var(--ink-1); font-size: 12.5px; background: none; letter-spacing: .04em; }
+  .btn:hover { border-color: var(--ink-2); }
+  .btn-signal { background: var(--signal); border-color: var(--signal); color: #140503; font-weight: 700; }
+  .btn-signal:hover { background: #ff8471; border-color: #ff8471; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars"></span><span class="stars s2"></span><span class="stars s3"></span></div>
+
+  <div class="sheet">
+    <!-- 页眉：编号横排索引 -->
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i on" href="#"><i>01</i>知识库</a>
+      <a class="nav-i" href="#"><i>02</i>对话</a>
+      <a class="nav-i" href="#"><i>03</i>生图</a>
+      <a class="nav-i" href="#"><i>04</i>抽取</a>
+      <a class="nav-i" href="#"><i>05</i>智能体</a>
+      <a class="nav-i" href="#"><i>06</i>分析</a>
+      <a class="nav-i" href="#"><i>07</i>任务</a>
+      <a class="nav-i" href="#"><i>08</i>设置</a>
+      <span class="coords">N 39°54′ · E 116°23′ · <b>ADMIN</b></span>
+    </header>
+
+    <!-- 图幅头 -->
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE I — KNOWLEDGE BASE</div>
+        <h1 class="serif">知识库</h1>
+        <p class="plate-desc">上传资料自动解析、切片、向量化；提问时按库召回，回答注明出处。</p>
+      </div>
+      <div>
+        <div class="plate-readout">
+          库<b>04</b>&nbsp;&nbsp;文件<b>60</b>&nbsp;&nbsp;可问答<b>50</b><br>
+          向量重建 <span style="color:var(--ink-1)">8 / 12</span> · 进行中
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">知识缺口分析</a>
+          <a class="btn btn-signal" href="#">＋ 新建知识库</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <!-- 图版目录 -->
+    <div class="toc-head">
+      <span class="cap">INDEX · 04 ENTRIES</span>
+      <div class="filters">
+        <a class="on" href="#">全部</a>
+        <a href="#">我创建的</a>
+        <a href="#">共享给我的</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">01</span>
+      <div class="e-main">
+        <div class="e-name serif">测试 <span class="st">可问答</span></div>
+        <p class="e-desc">冒烟测试与演示用库，用于验证解析、切片与召回链路。</p>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">12 文件 · <b>9</b> 可问答<br>更新 2026 / 9 / 28</div>
+      <div class="e-act">
+        <a href="#">管理</a>
+        <a class="go" href="#">提问 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">02</span>
+      <div class="e-main">
+        <div class="e-name serif">产品知识库 <span class="st">可问答</span></div>
+        <p class="e-desc">产品手册、FAQ、版本发布说明与接口文档，面向售前与客服团队。</p>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">24 文件 · <b>24</b> 可问答<br>更新 2026 / 9 / 30</div>
+      <div class="e-act">
+        <a href="#">管理</a>
+        <a class="go" href="#">提问 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">03</span>
+      <div class="e-main">
+        <div class="e-name serif">研发技术库 <span class="st busy">解析中</span></div>
+        <p class="e-desc">架构设计、评审记录与排障手册，团队共享，按周同步更新。</p>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">18 文件 · <b>11</b> 可问答<br>更新 2026 / 10 / 2</div>
+      <div class="e-act">
+        <a href="#">管理</a>
+        <a class="go" href="#">提问 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">04</span>
+      <div class="e-main">
+        <div class="e-name serif">合同文档库 <span class="st">可问答</span></div>
+        <p class="e-desc">标准合同模板、用印规范与审批流程说明，仅授权成员可读。</p>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">6 文件 · <b>6</b> 可问答<br>更新 2026 / 8 / 12</div>
+      <div class="e-act">
+        <a href="#">管理</a>
+        <a class="go" href="#">提问 →</a>
+      </div>
+    </div>
+    <footer class="plate-foot">
+      <span>PLATE I</span><span>KNOWLEDGE BASE · 04 ENTRIES</span><span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,7 +1,12 @@
+# 说明：这里的路径规则一律不写死子项目目录名（不再出现 rag-server/ rag-web/），
+# 因为项目目录从 rag-server、rag-web 改名为 ai-nexus-server、ai-nexus-web 之后，
+# 旧规则整批失效，导致 node_modules 与 target 一度未被忽略。
+# Git 的忽略模式会自动匹配任意层级，所以写 `target/` 即可命中 ai-nexus-server/target/。
+
 # ==================== Java / Spring Boot ====================
 
 # Maven 构建产物
-rag-server/target/
+target/
 *.class
 *.jar
 *.war
@@ -35,14 +40,22 @@ bin/
 # ==================== Node.js / Vue ====================
 
 # 依赖
-rag-web/node_modules/
+node_modules/
+.pnpm-store/
 
 # 构建产物
-rag-web/dist/
+dist/
+dist-*/
+.vite/
+coverage/
+*.tsbuildinfo
+.eslintcache
 
 # 环境变量
-rag-web/.env.local
-rag-web/.env.*.local
+.env
+.env.local
+.env.*
+!.env.example
 
 # ==================== 系统文件 ====================
 
@@ -63,7 +76,6 @@ desktop.ini
 # ==================== 项目特定 ====================
 
 # 文档
-README.md
 RAG知识库完整流程.md
 
 # 上传的文件目录
@@ -77,10 +89,6 @@ pic/
 *.db
 *.sqlite
 
-# 环境变量
-.env
-.env.local
-
 # Spring Boot 外部配置
 application-local.yml
 application-dev.yml
@@ -93,7 +101,7 @@ qdrant_storage/
 
 # ==================== 开发探针临时产物 ====================
 
-# tools/dev-probes/*.mjs 每次运行都会在 rag-web/ 下建一个
+# tools/dev-probes/*.mjs 每次运行都会在前端目录下建一个
 # .chrome-<probe>-<timestamp>/ 无头 Chrome profile 目录。
 # 这些目录里的 *.log / *.db 命中上面的忽略规则，所以
 # `git clean -fd` 删不掉它们，必须用 `git clean -fdx`。
@@ -113,10 +121,13 @@ qdrant_storage/
 tmp/
 visuals/
 
+# 根目录遗留的临时脚本与运行日志
+tmp_*.py
+rag-server-run.log
+
 # 前端临时构建产物与开发探针
-rag-web/dist-*/
-rag-web/vite.config.js.timestamp-*.mjs
-rag-web/ink_*.png
-rag-web/probe*.mjs
-rag-web/vl_verify.mjs
-rag-web/tools/
+vite.config.js.timestamp-*.mjs
+ink_*.png
+probe*.mjs
+vl_verify.mjs
+ai-nexus-web/tools/

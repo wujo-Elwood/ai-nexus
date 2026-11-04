@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档抽取 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  .conf { display: inline-flex; align-items: center; gap: 10px; }
+  .conf .linebar { width: 64px; }
+  .conf b { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; color: var(--ink-1); font-weight: 500; }
+  td .val-input { background: rgba(236,233,225,.04); border: 1px solid var(--rule); color: var(--ink-1); font-family: inherit; font-size: 13px; padding: 6px 10px; width: 180px; border-radius: 0; outline: none; }
+  td .val-input:focus { border-color: var(--rule-strong); }
+  /* 原文证据：脚注式 */
+  .evidence { border-top: 1px solid var(--rule); margin-top: 4px; }
+  .evidence .fn { display: flex; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(236,233,225,.06); font-size: 12px; color: var(--ink-2); align-items: baseline; }
+  .evidence .fn .no { color: var(--signal); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; flex: 0 0 40px; }
+  .evidence .fn .raw { color: var(--ink-2); line-height: 1.7; }
+  .evidence .fn .pg { margin-left: auto; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i on" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE IV — EXTRACTION</div>
+        <h1 class="serif">文档抽取</h1>
+        <p class="plate-desc">上传合同类 PDF / Word，按模板抽取结构化字段，保留原文片段、页码、置信度与人工校正记录。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          任务<b>03</b>&nbsp;&nbsp;需关注<b>6</b>&nbsp;&nbsp;已校正<b>11</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">JSON</a>
+          <a class="btn" href="#">Excel</a>
+          <a class="btn btn-signal" href="#">开始抽取</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <!-- 上传与模板 -->
+    <div class="ghost-upload" style="margin-top:24px;">
+      <span class="plus">＋</span>
+      拖入 PDF / Word（≤ 50MB）· 当前模板：<b style="color:var(--ink-1)">合同基础信息抽取</b>
+      <a class="btn" href="#" style="height:30px; padding:0 12px;">更换模板 ▾</a>
+    </div>
+
+    <!-- 任务列表 -->
+    <div class="sec"><span class="cap">JOBS</span><span class="t">抽取任务</span></div>
+    <table class="table">
+      <thead><tr><th style="width:44px">NO.</th><th>文件名称</th><th style="width:170px">模板</th><th style="width:110px">状态</th><th style="width:120px">创建</th><th style="width:170px; text-align:right">导出</th></tr></thead>
+      <tbody>
+        <tr><td class="num">01</td><td>华信-软件采购合同-2026.docx</td><td>合同基础信息抽取</td><td><span class="st">已校正</span></td><td class="num">今天 09:12</td><td class="op" style="text-align:right"><a href="#">查看结果</a><a href="#">JSON</a><a href="#">Excel</a></td></tr>
+        <tr><td class="num">02</td><td>恒宇-运维服务协议.pdf</td><td>合同基础信息抽取</td><td><span class="st busy">抽取中</span></td><td class="num">今天 09:40</td><td class="op" style="text-align:right"><a href="#">详情</a><a href="#" class="danger">取消</a></td></tr>
+        <tr><td class="num">03</td><td>启明-数据安全补充条款.pdf</td><td>合同基础信息抽取</td><td><span class="st">需人工复核</span></td><td class="num">昨天</td><td class="op" style="text-align:right"><a href="#">查看结果</a><a href="#">JSON</a><a href="#">Excel</a></td></tr>
+      </tbody>
+    </table>
+
+    <!-- 字段校正 + 原文证据 -->
+    <div class="sec"><span class="cap">REVIEW</span><span class="t">字段校正</span><span class="more">任务 03 · 启明-数据安全补充条款</span></div>
+    <table class="table">
+      <thead><tr><th style="width:150px">字段</th><th>字段值（可编辑）</th><th style="width:140px">置信度</th><th style="width:110px">状态</th><th style="width:70px"></th></tr></thead>
+      <tbody>
+        <tr><td>合同编号</td><td><input class="val-input" value="HM-DS-2026-018"></td><td><span class="conf"><span class="linebar"><i style="width:96%"></i></span><b>0.96</b></span></td><td><span class="st">已确认</span></td><td class="op"><a href="#">保存</a></td></tr>
+        <tr><td>甲方名称</td><td><input class="val-input" value="恒宇云计算有限公司"></td><td><span class="conf"><span class="linebar"><i style="width:91%"></i></span><b>0.91</b></span></td><td><span class="st">已确认</span></td><td class="op"><a href="#">保存</a></td></tr>
+        <tr><td>合同金额</td><td><input class="val-input" value="¥ 1,280,000.00"></td><td><span class="conf"><span class="linebar"><i style="width:64%"></i></span><b>0.64</b></span></td><td><span class="st busy">需复核</span></td><td class="op"><a class="go" href="#">保存</a></td></tr>
+        <tr><td>服务期限</td><td><input class="val-input" value="2026-01-01 至 2026-12-31"></td><td><span class="conf"><span class="linebar"><i style="width:88%"></i></span><b>0.88</b></span></td><td><span class="st">已确认</span></td><td class="op"><a href="#">保存</a></td></tr>
+        <tr><td>违约金比例</td><td><input class="val-input" value="日万分之五（待确认）"></td><td><span class="conf"><span class="linebar sig"><i style="width:41%"></i></span><b style="color:var(--signal)">0.41</b></span></td><td><span class="st bad">低置信</span></td><td class="op"><a class="go" href="#">保存</a></td></tr>
+      </tbody>
+    </table>
+
+    <div class="evidence">
+      <div class="fn"><span class="no">注 P.4</span><span class="raw">「合同总金额为人民币壹佰贰拾捌万元整（¥1,280,000.00），含税。」</span><span class="pg">第 4 页 · 原文片段</span></div>
+      <div class="fn"><span class="no">注 P.7</span><span class="raw">「逾期交付的，每逾期一日按合同总金额的万分之五支付违约金。」</span><span class="pg">第 7 页 · 原文片段</span></div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE IV</span>
+      <span>EXTRACTION · 03 JOBS</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · AI 聊天</title>
+<link rel="stylesheet" href="paper.css">
+</head>
+<body>
+<div class="chat-shell">
+  <aside class="chat-side">
+    <div class="brand" style="font-weight:700;font-size:15px;padding:0 8px 16px;">AI Nexus</div>
+    <div class="new">＋ 新对话</div>
+    <h3>历史对话</h3>
+    <div class="sess">设备巡检结论确认</div>
+    <div class="sess on">季度经营数据问答</div>
+    <div class="sess">Python 学习路线</div>
+    <div class="sess">客户 FAQ 整理</div>
+    <h3>召回测试</h3>
+    <div class="sess" style="color:var(--text-3)">输入问题查看召回块</div>
+  </aside>
+  <main class="chat-main">
+    <div class="chat-head">
+      <h1>季度经营数据问答</h1>
+      <span class="meta">知识库：售前解决方案库 · 模型 GPT / gpt-6-sol</span>
+    </div>
+    <div class="chat-scroll">
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar me">你</span><span class="who">你</span><span class="time">14:31</span></div>
+        <div class="msg-body msg-user">今年营收同比增长了多少？哪个产品线贡献最大？</div>
+      </div>
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar ai">AI</span><span class="who">AI 助手</span><span class="time">14:31</span></div>
+        <div class="msg-body">
+          根据季度经营纪要，今年营收同比增长 <b>20%</b>，其中企业服务产品线贡献最大，占新增收入的 46%。
+          <br><br>
+          建议下季度继续关注该产品线的续约率与实施交付周期。
+        </div>
+        <div class="cite">引用 2 条：季度经营纪要Q3.md · 第2段｜产品线拆解.xlsx · 第4段</div>
+        <div class="msg-actions">
+          <button>🔊 朗读</button>
+          <button>👍 有帮助</button>
+          <button>👎 无帮助</button>
+        </div>
+        <div class="followups">
+          <a href="#">企业服务产品线的续约率是多少？</a>
+          <a href="#">和去年同期对比的明细？</a>
+          <a href="#">下季度的营收目标是什么？</a>
+        </div>
+      </div>
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar me">你</span><span class="who">你</span><span class="time">14:33</span></div>
+        <div class="msg-body msg-user">把这条结论整理成一段汇报用语。</div>
+      </div>
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar ai">AI</span><span class="who">AI 助手</span><span class="time">14:33</span></div>
+        <div class="msg-body">
+          本季度公司营收同比增长 20%，主要由企业服务产品线驱动，该产品线贡献了新增收入的 46%。建议下季度继续加大在该方向的投入，同时跟踪续约率与交付周期两项前置指标。
+        </div>
+        <div class="msg-actions">
+          <button>🔊 朗读</button>
+          <button>👍 有帮助</button>
+          <button>👎 无帮助</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <div class="line">
+        <textarea placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"></textarea>
+        <span class="mic">🎤</span>
+        <button class="send">发送 ↵</button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

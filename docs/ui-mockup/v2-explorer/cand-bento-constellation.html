@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>B · 星图舱 Bento Constellation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #eef0f7;
+    background: #05060f;
+    min-width: 1280px;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* 星空背景（同源静态化，B 里让星更亮一点服务星图概念） */
+  .cosmos { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(ellipse 60% 46% at 78% 10%, rgba(56, 66, 140, 0.30), transparent 66%),
+      radial-gradient(ellipse 50% 40% at 12% 88%, rgba(16, 90, 110, 0.22), transparent 62%),
+      linear-gradient(180deg, #070812 0%, #05060f 55%, #030409 100%);
+  }
+  .stars, .stars.s2, .stars.s3 { position: absolute; inset: 0; background-repeat: repeat; }
+  .stars {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.9) 0 .8px, transparent 1.2px),
+      radial-gradient(circle, rgba(150,200,255,.7) 0 .9px, transparent 1.3px);
+    background-position: 0 0, 44px 60px;
+    background-size: 58px 54px, 96px 88px;
+    animation: drift 110s linear infinite;
+  }
+  .stars.s2 {
+    background-image: radial-gradient(circle, rgba(255,255,255,.95) 0 1px, transparent 1.5px);
+    background-position: 20px 26px; background-size: 110px 100px; animation: drift 90s linear infinite;
+  }
+  .stars.s3 {
+    background-image: radial-gradient(circle, rgba(186,214,255,.9) 0 1.3px, transparent 2px);
+    background-position: 30px 40px; background-size: 210px 190px; animation: drift 70s linear infinite;
+  }
+  @keyframes drift { to { transform: translate3d(36px, 24px, 0); } }
+
+  :root {
+    --tile: rgba(13, 16, 30, 0.72);
+    --line: rgba(255,255,255,.08);
+    --ink-1: #eef0f7; --ink-2: #9aa3b8; --ink-3: #5f6779;
+    --blue: #4f8ef7; --violet: #8b7bf7; --orange: #f79d4f; --green: #3ecf9a; --pink: #f2699c; --cyan: #3ec5e0;
+    --motion: cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+
+  /* 顶部窄 dock */
+  .topdock {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 20px;
+    height: 62px; padding: 0 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: 8px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    background: conic-gradient(from 210deg, #4f8ef7, #8b7bf7, #f2699c, #f79d4f, #3ecf9a, #4f8ef7);
+    color: #05060f; font-weight: 800; font-size: 15px; }
+  .brand b { font-size: 14.5px; }
+  .docknav { display: flex; gap: 4px; flex: 1; }
+  .ditem { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 10px;
+    color: var(--ink-2); font-size: 13px; text-decoration: none; transition: background .16s var(--motion), color .16s var(--motion); }
+  .ditem:hover { background: rgba(255,255,255,.06); color: var(--ink-1); }
+  .ditem.active { color: #fff; background: rgba(255,255,255,.09); box-shadow: inset 0 0 0 1px var(--line); }
+  .ditem .sw { width: 8px; height: 8px; border-radius: 3px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px var(--line); }
+
+  /* Bento */
+  .wrap { position: relative; z-index: 1; padding: 6px 22px 22px; height: calc(100vh - 62px); overflow: auto; }
+  .headrow { display: flex; align-items: flex-end; justify-content: space-between; margin: 6px 0 16px; }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: .01em; }
+  .sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
+  .btn { height: 38px; padding: 0 18px; border: 0; border-radius: 12px; font-size: 13.5px; font-weight: 700; }
+  .btn-hue { color: #06121f;
+    background: linear-gradient(90deg, #3ec5e0, #4f8ef7 55%, #8b7bf7);
+    box-shadow: 0 8px 24px rgba(79,142,247,.35); }
+  .btn-hue:hover { filter: brightness(1.08); }
+
+  .bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 96px; gap: 14px; }
+
+  .tile { border-radius: 18px; background: var(--tile); backdrop-filter: blur(16px);
+    box-shadow: inset 0 0 0 1px var(--line), 0 14px 40px rgba(0,0,0,.35);
+    padding: 16px 18px; position: relative; overflow: hidden; }
+  .tile .lab { font-size: 11.5px; color: var(--ink-3); letter-spacing: .1em; display: flex; align-items: center; gap: 8px; }
+  .tile .lab::before { content: ""; width: 8px; height: 8px; border-radius: 3px; background: var(--hue, var(--blue)); box-shadow: 0 0 10px var(--hue, var(--blue)); }
+  .tile .big { margin-top: 8px; font-size: 46px; font-weight: 800; line-height: 1; letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(90deg, var(--hue, #4f8ef7), #ffffff 130%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tile .note { position: absolute; right: 18px; bottom: 14px; color: var(--ink-3); font-size: 11.5px; }
+
+  .tile.wide { grid-column: span 3; }
+  .tile.kb { grid-column: span 4; grid-row: span 3; }
+  .tile.action { grid-column: span 4; grid-row: span 1; display: flex; flex-direction: column; justify-content: center; }
+  .tile.orbit { grid-column: span 4; grid-row: span 2; }
+  .tile.gap2 { grid-column: span 4; grid-row: span 1; }
+
+  /* 行星知识库卡 */
+  .planet { display: flex; gap: 16px; margin-top: 12px; }
+  .orb { position: relative; width: 108px; height: 108px; flex: 0 0 auto; }
+  .orb svg { width: 108px; height: 108px; display: block; filter: drop-shadow(0 0 14px rgba(79,142,247,.35)); }
+  .orb .val { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .orb .val b { font-size: 24px; font-weight: 800; }
+  .orb .val span { display: block; font-size: 10px; color: var(--ink-3); margin-top: 1px; }
+  .pmain { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+  .pname { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .tag.g { color: #3ecf9a; background: rgba(62,207,154,.12); box-shadow: inset 0 0 0 1px rgba(62,207,154,.3); }
+  .tag.o { color: #f79d4f; background: rgba(247,157,79,.12); box-shadow: inset 0 0 0 1px rgba(247,157,79,.3); }
+  .pdesc { margin-top: 5px; color: var(--ink-2); font-size: 12px; line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pfoot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+  .pnum { color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .pgo { height: 30px; padding: 0 14px; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700;
+    color: #06121f; background: var(--hue2, linear-gradient(90deg,#3ec5e0,#4f8ef7)); }
+  .pgo:hover { filter: brightness(1.1); }
+
+  /* 快捷区 */
+  .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+  .q { border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);
+    font-size: 12.5px; color: var(--ink-2); transition: background .16s var(--motion), transform .16s var(--motion); }
+  .q:hover { background: rgba(255,255,255,.08); transform: translateY(-1px); color: var(--ink-1); }
+  .q b { display: block; font-size: 13px; color: var(--ink-1); margin-bottom: 3px; }
+
+  /* 轨道任务 */
+  .taskline { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--ink-2); }
+  .taskline .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hue, #4f8ef7); box-shadow: 0 0 10px var(--hue, #4f8ef7); }
+  .taskline .bar { flex: 1; height: 4px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .taskline .bar i { display: block; height: 100%; width: var(--w, 50%); border-radius: 999px; background: linear-gradient(90deg, var(--hue, #4f8ef7), #fff0); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars"></span><span class="stars s2"></span><span class="stars s3"></span>
+  </div>
+
+  <header class="topdock">
+    <div class="brand"><div class="brand-mark">A</div><b>AI 智能平台</b></div>
+    <nav class="docknav">
+      <a class="ditem active" href="#"><span class="sw" style="background:#4f8ef7"></span>知识库</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#8b7bf7"></span>AI 聊天</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#f2699c"></span>AI 生图</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#f79d4f"></span>文档抽取</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#3ecf9a"></span>智能体</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#3ec5e0"></span>数据分析</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#5f6779"></span>任务中心</a>
+      <a class="ditem" href="#"><span class="sw" style="background:#5f6779"></span>设置</a>
+    </nav>
+    <div class="avatar">A</div>
+  </header>
+
+  <div class="wrap">
+    <div class="headrow">
+      <div>
+        <h1>知识库</h1>
+        <div class="sub">上传资料自动解析、切片、向量化，提问时按库召回并注明引用。</div>
+      </div>
+      <button class="btn btn-hue">＋ 新建知识库</button>
+    </div>
+
+    <div class="bento">
+      <div class="tile wide" style="--hue:#4f8ef7">
+        <div class="lab">知识库</div>
+        <div class="big">4</div>
+        <div class="note">全部可用</div>
+      </div>
+      <div class="tile wide" style="--hue:#3ecf9a">
+        <div class="lab">可问答</div>
+        <div class="big">50</div>
+        <div class="note">占比 83%</div>
+      </div>
+      <div class="tile wide" style="--hue:#f79d4f">
+        <div class="lab">文件</div>
+        <div class="big">60</div>
+        <div class="note">本周 +6</div>
+      </div>
+
+      <div class="tile kb" style="--hue:#4f8ef7">
+        <div class="lab">测试 · 就绪度</div>
+        <div class="planet">
+          <div class="orb">
+            <svg viewBox="0 0 108 108">
+              <defs><linearGradient id="pg1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#3ec5e0"/><stop offset="1" stop-color="#4f8ef7"/>
+              </linearGradient></defs>
+              <circle cx="54" cy="54" r="46" fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.08)" stroke-width="7"/>
+              <circle cx="54" cy="54" r="46" fill="none" stroke="url(#pg1)" stroke-width="7" stroke-linecap="round"
+                      stroke-dasharray="216.7 289" transform="rotate(-90 54 54)"/>
+            </svg>
+            <div class="val"><div><b>75%</b><span>9 / 12 文件</span></div></div>
+          </div>
+          <div class="pmain">
+            <div class="pname">测试 <span class="tag g">可问答</span></div>
+            <div class="pdesc">上传资料自动解析、切片、向量化，聊天时按库召回并注明引用。</div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">+2</b>
+                <span style="font-size:10px; color: var(--ink-3);">本周新增</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">96%</b>
+                <span style="font-size:10px; color: var(--ink-3);">召回命中</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">214</b>
+                <span style="font-size:10px; color: var(--ink-3);">切片总量</span>
+              </span>
+            </div>
+            <div class="pfoot">
+              <span class="pnum">12 文件 · 2026/9/28</span>
+              <button class="pgo">去提问 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile kb" style="--hue:#8b7bf7">
+        <div class="lab">产品知识库 · 就绪度</div>
+        <div class="planet">
+          <div class="orb">
+            <svg viewBox="0 0 108 108">
+              <defs><linearGradient id="pg2" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#8b7bf7"/><stop offset="1" stop-color="#f2699c"/>
+              </linearGradient></defs>
+              <circle cx="54" cy="54" r="46" fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.08)" stroke-width="7"/>
+              <circle cx="54" cy="54" r="46" fill="none" stroke="url(#pg2)" stroke-width="7" stroke-linecap="round"
+                      stroke-dasharray="289 289" transform="rotate(-90 54 54)"/>
+            </svg>
+            <div class="val"><div><b>100%</b><span>24 / 24 文件</span></div></div>
+          </div>
+          <div class="pmain">
+            <div class="pname">产品知识库 <span class="tag g">可问答</span></div>
+            <div class="pdesc">产品手册、FAQ、版本发布说明与接口文档，面向售前与客服团队。</div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">+4</b>
+                <span style="font-size:10px; color: var(--ink-3);">本周新增</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">97%</b>
+                <span style="font-size:10px; color: var(--ink-3);">召回命中</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">582</b>
+                <span style="font-size:10px; color: var(--ink-3);">切片总量</span>
+              </span>
+            </div>
+            <div class="pfoot">
+              <span class="pnum">24 文件 · 2026/9/30</span>
+              <button class="pgo">去提问 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile orbit" style="--hue:#f79d4f">
+        <div class="lab">向量重建轨道</div>
+        <div class="taskline"><span class="dot"></span>测试 · 8/12<span class="bar"><i style="--w:66%"></i></span></div>
+        <div class="taskline"><span class="dot" style="--hue:#3ecf9a"></span>产品知识库 · 完成<span class="bar"><i style="--w:100%"></i></span></div>
+        <div class="taskline"><span class="dot" style="--hue:#f2699c"></span>研发技术库 · 11/18<span class="bar"><i style="--w:61%"></i></span></div>
+      </div>
+
+      <div class="tile kb" style="--hue:#3ecf9a">
+        <div class="lab">研发技术库 · 就绪度</div>
+        <div class="planet">
+          <div class="orb">
+            <svg viewBox="0 0 108 108">
+              <defs><linearGradient id="pg3" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#3ecf9a"/><stop offset="1" stop-color="#3ec5e0"/>
+              </linearGradient></defs>
+              <circle cx="54" cy="54" r="46" fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.08)" stroke-width="7"/>
+              <circle cx="54" cy="54" r="46" fill="none" stroke="url(#pg3)" stroke-width="7" stroke-linecap="round"
+                      stroke-dasharray="176.3 289" transform="rotate(-90 54 54)"/>
+            </svg>
+            <div class="val"><div><b>61%</b><span>11 / 18 文件</span></div></div>
+          </div>
+          <div class="pmain">
+            <div class="pname">研发技术库 <span class="tag o">解析中</span></div>
+            <div class="pdesc">架构设计、评审记录与排障手册，团队共享，按周同步更新。</div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">+3</b>
+                <span style="font-size:10px; color: var(--ink-3);">本周新增</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">92%</b>
+                <span style="font-size:10px; color: var(--ink-3);">召回命中</span>
+              </span>
+              <span style="flex:1; border-radius:10px; padding:8px 12px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line);">
+                <b style="display:block; font-size:14px; font-variant-numeric:tabular-nums;">391</b>
+                <span style="font-size:10px; color: var(--ink-3);">切片总量</span>
+              </span>
+            </div>
+            <div class="pfoot">
+              <span class="pnum">18 文件 · 2026/10/2</span>
+              <button class="pgo">去提问 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile action">
+        <div class="lab" style="--hue:#f2699c">快捷进入</div>
+        <div class="quick">
+          <div class="q"><b>AI 聊天</b><span style="white-space:nowrap">按库问答</span></div>
+          <div class="q"><b>文档抽取</b><span style="white-space:nowrap">合同字段</span></div>
+          <div class="q"><b>知识缺口</b><span style="white-space:nowrap">本周 3 个</span></div>
+          <div class="q"><b>任务中心</b><span style="white-space:nowrap">2 个进行中</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

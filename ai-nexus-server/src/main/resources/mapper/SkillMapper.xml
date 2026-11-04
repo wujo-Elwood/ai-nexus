@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.skill.mapper.SkillMapper">
+
+    <select id="findAll" resultType="com.rag.skill.entity.SkillInfo">
+        SELECT id,
+               skill_name AS skillName,
+               description,
+               enabled,
+               create_time AS createTime,
+               update_time AS updateTime
+        FROM skill
+        ORDER BY skill_name
+    </select>
+
+    <insert id="upsertSkill">
+        INSERT INTO skill (skill_name, description)
+        VALUES (#{skillName}, #{description})
+        ON DUPLICATE KEY UPDATE description = VALUES(description)
+    </insert>
+
+    <update id="updateEnabled">
+        UPDATE skill SET enabled = #{enabled} WHERE skill_name = #{skillName}
+    </update>
+
+    <select id="summarizeBySkill" resultType="com.rag.skill.entity.SkillUsageStat">
+        SELECT tool_name AS skillName,
+               COUNT(*) AS calls,
+               SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS successCount,
+               SUM(CASE WHEN status IS NULL OR status &lt;&gt; 'SUCCESS' THEN 1 ELSE 0 END) AS failedCount,
+               AVG(cost_ms) AS avgCostMs,
+               MAX(create_time) AS lastCalledAt
+        FROM agent_tool_step
+        WHERE create_time &gt;= #{since}
+        GROUP BY tool_name
+        ORDER BY calls DESC
+    </select>
+
+    <select id="summarizeByAgent" resultType="com.rag.skill.entity.AgentUsageStat">
+        SELECT agent_code AS agentCode,
+               COUNT(*) AS calls,
+               SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS successCount,
+               SUM(CASE WHEN status IS NULL OR status &lt;&gt; 'SUCCESS' THEN 1 ELSE 0 END) AS failedCount,
+               AVG(cost_ms) AS avgCostMs,
+               MAX(create_time) AS lastCalledAt
+        FROM agent_tool_step
+        WHERE create_time &gt;= #{since} AND agent_code IS NOT NULL AND agent_code &lt;&gt; ''
+        GROUP BY agent_code
+        ORDER BY calls DESC
+    </select>
+</mapper>

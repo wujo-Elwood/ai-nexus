@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>个人资料 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  .avatar-block {
+    width: 84px; height: 84px; display: grid; place-items: center;
+    border: 1px solid var(--rule-strong); color: var(--ink-1);
+    font-family: "Noto Serif SC", serif; font-size: 38px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE XIV — ACCOUNT</div>
+        <h1 class="serif">个人资料</h1>
+        <p class="plate-desc">修改当前账号在平台里的展示信息；用户名用于登录，不在这里修改。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-actions">
+          <a class="btn" href="password.html">修改密码 →</a>
+          <a class="btn" href="#">重置</a>
+          <a class="btn btn-signal" href="#">保存资料</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <div class="cols" style="margin-top:24px;">
+      <div>
+        <div class="sec" style="padding-top:0;"><span class="cap">PROFILE</span><span class="t">资料信息</span></div>
+        <div class="form-line"><label>用户名<small>用于登录，不可修改</small></label><div class="fld"><input type="text" value="admin" disabled style="opacity:.55;"></div></div>
+        <div class="form-line"><label>昵称<small>平台内展示</small></label><div class="fld"><input type="text" value="Admin"><span class="hint">5 / 50</span></div></div>
+        <div class="form-line"><label>头像地址</label><div class="fld"><input type="url" placeholder="可填写头像图片 URL，暂不上传文件"><span class="hint">0 / 255</span></div></div>
+      </div>
+      <aside class="aside">
+        <div class="sec" style="padding-top:0;"><span class="cap">ID</span><span class="t">账号标识</span></div>
+        <div style="display:flex; align-items:center; gap:20px;">
+          <div class="avatar-block">A</div>
+          <div>
+            <div style="font-size:16px; font-weight:700;">Admin</div>
+            <div style="color:var(--ink-3); font-size:12px;" class="mono">admin · UID 2</div>
+            <div style="color:var(--ink-3); font-size:12px;" class="mono">注册 2026/5/12</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE XIV</span>
+      <span>ACCOUNT · PROFILE</span>
+      <span class="right">保存后右上角昵称立即同步</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.analysis.mapper.AnalysisFileMapper">
+
+    <sql id="baseColumns">
+        id,
+        user_id AS userId,
+        file_name AS fileName,
+        file_path AS filePath,
+        sheets_json AS sheetsJson,
+        total_rows AS totalRows,
+        create_time AS createTime
+    </sql>
+
+    <insert id="insert" parameterType="com.rag.analysis.entity.AnalysisFile" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO analysis_file (user_id, file_name, file_path, sheets_json, total_rows)
+        VALUES (#{userId}, #{fileName}, #{filePath}, #{sheetsJson}, #{totalRows})
+    </insert>
+
+    <select id="findByIdAndUserId" resultType="com.rag.analysis.entity.AnalysisFile">
+        SELECT <include refid="baseColumns"/>
+        FROM analysis_file
+        WHERE id = #{id} AND user_id = #{userId}
+    </select>
+
+    <select id="findByUserId" resultType="com.rag.analysis.entity.AnalysisFile">
+        SELECT <include refid="baseColumns"/>
+        FROM analysis_file
+        WHERE user_id = #{userId}
+        ORDER BY id DESC
+    </select>
+
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM analysis_file WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+</mapper>

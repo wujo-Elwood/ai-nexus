@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>生图画布 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  /* 画布区：星空即画布，图片为直角图块 + mono 注 */
+  .canvas-stage { position: relative; height: 520px; border: 1px solid var(--rule); overflow: hidden; }
+  .stage-ctl { display: flex; align-items: baseline; gap: 22px; padding: 10px 0 14px; color: var(--ink-3); font-size: 11px; font-family: "JetBrains Mono", Consolas, monospace; letter-spacing: .1em; }
+  .stage-ctl a:hover { color: var(--ink-1); }
+  .stage-ctl .right { margin-left: auto; }
+  .art { position: absolute; border: 1px solid var(--rule-strong); background: linear-gradient(135deg, #10131f, #1a2033 60%, #141020); }
+  .art .no { position: absolute; left: -1px; top: -1px; background: var(--ink-1); color: #0a0a12; font-family: "JetBrains Mono", Consolas, monospace; font-size: 9px; letter-spacing: .12em; padding: 2px 7px; }
+  .art .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px 5px; background: linear-gradient(180deg, transparent, rgba(2,3,10,.85)); color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 9.5px; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gen-row { display: flex; align-items: center; gap: 16px; border: 1px solid var(--rule-strong); padding: 6px 6px 6px 18px; }
+  .gen-row input { flex: 1; background: none; border: 0; outline: none; color: var(--ink-1); font-size: 13.5px; font-family: inherit; }
+  .gen-row input::placeholder { color: var(--ink-3); }
+  .gen-row .cnt { color: var(--ink-3); font-size: 11px; font-family: "JetBrains Mono", Consolas, monospace; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i on" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE III·B — CANVAS</div>
+        <h1 class="serif">生图画布</h1>
+        <p class="plate-desc">把生成的图片铺在无限画布上自由排版对比：拖动空白平移，滚轮缩放，位置自动记忆，双击卡片查看大图。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          画布上<b>07</b>&nbsp;&nbsp;运行中<b>0 / 6</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="image.html">← 参数模式</a>
+          <a class="btn" href="#">清空复位</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <div class="stage-ctl">
+      <span>复位视图</span><span>100%</span><span>拖动平移 · 滚轮缩放 · 双击看大图</span>
+      <span class="right">画布坐标 X 0 · Y 0</span>
+    </div>
+    <div class="canvas-stage">
+      <div class="art" style="left:36px; top:40px; width:250px; height:170px;"><span class="no">01</span><span class="cap">现代都市写实风格 · 雨夜玻璃幕墙</span></div>
+      <div class="art" style="left:330px; top:88px; width:210px; height:210px;"><span class="no">02</span><span class="cap">公司会议室 · 中年老板拍案</span></div>
+      <div class="art" style="left:586px; top:30px; width:260px; height:150px;"><span class="no">03</span><span class="cap">会议室大屏幕亮起 · 数据大屏</span></div>
+      <div class="art" style="left:890px; top:110px; width:200px; height:200px;"><span class="no">04</span><span class="cap">弯腰捡起文件的年轻人 · 冷色调</span></div>
+      <div class="art" style="left:120px; top:266px; width:300px; height:170px;"><span class="no">05</span><span class="cap">水墨宇航员漂浮深空 · 留白构图</span></div>
+      <div class="art" style="left:500px; top:292px; width:230px; height:150px;"><span class="no">06</span><span class="cap">夜景霓虹都市天际线 · 雨后倒影</span></div>
+      <div class="art" style="left:800px; top:330px; width:180px; height:180px;"><span class="no">07</span><span class="cap">深夜便利店橱窗 · 胶片颗粒</span></div>
+    </div>
+
+    <!-- 底部生成条 -->
+    <div class="gen-row" style="margin-top:20px;">
+      <input placeholder="输入提示词直接生成，新图片会实时出现在画布上" />
+      <span class="cnt">运行中 0 / 6</span>
+      <a class="btn btn-signal" href="#">生成 →</a>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE III·B</span>
+      <span>CANVAS · 07 PLACED</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

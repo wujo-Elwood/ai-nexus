@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智能体对话 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  /* 复用 chat 的手稿语法 */
+  .work { display: flex; gap: 0; height: calc(100vh - 0px); max-width: 1200px; margin: 0 auto; padding: 0 40px; }
+  .manuscript { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ms-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 24px 0 14px; border-bottom: 1px solid var(--rule); }
+  .ms-head .t { font-size: 17px; font-weight: 700; display: flex; align-items: baseline; gap: 14px; }
+  .ms-head .m { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; letter-spacing: .12em; }
+  .ms-scroll { flex: 1; overflow-y: auto; padding: 24px 0 10px; scrollbar-width: none; }
+  .ms-scroll::-webkit-scrollbar { display: none; }
+  .u-line { position: relative; padding-left: 18px; margin: 0 0 26px; }
+  .u-line::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; background: var(--signal); }
+  .u-line .who { color: var(--ink-3); font-size: 10px; letter-spacing: .2em; font-family: "JetBrains Mono", Consolas, monospace; display: block; margin-bottom: 5px; }
+  .u-line .txt { font-size: 14.5px; line-height: 1.75; }
+  .a-line { margin: 0 0 30px; }
+  .a-line .who { color: var(--ink-3); font-size: 10px; letter-spacing: .2em; font-family: "JetBrains Mono", Consolas, monospace; display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .a-line .txt { font-size: 14px; line-height: 1.85; }
+  .ms-input { border-top: 1px solid var(--rule-strong); padding: 14px 0 22px; }
+  .ms-input .row { display: flex; align-items: center; gap: 16px; }
+  .ms-input input { flex: 1; background: none; border: 0; outline: none; color: var(--ink-1); font-size: 14px; font-family: inherit; padding: 8px 0; }
+  .ms-input input::placeholder { color: var(--ink-3); }
+  .ms-input .send { color: var(--ink-1); font-size: 13px; letter-spacing: .06em; }
+  .ms-input .send:hover { color: var(--signal); }
+  /* 推理强度 / 模型选择：行内 mono 词 */
+  .ms-ctl { display: flex; align-items: center; gap: 18px; padding-top: 10px; color: var(--ink-3); font-size: 11px; font-family: "JetBrains Mono", Consolas, monospace; letter-spacing: .06em; }
+  .ms-ctl a { color: var(--ink-2); }
+  .ms-ctl a:hover { color: var(--ink-1); }
+  .ms-ctl .on { color: var(--ink-1); border-bottom: 1px solid var(--signal); padding-bottom: 1px; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet" style="padding-bottom:0; height:100vh; display:flex; flex-direction:column;">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i on" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <div class="work" style="flex:1; min-height:0;">
+      <main class="manuscript">
+        <div class="ms-head">
+          <div>
+            <div class="kicker" style="margin-bottom:6px;">PLATE V·B — AGENT DIALOGUE · 手稿</div>
+            <span class="t">天气查询智能体 <span class="mono" style="font-size:10px; color:var(--ink-3); letter-spacing:.06em;">skills: weather_now · weather_forecast</span></span>
+          </div>
+          <span class="m"><a href="agents.html" style="color:var(--ink-2)">← 返回智能体</a>&nbsp;&nbsp;对话模型 GPT / gpt-6-sol&nbsp;&nbsp;<a href="#" style="color:var(--ink-2)">＋ 新对话</a></span>
+        </div>
+
+        <div class="ms-scroll">
+          <div class="u-line">
+            <span class="who">Q · 21:41</span>
+            <div class="txt">北京今天天气怎么样？适合夜跑吗？</div>
+          </div>
+
+          <div class="a-line">
+            <span class="who">A · 天气查询智能体<span style="letter-spacing:.06em;">3 步 · 2.8s</span></span>
+            <div class="txt">北京今天（10 / 3）多云转晴，当前 <strong>14°C</strong>，湿度 42%，西北风 3 级；夜间约 <strong>8°C</strong>，无降水。<span class="mono" style="color:var(--ink-3); font-size:11px;">（数据源：weather_now / weather_forecast）</span></div>
+            <div class="steps">
+              <span class="cap-label cap">执行过程 · 3 STEPS</span>
+              <div class="ln"><span class="no">STEP 1</span><span>weather_now(city=北京)</span><span class="ok">→ 14°C 多云转晴</span><span class="ms">OK · 212ms</span></div>
+              <div class="ln"><span class="no">STEP 2</span><span>weather_forecast(city=北京, days=1)</span><span class="ok">→ 夜间 8°C 无降水</span><span class="ms">OK · 305ms</span></div>
+              <div class="ln"><span class="no">STEP 3</span><span>汇总判断夜跑适宜度</span><span class="ok">→ 适宜，建议 19:00 后</span><span class="ms">OK · 118ms</span></div>
+            </div>
+          </div>
+
+          <div class="u-line">
+            <span class="who">Q · 21:44</span>
+            <div class="txt">那对比一下上海呢？</div>
+          </div>
+
+          <div class="a-line">
+            <span class="who">A · 天气查询智能体<span style="letter-spacing:.06em;">2 步 · 1.9s</span></span>
+            <div class="txt">上海今天阴，<strong>19°C</strong>，湿度 71%，东北风 2 级，傍晚有零星小雨；夜跑体感偏闷，建议室内替代。</div>
+            <div class="steps">
+              <span class="cap-label cap">执行过程 · 2 STEPS</span>
+              <div class="ln"><span class="no">STEP 1</span><span>weather_now(city=上海)</span><span class="ok">→ 19°C 阴</span><span class="ms">OK · 243ms</span></div>
+              <div class="ln"><span class="no">STEP 2</span><span>weather_forecast(city=上海, days=1)</span><span class="ok">→ 傍晚零星小雨</span><span class="ms">OK · 280ms</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ms-input">
+          <div class="row">
+            <input placeholder="向智能体提问，Enter 发送" />
+            <a class="send" href="#">发送 ⏎</a>
+          </div>
+          <div class="ms-ctl">
+            <span>推理强度</span>
+            <a class="on" href="#">高</a>
+            <a href="#">中</a>
+            <a href="#">低</a>
+            <span style="margin-left:auto;">回答由 AI 生成 · 工具调用过程实时可见</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 联网搜索智能体（执行日志）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="chat-shell">
+  <aside class="chat-side">
+    <div class="brand" style="font-weight:700;font-size:15px;padding:0 8px 16px;">AI Nexus</div>
+    <div style="font-size:13px;color:var(--text-2);padding:0 8px 14px;">← 返回智能体列表</div>
+    <h3>历史对话</h3>
+    <div class="sess on">最近的 AI 圈动态</div>
+    <div class="sess">竞品融资消息检索</div>
+  </aside>
+  <main class="chat-main">
+    <div class="chat-head">
+      <h1>联网搜索智能体</h1>
+      <span class="meta">TOOLS://web_search · MODEL:GPT-6-SOL</span>
+    </div>
+    <div class="chat-scroll">
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar me">你</span><span class="who">你</span><span class="time">15:02</span></div>
+        <div class="msg-body msg-user">最近一周 AI 圈有什么值得关注的动态？</div>
+      </div>
+      <div class="exchange">
+        <div class="log-tag">LOG <b>//</b> AGENT-RUN · <b>2 STEPS</b></div><div class="msg-head"><span class="avatar ai">AI</span><span class="who">联网搜索智能体</span><span class="time">15:02</span></div>
+        <div class="steps-log">
+          <div class="line">01 <b>web_search</b> "AI 动态 最近一周" <span class="ms">· 612ms</span> <span class="ok">✓ 5 条结果</span></div>
+          <div class="line">02 <b>web_search</b> "大模型 发布 融资" <span class="ms">· 588ms</span> <span class="ok">✓ 4 条结果</span></div>
+        </div>
+        <div class="msg-body">
+          最近一周值得关注的动态有三条：<br>
+          1. 两家头部实验室先后发布了多模态模型的迭代版本；<br>
+          2. 国产大模型厂商完成新一轮融资，投向推理成本优化；<br>
+          3. 开源社区出现了面向端侧的小模型，评测表现接近上一代旗舰。
+        </div>
+        <div class="cite">引用 3 条：来源标题与链接已按条附在结果中</div>
+        <div class="msg-actions">
+          <button>🔊 朗读</button>
+          <button>👍 有帮助</button>
+          <button>👎 无帮助</button>
+        </div>
+        <div class="followups">
+          <a href="#">展开第 1 条动态的原文？</a>
+          <a href="#">这些动态对我们行业的影响？</a>
+        </div>
+      </div>
+      <div class="exchange">
+        <div class="msg-head"><span class="avatar me">你</span><span class="who">你</span><span class="time">15:04</span></div>
+        <div class="msg-body msg-user">第二条展开说说。</div>
+      </div>
+      <div class="exchange">
+        <div class="log-tag">LOG <b>//</b> AGENT-RUN · <b>2 STEPS</b></div><div class="msg-head"><span class="avatar ai">AI</span><span class="who">联网搜索智能体</span><span class="time">15:04</span></div>
+        <div class="steps-log">
+          <div class="line">03 <b>web_search</b> "国产大模型 融资 推理成本" <span class="ms">· 540ms</span> <span class="ok">✓ 3 条结果</span></div>
+        </div>
+        <div class="msg-body">
+          该轮融资由头部机构领投，资金主要用于推理成本优化与行业落地。公司披露的口径是：单位推理成本较上一代下降约四成，已在两个行业客户中试点。
+        </div>
+        <div class="cite">引用 1 条：来源标题与链接已附在结果中</div>
+        <div class="msg-actions">
+          <button>🔊 朗读</button>
+          <button>👍 有帮助</button>
+          <button>👎 无帮助</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <div class="line">
+        <textarea placeholder="输入问题，自动调用工具查询，Enter 发送"></textarea>
+        <span class="mic">🎤</span>
+        <button class="send">发送 ↵</button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

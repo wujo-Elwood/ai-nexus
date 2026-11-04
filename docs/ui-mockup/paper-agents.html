@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 智能体</title>
+<link rel="stylesheet" href="paper.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+    <div class="group">功能</div>
+    <a href="#">知识库</a>
+    <a href="#">AI 聊天</a>
+    <a href="#">AI 生图</a>
+    <a href="#">文档抽取</a>
+    <a href="#">数据分析</a>
+    <a class="active" href="#">智能体</a>
+    <a href="#">技能管理</a>
+    <a href="#">模型设置</a>
+    <a href="#">用量统计</a>
+    <a href="#">系统健康</a>
+    <a href="#">任务中心</a>
+    <div class="group">管理</div>
+    <a href="#">权限管理</a>
+    <a href="#">RAG 评测</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h1>智能体</h1>
+          <div class="desc">每个智能体绑定一组技能，回答时自主调用工具，执行过程逐步可见。</div>
+        </div>
+        <button class="btn-primary">＋ 新建智能体</button>
+      </div>
+
+      <div class="num-strip">
+        <div class="num-item"><b>9</b><span>智能体</span></div>
+        <div class="num-item"><b>86</b><span>近 7 天调用</span></div>
+        <div class="num-item"><b>97.2%</b><span>成功率</span></div>
+      </div>
+
+      <div class="row-list">
+        <div class="row-item">
+          <div class="row-icon">◉</div>
+          <div class="row-main">
+            <div class="row-name">联网搜索智能体<span class="st-tag st-ok">● 已启用</span><span class="st-tag" style="color:var(--primary-hi)">上次使用</span></div>
+            <div class="row-desc">调用 web_search 检索互联网并基于结果回答，注明来源链接</div>
+            <div class="skill-chips"><code>web_search</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-6-sol · 32 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+        <div class="row-item">
+          <div class="row-icon">☁</div>
+          <div class="row-main">
+            <div class="row-name">天气查询智能体<span class="st-tag st-ok">● 已启用</span></div>
+            <div class="row-desc">调用城市定位与天气查询工具回答实时天气问题</div>
+            <div class="skill-chips"><code>search_city_location</code><code>get_weather</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-6-sol · 21 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+        <div class="row-item">
+          <div class="row-icon">💱</div>
+          <div class="row-main">
+            <div class="row-name">货币换算智能体<span class="st-tag st-ok">● 已启用</span></div>
+            <div class="row-desc">查询实时汇率并结合计算器完成多币种金额换算</div>
+            <div class="skill-chips"><code>get_exchange_rate</code><code>calculate</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-6-sol · 9 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+        <div class="row-item">
+          <div class="row-icon">📋</div>
+          <div class="row-main">
+            <div class="row-name">数据问答智能体<span class="st-tag st-ok">● 已启用</span></div>
+            <div class="row-desc">只读查询系统数据库，回答用户、知识库、调用量等统计问题</div>
+            <div class="skill-chips"><code>list_tables</code><code>describe_table</code><code>query_database</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-6-sol · 14 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+        <div class="row-item">
+          <div class="row-icon">🖼</div>
+          <div class="row-main">
+            <div class="row-name">生图智能体<span class="st-tag st-ok">● 已启用</span></div>
+            <div class="row-desc">整理提示词并调用生图工具生成 AI 图片，结果存入生图历史</div>
+            <div class="skill-chips"><code>generate_image</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-image-2 · 6 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+        <div class="row-item">
+          <div class="row-icon">📰</div>
+          <div class="row-main">
+            <div class="row-name">AI 资讯助手<span class="st-tag st-ok">● 已启用</span></div>
+            <div class="row-desc">从 Hacker News 检索 AI 圈近期热门内容并翻译成中文简报</div>
+            <div class="skill-chips"><code>fetch_ai_news</code><code>send_email</code></div>
+          </div>
+          <div class="row-meta">GPT / gpt-6-sol · 4 次调用</div>
+          <a class="row-cta" href="#">进入 →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

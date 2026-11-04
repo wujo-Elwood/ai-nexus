@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 系统健康（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a class="active" href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://SYS-HEALTH//OVERVIEW</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>系统健康</h1>
+            <div class="desc">MySQL、Qdrant、嵌入、大模型、磁盘与线程池的实时状态</div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="readouts">
+        <div class="readout"><div class="val">6/6</div><div class="lab">服务在线</div></div>
+        <div class="readout"><div class="val">32 天</div><div class="lab">持续运行</div></div>
+        <div class="readout"><div class="val">78%</div><div class="lab">磁盘使用</div></div>
+      </div>
+      <div class="sys-label" style="margin-bottom:10px;"><span class="pulse"></span>SERVICES // 全部在线</div>
+      <div class="hud-list">
+        <div class="hud-row"><div class="row-main"><div class="row-name">MySQL</div><div class="row-desc">rag_db · 连接正常</div></div>
+          <div class="row-meta">延迟 2 ms</div><span class="st ok"><span class="dot ok"></span>正常</span></div>
+        <div class="hud-row"><div class="row-main"><div class="row-name">Qdrant 向量库</div><div class="row-desc">rag_chunks · 12,048 点</div></div>
+          <div class="row-meta">延迟 4 ms</div><span class="st ok"><span class="dot ok"></span>正常</span></div>
+        <div class="hud-row"><div class="row-main"><div class="row-name">Embedding · bge-m3</div><div class="row-desc">本地 Ollama · 1024 维</div></div>
+          <div class="row-meta">延迟 118 ms</div><span class="st ok"><span class="dot ok"></span>正常</span></div>
+        <div class="hud-row"><div class="row-main"><div class="row-name">LLM · GPT / gpt-6-sol</div><div class="row-desc">https://rillapi.com</div></div>
+          <div class="row-meta">延迟 340 ms</div><span class="st ok"><span class="dot ok"></span>正常</span></div>
+        <div class="hud-row"><div class="row-main"><div class="row-name">磁盘 · uploads 分区</div><div class="row-desc">已用 78% · 剩余 42 GB</div></div>
+          <div class="row-meta">—</div><span class="st warn"><span class="dot warn"></span>注意</span></div>
+        <div class="hud-row"><div class="row-main"><div class="row-name">线程池</div><div class="row-desc">活跃 6 / 上限 32</div></div>
+          <div class="row-meta">—</div><span class="st ok"><span class="dot ok"></span>正常</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

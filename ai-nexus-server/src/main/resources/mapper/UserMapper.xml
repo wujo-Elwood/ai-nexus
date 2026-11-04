@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.UserMapper">
+
+    <!-- 根据用户编号查询用户信息 -->
+    <select id="findById" resultType="com.rag.entity.SysUser">
+        SELECT *
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据用户名查询用户信息 -->
+    <select id="findByUsername" resultType="com.rag.entity.SysUser">
+        SELECT *
+        FROM sys_user
+        WHERE username = #{username}
+    </select>
+
+    <!-- 查询全部用户信息，不返回密码字段 -->
+    <select id="findAll" resultType="com.rag.entity.SysUser">
+        SELECT id, username, nickname, avatar, create_time
+        FROM sys_user
+        ORDER BY id
+    </select>
+
+    <!-- 新增用户信息 -->
+    <insert id="insert" parameterType="com.rag.entity.SysUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (username, password, nickname, create_time)
+        VALUES (#{username}, #{password}, #{nickname}, NOW())
+    </insert>
+
+    <!-- 修改当前用户资料 -->
+    <update id="updateProfile" parameterType="com.rag.entity.SysUser">
+        UPDATE sys_user
+        SET nickname = #{nickname},
+            avatar = #{avatar}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 修改当前用户密码 -->
+    <update id="updatePassword">
+        UPDATE sys_user
+        SET password = #{password}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 查询用户当前的令牌版本号 -->
+    <select id="findTokenVersionById" resultType="java.lang.Integer">
+        SELECT token_version
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <!-- 递增令牌版本号，使该用户已签发的全部 Token 失效 -->
+    <update id="bumpTokenVersion">
+        UPDATE sys_user
+        SET token_version = token_version + 1
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新吉祥物外观偏好 JSON（skin/outfit/name） -->
+    <update id="updateMascotPrefs">
+        UPDATE sys_user
+        SET mascot_prefs = #{mascotPrefs}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除用户角色授权 -->
+    <delete id="deleteUserRoles">
+        DELETE FROM sys_user_role
+        WHERE user_id = #{id}
+    </delete>
+
+    <!-- 删除用户信息 -->
+    <delete id="deleteById">
+        DELETE FROM sys_user
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

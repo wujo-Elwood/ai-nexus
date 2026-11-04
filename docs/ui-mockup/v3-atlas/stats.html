@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>用量统计 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  /* 数字总表：通栏行，无卡片 */
+  .ledger { display: flex; padding: 20px 0 18px; border-bottom: 1px solid var(--rule); }
+  .ledger .cell { flex: 1; }
+  .ledger .cell + .cell { border-left: 1px solid var(--rule); padding-left: 30px; }
+  .ledger .k { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+  .ledger .v { margin-top: 10px; color: var(--ink-1); font-family: "JetBrains Mono", Consolas, monospace; font-size: 34px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1.1; }
+  .ledger .v small { font-size: 16px; color: var(--ink-3); margin-left: 4px; letter-spacing: .02em; }
+  .ledger .delta { margin-top: 6px; color: var(--ink-2); font-size: 11px; font-family: "JetBrains Mono", Consolas, monospace; }
+
+  /* 七日表：行列 + 文本条形 */
+  .week { margin-top: 8px; }
+  .wrow { display: grid; grid-template-columns: 90px minmax(0,1fr) 90px 110px; gap: 22px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid rgba(236,233,225,.06); }
+  .wrow.hd { color: var(--ink-3); font-size: 9.5px; letter-spacing: .22em; font-family: "JetBrains Mono", Consolas, monospace; border-bottom-color: var(--rule); padding-top: 24px; }
+  .wrow .d { color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; }
+  .wrow .bar { position: relative; height: 3px; background: rgba(236,233,225,.08); align-self: center; }
+  .wrow .bar i { position: absolute; left: 0; top: 0; height: 100%; background: var(--ink-1); }
+  .wrow.today .d, .wrow.today .n { color: var(--signal); }
+  .wrow.today .bar i { background: var(--signal); }
+  .wrow .n { color: var(--ink-1); font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; text-align: right; }
+  .wrow .tk { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; text-align: right; }
+
+  /* 模型分布：点线条目 */
+  .models { margin-top: 34px; }
+  .mrow { display: flex; align-items: baseline; gap: 20px; padding: 12px 0; border-bottom: 1px solid rgba(236,233,225,.06); }
+  .mrow .name { width: 180px; font-size: 14.5px; font-weight: 700; }
+  .mrow .bar { flex: 1; position: relative; height: 3px; background: rgba(236,233,225,.08); align-self: center; }
+  .mrow .bar i { position: absolute; left: 0; top: 0; height: 100%; background: var(--ink-1); }
+  .mrow .pct { width: 110px; text-align: right; color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; }
+  .mrow .pct b { color: var(--ink-1); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i on" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE IX — USAGE LEDGER</div>
+        <h1 class="serif">用量统计</h1>
+        <p class="plate-desc">模型调用量与 Token 消耗概览，按自然日汇总。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          成功率<b>98.7%</b>&nbsp;&nbsp;平均响应<b>1.8s</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">导出报表</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <div class="ledger">
+      <div class="cell">
+        <div class="k">今日调用</div>
+        <div class="v">1,284</div>
+        <div class="delta">较昨日 +18%</div>
+      </div>
+      <div class="cell">
+        <div class="k">今日 TOKEN</div>
+        <div class="v">3.2<small>M</small></div>
+        <div class="delta">输入 2.1M · 输出 1.1M</div>
+      </div>
+      <div class="cell">
+        <div class="k">本月调用</div>
+        <div class="v">10,540</div>
+        <div class="delta">四个模型</div>
+      </div>
+      <div class="cell">
+        <div class="k">本月 TOKEN</div>
+        <div class="v">31.6<small>M</small></div>
+        <div class="delta">折合 ¥ 46.20</div>
+      </div>
+    </div>
+
+    <div class="week">
+      <div class="wrow hd"><span>日期</span><span>调用次数</span><span style="text-align:right">次数</span><span style="text-align:right">TOKEN</span></div>
+      <div class="wrow"><span class="d">9 / 27</span><span class="bar"><i style="width:44%"></i></span><span class="n">862</span><span class="tk">2.13M</span></div>
+      <div class="wrow"><span class="d">9 / 28</span><span class="bar"><i style="width:50%"></i></span><span class="n">975</span><span class="tk">2.44M</span></div>
+      <div class="wrow"><span class="d">9 / 29</span><span class="bar"><i style="width:57%"></i></span><span class="n">1,103</span><span class="tk">2.83M</span></div>
+      <div class="wrow"><span class="d">9 / 30</span><span class="bar"><i style="width:51%"></i></span><span class="n">986</span><span class="tk">2.52M</span></div>
+      <div class="wrow"><span class="d">10 / 1</span><span class="bar"><i style="width:66%"></i></span><span class="n">1,268</span><span class="tk">3.17M</span></div>
+      <div class="wrow"><span class="d">10 / 2</span><span class="bar"><i style="width:73%"></i></span><span class="n">1,410</span><span class="tk">3.55M</span></div>
+      <div class="wrow today"><span class="d">今天</span><span class="bar"><i style="width:67%"></i></span><span class="n">1,284</span><span class="tk">3.22M</span></div>
+    </div>
+
+    <div class="models">
+      <span class="cap-label">MODEL DISTRIBUTION · 本月按调用次数</span>
+      <div style="height:10px"></div>
+      <div class="mrow"><span class="name">gpt-6-sol</span><span class="bar"><i style="width:61%"></i></span><span class="pct">6,420 · <b>61%</b></span></div>
+      <div class="mrow"><span class="name">glm-5-air</span><span class="bar"><i style="width:22%"></i></span><span class="pct">2,318 · <b>22%</b></span></div>
+      <div class="mrow"><span class="name">qwen-vl-max</span><span class="bar"><i style="width:10%"></i></span><span class="pct">1,064 · <b>10%</b></span></div>
+      <div class="mrow"><span class="name">gpt-image-2</span><span class="bar"><i style="width:7%"></i></span><span class="pct">738 · <b>7%</b></span></div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE IX</span>
+      <span>USAGE LEDGER · 7 DAYS</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

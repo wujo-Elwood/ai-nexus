@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模型设置 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i on" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE XII — PROVIDERS</div>
+        <h1 class="serif">模型设置</h1>
+        <p class="plate-desc">统一管理大模型供应商的 API 地址、密钥与模型名；对话、生图、视觉三套配置相互独立。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          供应商<b>02</b>&nbsp;&nbsp;聊天使用中<b>01</b>&nbsp;&nbsp;生图使用中<b>01</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="health.html">系统健康 →</a>
+          <a class="btn btn-signal" href="#">＋ 新增供应商</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <table class="table" style="margin-top:24px;">
+      <thead><tr><th style="width:44px">NO.</th><th>供应商</th><th style="width:150px">对话模型</th><th style="width:150px">生图模型</th><th style="width:150px">视觉模型</th><th>API 地址</th><th style="width:200px">状态</th><th style="width:150px; text-align:right">操作</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="num">01</td>
+          <td style="font-weight:700">GPT <span class="sw sig" style="margin-left:8px;">[使用中]</span></td>
+          <td class="num">gpt-6-sol</td><td class="num">gpt-image-2</td><td class="num" style="color:var(--ink-3)">沿用对话模型</td>
+          <td class="num" style="color:var(--ink-2)">https://rllapi.com/v1</td>
+          <td><span class="st">聊天使用中</span> <span class="st busy">生图使用中</span></td>
+          <td class="op" style="text-align:right"><a href="#">编辑</a></td>
+        </tr>
+        <tr>
+          <td class="num">02</td>
+          <td style="font-weight:700">测试 <span class="sw off" style="margin-left:8px;">[平台]</span></td>
+          <td class="num">11</td><td class="num">gpt-image-2</td><td class="num" style="color:var(--ink-3)">沿用对话模型</td>
+          <td class="num" style="color:var(--ink-2)">https://11</td>
+          <td><span class="st">未启用</span></td>
+          <td class="op" style="text-align:right"><a href="#">设为生图</a><a href="#">编辑</a><a href="#" class="danger">删除</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 三套配置说明：行式表单示意（弹窗内容的页内化） -->
+    <div class="cols" style="margin-top:44px;">
+      <div>
+        <div class="sec" style="padding-top:0;"><span class="cap">CHAT CONFIG</span><span class="t">对话模型配置</span></div>
+        <div class="form-line"><label>名称</label><div class="fld"><input type="text" value="GPT"></div></div>
+        <div class="form-line"><label>API 地址</label><div class="fld"><input type="url" value="https://rllapi.com/v1"></div></div>
+        <div class="form-line"><label>API 密钥</label><div class="fld"><input type="password" value="sk-****************"></div></div>
+        <div class="form-line"><label>对话模型名称</label><div class="fld"><input type="text" value="gpt-6-sol"></div></div>
+      </div>
+      <div class="aside">
+        <div class="sec" style="padding-top:0;"><span class="cap">VISION / IMAGE</span><span class="t">生图与视觉</span></div>
+        <div class="form-line"><label>生图模型</label><div class="fld"><input type="text" value="gpt-image-2"></div></div>
+        <div class="form-line"><label>视觉模型</label><div class="fld"><input type="text" value="qwen-vl-max" placeholder="留空沿用对话模型"></div></div>
+        <div class="form-line"><label>视觉密钥</label><div class="fld"><input type="password" value="sk-****************"></div></div>
+        <p class="hint" style="margin-top:12px;">文档视觉解析、图片理解智能体使用视觉配置；生图智能体使用生图配置。</p>
+      </div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE XII</span>
+      <span>PROVIDERS · 02 ENTRIES</span>
+      <span class="right">密钥仅服务端解密使用 · 不回显明文</span>
+    </footer>
+  </div>
+</body>
+</html>

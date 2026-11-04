@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 模型设置（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a class="active" href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://MODEL//PROVIDERS</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>模型设置</h1>
+            <div class="desc">统一管理对话、生图与视觉模型的 API 地址、密钥和模型名</div>
+          </div>
+          <button class="btn-primary">＋ 新增供应商</button>
+        </div>
+      </div>
+      
+      
+      <div class="toolbar"><h1 style="font-size:16px;font-weight:600;">模型供应商</h1><div class="spacer"></div>
+        <button class="btn-primary">＋ 新增供应商</button></div>
+      <div class="hud-list">
+        <div class="hud-row">
+          <span class="idx"><b>01</b></span>
+          <div class="row-main"><div class="row-name">GPT <span class="st-tag st-ok">● 使用中</span></div>
+          <div class="row-desc">对话 gpt-6-sol · 生图 gpt-image-2 · https://rillapi.com</div></div>
+          <div class="row-meta">创建人 —</div>
+          <a class="row-cta" href="#">编辑 →</a>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>02</b></span>
+          <div class="row-main"><div class="row-name">测试</div>
+          <div class="row-desc">对话 11 · 生图 gpt-image-2 · admin 创建</div></div>
+          <div class="row-meta">创建人 admin</div>
+          <a class="row-cta" href="#">编辑 →</a>
+        </div>
+      </div>
+      <div class="sys-label" style="margin-bottom:10px;"><span class="pulse"></span>EMBEDDING // 本地 Ollama</div>
+      <div class="hud-row">
+        <div class="row-main"><div class="row-name">bge-m3 <span class="st-tag st-ok">● 在线</span></div>
+        <div class="row-desc">http://localhost:11434 · 1024 维 · 知识库切片与召回向量化</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

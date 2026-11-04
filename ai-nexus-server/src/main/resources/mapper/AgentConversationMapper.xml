@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.agent.mapper.AgentConversationMapper">
+
+    <sql id="baseColumns">
+        id,
+        user_id AS userId,
+        agent_code AS agentCode,
+        title,
+        create_time AS createTime,
+        update_time AS updateTime
+    </sql>
+
+    <insert id="insert" parameterType="com.rag.agent.entity.AgentConversation" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_conversation (user_id, agent_code, title)
+        VALUES (#{userId}, #{agentCode}, #{title})
+    </insert>
+
+    <select id="findByUserAndAgent" resultType="com.rag.agent.entity.AgentConversation">
+        SELECT <include refid="baseColumns"/>
+        FROM agent_conversation
+        WHERE user_id = #{userId} AND agent_code = #{agentCode}
+        ORDER BY update_time DESC, id DESC
+        LIMIT 50
+    </select>
+
+    <select id="findByIdAndUserId" resultType="com.rag.agent.entity.AgentConversation">
+        SELECT <include refid="baseColumns"/>
+        FROM agent_conversation
+        WHERE id = #{id} AND user_id = #{userId}
+    </select>
+
+    <update id="touch">
+        UPDATE agent_conversation SET update_time = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM agent_conversation WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+</mapper>

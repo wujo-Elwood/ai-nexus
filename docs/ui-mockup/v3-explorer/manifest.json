@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "project": "AI 智能平台 · 主界面改版（第 02 轮：反 AI 卡片风）",
+  "brief": "知识库列表页首屏：查看知识库就绪状态并进入提问或文件管理。基线为已落地的 v2「深空玻璃 Aurora Glass」（磨砂玻璃卡片风，用户反馈『一眼 AI 做的卡片式』）。本轮三个候选全部禁用卡片/渐变/玻璃/圆角浮层，用通栏表格、索引、边注组织信息，星空背景不变。",
+  "round": "02",
+  "candidates": [
+    {
+      "id": "baseline",
+      "name": "现状 · 深空玻璃 Aurora Glass（已落地）",
+      "concept": "轨道站舷窗边的磨砂玻璃操作台：星空透过玻璃参与画面。",
+      "typography": "系统无衬线栈，页标题 26px/700，数字 tabular",
+      "palette": ["#02030a", "#818cf8", "#22d3ee", "#e879f9"],
+      "traits": ["悬浮玻璃岛侧栏 + 玻璃卡网格", "极光渐变三处", "大圆角 + 玻璃反光"],
+      "kind": "image",
+      "source": "baseline-v2-impl.png",
+      "baseline": true
+    },
+    {
+      "id": "star-atlas",
+      "name": "A · 星图年鉴 STAR ATLAS",
+      "concept": "平台是一本正在编写的天体图年鉴：每页是一张带编号、坐标读数和目录点线的星图版面。",
+      "typography": "Noto Serif SC 衬线大字（页标题 34-36px）+ JetBrains Mono 编号读数 + Noto Sans SC 正文",
+      "palette": ["#02030a", "#ece9e1", "#9a9890", "#ff6b57"],
+      "traits": ["无侧栏，页眉编号横排索引", "目录点线连接名称与读数", "单一朱砂信号色，零渐变零发光"],
+      "kind": "html",
+      "source": "cand-star-atlas.html"
+    },
+    {
+      "id": "flight-board",
+      "name": "B · 航行看板 FLIGHT BOARD",
+      "concept": "平台是深空港的出发信息板：全部状态一屏可读，信息以行列组织，不藏进任何容器。",
+      "typography": "全 JetBrains Mono + 中文黑体，标题宽字距",
+      "palette": ["#04050a", "#f2f2ee", "#45e890", "#ffb454"],
+      "traits": ["左 64px 编号索引轨", "行列信息板 + [READY] 方括号标签", "hover 整行反白翻牌感"],
+      "kind": "html",
+      "source": "cand-flight-board.html"
+    },
+    {
+      "id": "marginalia",
+      "name": "C · 巨字索引 MARGINALIA",
+      "concept": "整个界面是一张索引海报：知识库名字是 46px 巨字主角，元数据退到右边距像书页边注。",
+      "typography": "Noto Sans SC 900 巨字（46-64px）+ mono 小字边注",
+      "palette": ["#010103", "#f0f0ee", "#8f8f89"],
+      "traits": ["纯黑白灰，颜色只来自星空", "单列巨字行 + 右边距注", "hover 整行负片反白"],
+      "kind": "html",
+      "source": "cand-marginalia.html"
+    }
+  ]
+}

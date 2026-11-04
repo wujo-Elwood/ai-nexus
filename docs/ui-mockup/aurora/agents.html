@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智能体 · AI 智能平台</title>
+<link rel="stylesheet" href="aurora.css">
+<style>
+  .agent-card { padding: 18px; display: flex; flex-direction: column; gap: 0; }
+  .agent-top { display: flex; gap: 13px; align-items: flex-start; }
+  .agent-main { min-width: 0; flex: 1; }
+  .agent-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+  .agent-name .badge { font-size: 9.5px; font-weight: 600; color: var(--ink-3); padding: 1px 7px;
+    border-radius: 999px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+  .agent-desc { margin-top: 4px; color: var(--ink-2); font-size: 12.5px; line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .agent-skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .agent-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .agent-meta { color: var(--ink-3); font-size: 11.5px; }
+  .agent-meta b { color: var(--ink-2); font-weight: 600; }
+  .agent-actions { display: flex; gap: 8px; opacity: 0; transform: translateY(3px);
+    transition: opacity .18s var(--motion), transform .18s var(--motion); }
+  .agent-card:hover .agent-actions { opacity: 1; transform: none; }
+
+  /* 执行记录带 */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; padding: 8px 10px 0; }
+
+  .recent { margin: 16px 10px 6px; padding: 16px 20px 10px; }
+  .recent .r-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .recent .r-title { font-size: 13.5px; font-weight: 700; }
+  .recent .r-sub { color: var(--ink-3); font-size: 11.5px; }
+  .recent .r-more { margin-left: auto; color: var(--ink-3); font-size: 12px; }
+  .recent .r-more:hover { color: var(--ink-1); }
+  .rrow { display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-top: 1px solid rgba(255,255,255,.05); font-size: 12.5px; }
+  .rrow:first-of-type { border-top: 0; }
+  .rrow .a-name { color: var(--ink-1); font-weight: 600; }
+  .rrow .a-q { color: var(--ink-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+  .rrow .a-meta { margin-left: auto; color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .main { overflow-y: auto; }
+  .main::-webkit-scrollbar { width: 6px; }
+  .main::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span>
+  </div>
+
+  <div class="shell">
+    <aside class="dock">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <div class="brand-name">AI 智能平台</div>
+          <div class="brand-sub">AI NEXUS</div>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">核心</div>
+        <a class="nav-item" href="kb.html"><span class="nav-ico">◈</span>知识库</a>
+        <a class="nav-item" href="chat.html"><span class="nav-ico">✦</span>AI 聊天</a>
+        <a class="nav-item" href="#"><span class="nav-ico">◐</span>AI 生图</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌘</span>文档抽取</a>
+        <a class="nav-item active" href="agents.html"><span class="nav-ico">◉</span>智能体</a>
+        <a class="nav-item" href="#"><span class="nav-ico">∿</span>数据分析</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">洞察</div>
+        <a class="nav-item" href="stats.html"><span class="nav-ico">▥</span>用量统计</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌁</span>知识缺口</a>
+        <a class="nav-item" href="#"><span class="nav-ico">✓</span>RAG 评测</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">管理</div>
+        <a class="nav-item" href="#"><span class="nav-ico">✧</span>技能管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">☰</span>任务中心</a>
+        <a class="nav-item" href="#"><span class="nav-ico">▧</span>权限管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⚙</span>模型设置</a>
+        <a class="nav-item" href="#"><span class="nav-ico">❤</span>系统健康</a>
+      </div>
+
+      <div class="dock-foot">
+        <div class="avatar">A</div>
+        <div class="who"><b>Admin</b>admin</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-head">
+        <div class="head-row">
+          <div>
+            <h1>智能体</h1>
+            <div class="head-desc">按场景进入对应智能体；工具调用全过程逐步展示，可随时中断。</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost">⟳ 刷新</button>
+            <button class="btn btn-primary">＋ 新建智能体</button>
+          </div>
+        </div>
+        <div class="aurora-band"></div>
+      </header>
+
+      <div class="pills">
+        <div class="pill-stat"><b>6</b><span>智能体</span></div>
+        <div class="pill-stat"><b>5</b><span>已启用</span></div>
+        <div class="pill-stat"><b>1,284</b><span>本月调用</span><span class="trend">+18%</span></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">⌕&nbsp; 搜索智能体…</div>
+        <div class="chips">
+          <button class="chip on">全部</button>
+          <button class="chip">内置</button>
+          <button class="chip">自定义</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#22d3ee; --g2:#60a5fa">☁</div>
+            <div class="agent-main">
+              <div class="agent-name">天气查询 <span class="badge">内置</span><span class="st ok"><i></i>已启用</span></div>
+              <div class="agent-desc">查询全球城市实时天气与未来预报，支持多城市对比。</div>
+              <div class="agent-skills">
+                <span class="skill">weather_now</span>
+                <span class="skill">weather_forecast</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">对话模型 <b>gpt-6-sol</b> · 上次使用 10/2</span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#818cf8; --g2:#a78bfa">¥</div>
+            <div class="agent-main">
+              <div class="agent-name">货币换算 <span class="badge">内置</span><span class="st ok"><i></i>已启用</span></div>
+              <div class="agent-desc">实时汇率换算与历史走势查询，支持 160+ 币种。</div>
+              <div class="agent-skills">
+                <span class="skill">fx_rate</span>
+                <span class="skill">fx_history</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">对话模型 <b>gpt-6-sol</b> · 上次使用 9/30</span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#c084fc; --g2:#e879f9">◎</div>
+            <div class="agent-main">
+              <div class="agent-name">视觉理解 <span class="badge">内置</span><span class="st ok"><i></i>已启用</span></div>
+              <div class="agent-desc">上传图片进行识别、描述、表格还原与信息提取。</div>
+              <div class="agent-skills">
+                <span class="skill">vision_parse</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">视觉模型 <b>qwen-vl-max</b> · 上次使用 10/1</span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#67e8f9; --g2:#38bdf8">∑</div>
+            <div class="agent-main">
+              <div class="agent-name">数据问答 <span class="badge">内置</span><span class="st ok"><i></i>已启用</span></div>
+              <div class="agent-desc">对已上传表格用自然语言查数，服务端确定性计算并出图。</div>
+              <div class="agent-skills">
+                <span class="skill">sql_query</span>
+                <span class="skill">chart_render</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">对话模型 <b>gpt-6-sol</b> · 上次使用 10/2</span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#e879f9; --g2:#c084fc">◐</div>
+            <div class="agent-main">
+              <div class="agent-name">AI 生图 <span class="badge">内置</span><span class="st idle"><i></i>未激活</span></div>
+              <div class="agent-desc">文生图智能体，需先在模型设置中启用生图供应商。</div>
+              <div class="agent-skills">
+                <span class="skill">image_gen</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">生图模型 <b>未配置</b> · 对话 <b>gpt-6-sol</b></span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable agent-card">
+          <div class="agent-top">
+            <div class="glyph" style="--g1:#94a3b8; --g2:#64748b">✧</div>
+            <div class="agent-main">
+              <div class="agent-name">运维助手 <span class="badge">自定义</span><span class="st ok"><i></i>已启用</span></div>
+              <div class="agent-desc">绑定 web_search 与知识库检索，回答内部运维问题。</div>
+              <div class="agent-skills">
+                <span class="skill">web_search</span>
+                <span class="skill">kb_retrieval</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-foot">
+            <span class="agent-meta">对话模型 <b>gpt-6-sol</b> · 上次使用 9/28</span>
+            <div class="agent-actions">
+              <button class="mini-btn">编辑</button>
+              <button class="mini-btn go">进入 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 次级内容带：最近调用 -->
+      <section class="panel recent">
+        <div class="r-head">
+          <span class="r-title">最近调用</span>
+          <span class="r-sub">全部智能体 · 最近 24 小时</span>
+          <a class="r-more" href="#">查看全部 →</a>
+        </div>
+        <div class="rrow">
+          <span class="a-name">天气查询</span>
+          <span class="a-q">「上海未来三天会下雨吗？」</span>
+          <span class="st ok"><i></i>成功</span>
+          <span class="a-meta">4 步 · 2.8s · 今天 11:02</span>
+        </div>
+        <div class="rrow">
+          <span class="a-name">数据问答</span>
+          <span class="a-q">「上个月退货率最高的是哪个 SKU？」</span>
+          <span class="st ok"><i></i>成功</span>
+          <span class="a-meta">3 步 · 4.1s · 今天 10:36</span>
+        </div>
+        <div class="rrow">
+          <span class="a-name">视觉理解</span>
+          <span class="a-q">「识别这张发票的抬头与金额」</span>
+          <span class="st bad"><i></i>失败</span>
+          <span class="a-meta">2 步 · 1.2s · 今天 09:58</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

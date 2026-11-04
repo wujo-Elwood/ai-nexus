@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "project": "AI 智能平台 · 主界面改版",
+  "brief": "知识库列表页首屏：查看知识库就绪状态并进入提问或文件管理。四个候选展示同一内容（4 个知识库、向量重建中、统计读数），现状为 v1「深空 HUD」，三个候选方向与现状完全不同。",
+  "round": "01",
+  "candidates": [
+    {
+      "id": "baseline",
+      "name": "现状 · 深空 HUD",
+      "concept": "细线 + 微亮的观测站控制台：1px 分割线、mono 系统标签、琥珀角标。",
+      "typography": "JetBrains Mono 标签 + Noto Sans SC 正文，读数 26px mono",
+      "palette": ["#02030a", "#e5a044", "#f2efe9"],
+      "traits": ["直角细线面板 + 琥珀角标", "mono 系统标签 SYS://", "仪表行列表"],
+      "kind": "image",
+      "source": "baseline-kb.png",
+      "baseline": true
+    },
+    {
+      "id": "aurora-glass",
+      "name": "A · 深空玻璃 Aurora Glass",
+      "concept": "像在轨道站舷窗边的磨砂玻璃操作台上工作：星空就在玻璃后面，界面越安静，宇宙越清楚。",
+      "typography": "系统无衬线栈，页标题 26px/700，数字 tabular 26-32px，mono 仅数据小注",
+      "palette": ["#02030a", "#818cf8", "#22d3ee", "#e879f9"],
+      "traits": ["悬浮玻璃岛侧栏，窗口四周露星空", "极光渐变只给主动作/导航胶囊/页头光带", "知识库卡带就绪星环"],
+      "kind": "html",
+      "source": "cand-aurora-glass.html"
+    },
+    {
+      "id": "bento-constellation",
+      "name": "B · 星图舱 Bento Constellation",
+      "concept": "平台是一张星图：每个功能是一个发光星区，数据是看得见的量。",
+      "typography": "紧凑无衬线 + 46-96px 渐变描边展示数字",
+      "palette": ["#05060f", "#4f8ef7", "#8b7bf7", "#f79d4f"],
+      "traits": ["顶部窄 dock + 全屏 bento 拼贴", "每个模块一种光谱色", "知识库是行星卡 + 大号环表"],
+      "kind": "html",
+      "source": "cand-bento-constellation.html"
+    },
+    {
+      "id": "editorial-space",
+      "name": "C · 编辑部深空 Editorial Space",
+      "concept": "像翻一本装帧考究的太空杂志：排版本身是主角，装饰退场。",
+      "typography": "Noto Serif SC 大标题 52px + 衬线大数字 44px，正文无衬线 13-14px",
+      "palette": ["#010208", "#0d1017", "#7dd3fc"],
+      "traits": ["无侧栏，通栏衬线大标题", "不对称双栏目录条目", "墨色面板 + 单一冰蓝，无光效"],
+      "kind": "html",
+      "source": "cand-editorial-space.html"
+    }
+  ]
+}

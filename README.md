@@ -15,6 +15,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 ### 知识库与文件管理
 
 - 创建、编辑、删除知识库，支持私有和公开可见范围。
+- 知识库共享授权：创建者可把私有知识库授权给指定用户（或角色/组），分「可阅读」和「可管理」两级；被授权人在列表、问答检索、文件查看中可见可用，移除授权立即生效。
 - 本地磁盘存储，上传文件、预览、下载、删除和重新处理。
 - 普通上传和大文件分片上传；支持断点续传、进度查询、暂停后继续、取消和过期分片清理。
 - 文件处理阶段、百分比进度、失败原因、累计尝试次数和定时自动重试。
@@ -28,7 +29,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 
 ### 文档解析与入库
 
-- 支持 PDF、DOC、DOCX、XLSX、TXT 和 Markdown。
+- 支持 PDF、DOC、DOCX、XLSX、PPT/PPTX、TXT 和 Markdown；PNG/JPG 等图片可独立入库。
 - Apache Tika 负责 PDF、Office 和文本内容提取。
 - Apache POI 将 XLSX 工作表转换为保留行列结构的 Markdown 表格。
 - PDF 表格提取文字内容，但不保证恢复原始行列结构。
@@ -41,7 +42,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 查询改写、候选集扩展、融合打分、重排序和结果去重。
 - 检索缓存、上下文压缩和多样性控制。
 - 召回测试和检索诊断台，可查看改写问题、候选结果、分数和来源。
-- SSE 流式问答、会话历史、回答反馈和用量统计。
+- SSE 流式问答、会话历史、回答反馈和用量统计；语音提问与回答朗读（Web Speech API，按浏览器能力自动降级）。
 - 可信回答控制：没有有效知识证据时拒答，避免脱离知识库自由编造。
 - 回答引用校验和来源展示，可追溯文件、切片、匹配方式及分数。
 - 回答置信度：结合引用分数、引用数量和证据覆盖率输出 HIGH、MEDIUM、LOW 或 NONE。
@@ -66,9 +67,10 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 天气查询智能体：模型自主调用城市定位与天气查询工具（Open-Meteo，无需 API Key），每个执行步骤实时推送到前端并落库 `agent_tool_step`，支持事后回放。
 - 货币换算智能体：调用实时汇率工具（Frankfurter，无需 API Key）与安全计算器完成多币种换算，执行过程逐步可见。
 - 视觉智能体：上传图片进行识别与分析（截图、照片中的文字与物体），结合计算工具可完成图中金额合计等多步分析。
+- 联网搜索智能体：调用 web_search 技能实时搜索互联网并基于结果回答，注明来源链接；搜索源支持 Tavily、Serper、博查和自建 SearXNG，API Key 在技能管理页按用户配置（平台默认兜底），每个执行步骤实时可见。
 - 能力展示：粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞、水墨等多套 WebGL 视觉展示页。
 
-> 当前不包含图片 OCR、图片语义理解或流程图理解。AI 生图是独立功能，不参与知识库文档检索。
+> 知识库开启「视觉解析」后自动识别扫描版 PDF 页面与图片内容（OCR 走视觉模型，按知识库开关与页数上限控制成本）；PPT 页内表格与逐页标题保留结构。AI 生图是独立功能，不参与知识库文档检索。
 > 自动生成业务报告不在当前范围；智能体质量报告属于既有质检功能。
 
 ## 技术栈
@@ -104,7 +106,7 @@ ai-nexus
 ├── docker-compose.yml                # MySQL/Qdrant/Ollama/前后端一键部署编排
 ├── database/                         # 初始化和历史数据库升级脚本
 ├── docs/                             # 设计、计划和模块说明
-├── rag-server/
+├── ai-nexus-server/
 │   └── src/main/java/com/rag/
 │       ├── agent/                    # 智能体与工具调用框架
 │       ├── ai/                       # 聊天、Embedding 和模型调用
@@ -121,7 +123,7 @@ ai-nexus
 │       ├── rbac/                     # 菜单、角色和用户权限
 │       ├── service/                  # 文件、知识库和分片上传服务
 │       └── task/                     # 统一任务中心
-├── rag-web/
+├── ai-nexus-web/
 │   ├── public/                       # 前端静态资源
 │   ├── scripts/                      # 前端辅助脚本
 │   └── src/
@@ -264,7 +266,7 @@ ollama serve
 
 ### 5. 配置后端
 
-编辑 `rag-server/src/main/resources/application.yml`，至少检查数据库账号、上传目录和 JWT 密钥。不要把生产密码或 API Key 提交到仓库。
+编辑 `ai-nexus-server/src/main/resources/application.yml`，至少检查数据库账号、上传目录和 JWT 密钥。不要把生产密码或 API Key 提交到仓库。
 
 ```yaml
 server:
@@ -317,14 +319,14 @@ jwt:
 Windows：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd spring-boot:run
 ```
 
 macOS / Linux：
 
 ```bash
-cd rag-server
+cd ai-nexus-server
 mvn spring-boot:run
 ```
 
@@ -333,7 +335,7 @@ mvn spring-boot:run
 ### 8. 启动前端
 
 ```bash
-cd rag-web
+cd ai-nexus-web
 npm install
 npm run dev
 ```
@@ -346,23 +348,39 @@ npm run dev
 
 ## 历史数据库升级
 
-已有数据库不要重新执行整库初始化。先备份 `rag_db`，再从仓库根目录按以下顺序执行升级脚本。脚本按 MySQL 5.7 编写，支持重复执行。
+已有数据库不要重新执行整库初始化。先备份 `rag_db`，再从仓库根目录按以下顺序执行升级脚本。当前模块使用的表结构已纳入 `init.sql`；下表脚本用于把旧库升级到当前版本。
 
 | 顺序 | 脚本 | 作用 |
 | --- | --- | --- |
 | 1 | `extract_v2_upgrade.sql` | 抽取模板创建人、任务进度、失败原因和结果修正字段 |
 | 2 | `rbac_management.sql` | 菜单、角色、用户角色和角色菜单表结构 |
-| 3 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
-| 4 | `image_history.sql` | 生图异步任务和历史记录 |
-| 5 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
-| 6 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
-| 7 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
-| 8 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
-| 9 | `system_health_upgrade.sql` | 系统健康面板相关表结构 |
-| 10 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
-| 11 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
-| 12 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
-| 13 | `image_active_upgrade.sql` | 生图供应商标记，解耦生图与聊天模型切换 |
+| 3 | `agent_manage_upgrade.sql` | 智能体注册表和内置智能体 |
+| 4 | `agent_custom_upgrade.sql` | 智能体创建人字段 |
+| 5 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
+| 6 | `image_history.sql` | 生图异步任务和历史记录 |
+| 7 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
+| 8 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
+| 9 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
+| 10 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
+| 11 | `system_health_upgrade.sql` | 系统健康面板菜单数据修正 |
+| 12 | `kb_second_priority_upgrade.sql` | 知识库策略和 RAG 评测表结构 |
+| 13 | `kb_summary_upgrade.sql` | 知识库摘要内容和更新时间字段 |
+| 14 | `model_provider_owner_upgrade.sql` | 模型供应商创建人字段和归属索引 |
+| 15 | `image_active_upgrade.sql` | 生图供应商标记，解耦生图与聊天模型切换 |
+| 16 | `vision_parse_upgrade.sql` | 视觉模型配置和知识库视觉解析开关 |
+| 17 | `chat_user_isolation_upgrade.sql` | 聊天消息用户归属字段和查询索引；无法确认归属的历史消息保持未归属 |
+| 18 | `ai_feedback_source_upgrade.sql` | 反馈来源字段，区分聊天与智能体消息 |
+| 19 | `knowledge_gap_analysis.sql` | 答案质量和知识缺口报告表 |
+| 20 | `conversation_history_upgrade.sql` | 智能体会话及消息历史表 |
+| 21 | `data_analysis_upgrade.sql` | 用户数据分析文件表 |
+| 22 | `kb_grant_upgrade.sql` | 知识库用户/角色授权表 |
+| 23 | `skill_module_upgrade.sql` | 技能注册表、智能体绑定及菜单授权 |
+| 24 | `skill_stats_upgrade.sql` | 技能调用记录表和智能体统计字段 |
+| 25 | `web_search_upgrade.sql` | 联网搜索配置、内置智能体和技能绑定 |
+| 26 | `ai_news_upgrade.sql` | AI 资讯智能体和技能绑定 |
+| 27 | `mascot_prefs_upgrade.sql` | 用户吉祥物外观偏好字段 |
+
+这些升级脚本按 MySQL 5.7 编写并支持重复执行。`database/agent_tool_step.sql` 是单独建表脚本；已有旧表时请执行上表中的 `skill_stats_upgrade.sql` 补齐统计字段。
 
 普通终端示例：
 
@@ -376,7 +394,7 @@ Windows PowerShell 单个脚本示例：
 
 ```powershell
 Get-Content -Raw -Encoding UTF8 database/kb_capabilities_upgrade.sql |
-  mysql --default-character-set=utf8mb4 -u root -p
+  mysql --default-character-set=utf8mb4 -u root -p rag_db
 ```
 
 Windows PowerShell 批量升级：
@@ -385,6 +403,8 @@ Windows PowerShell 批量升级：
 $scripts = @(
   'extract_v2_upgrade.sql',
   'rbac_management.sql',
+  'agent_manage_upgrade.sql',
+  'agent_custom_upgrade.sql',
   'image_model_provider_upgrade.sql',
   'image_history.sql',
   'kb_file_process_upgrade.sql',
@@ -394,12 +414,25 @@ $scripts = @(
   'system_health_upgrade.sql',
   'kb_second_priority_upgrade.sql',
   'kb_summary_upgrade.sql',
-  'model_provider_owner_upgrade.sql'
+  'model_provider_owner_upgrade.sql',
+  'image_active_upgrade.sql',
+  'vision_parse_upgrade.sql',
+  'chat_user_isolation_upgrade.sql',
+  'ai_feedback_source_upgrade.sql',
+  'knowledge_gap_analysis.sql',
+  'conversation_history_upgrade.sql',
+  'data_analysis_upgrade.sql',
+  'kb_grant_upgrade.sql',
+  'skill_module_upgrade.sql',
+  'skill_stats_upgrade.sql',
+  'web_search_upgrade.sql',
+  'ai_news_upgrade.sql',
+  'mascot_prefs_upgrade.sql'
 )
 
 foreach ($script in $scripts) {
   Get-Content -Raw -Encoding UTF8 "database/$script" |
-    mysql --default-character-set=utf8mb4 -u root -p
+    mysql --default-character-set=utf8mb4 -u root -p rag_db
 }
 ```
 
@@ -452,6 +485,8 @@ foreach ($script in $scripts) {
 | AI 生图 | 生成、任务、历史、查看、下载和删除接口 |
 | 智能体 | 智能体列表 |
 | 天气查询智能体 | `POST /agent-tools/chat/stream`（SSE：open/step_start/step_result/answer/done/error）、`GET /agent-tools/tools` |
+| 搜索源配置 | `GET/PUT/DELETE /api/skills/web-search/config`（按用户维度存 Key，Key 脱敏下发，scope=platform 存平台默认） |
+| 知识库共享 | `GET/POST/DELETE /api/kb/{id}/grants`、`GET /api/kb/share-users`（仅编号与展示名） |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
 | 模型与统计 | 模型供应商增删改查、激活与设为生图（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
 
@@ -460,7 +495,7 @@ foreach ($script in $scripts) {
 | 领域 | 数据表 |
 | --- | --- |
 | 用户与权限 | `sys_user`、`sys_menu`、`sys_role`、`sys_user_role`、`sys_role_menu` |
-| 知识库 | `kb_knowledge_base`、`kb_file`、`kb_chunk` |
+| 知识库 | `kb_knowledge_base`、`kb_file`、`kb_chunk`、`kb_grant` |
 | 上传与版本 | `kb_upload_session`、`kb_upload_chunk`、`kb_file_version` |
 | 目录与标签 | `kb_file_folder`、`kb_file_tag`、`kb_file_tag_rel` |
 | 聊天与模型 | `ai_chat_message`、`ai_model_provider`、`ai_usage_log`、`ai_feedback` |
@@ -468,6 +503,7 @@ foreach ($script in $scripts) {
 | 文档抽取 | `extract_document`、`extract_template`、`extract_field`、`extract_task`、`extract_result`、`extract_review_record`、`extract_export_record` |
 | AI 生图 | `ai_image_task`、`ai_image_history` |
 | 智能体工具步骤 | `agent_tool_step` |
+| 技能与绑定 | `skill`、`agent_skill`、`web_search_config` |
 | 知识缺口分析 | `ai_answer_quality`、`kb_gap_report` |
 
 ## 核心流程
@@ -495,21 +531,21 @@ foreach ($script in $scripts) {
 后端测试：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd test
 ```
 
 前端生产构建：
 
 ```powershell
-cd rag-web
+cd ai-nexus-web
 npm.cmd run build
 ```
 
 后端打包：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd clean package
 ```
 

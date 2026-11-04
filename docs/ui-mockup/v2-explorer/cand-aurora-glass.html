@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>A · 深空玻璃 Aurora Glass</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #f4f6fb;
+    background: #02030a;
+    min-width: 1280px;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ============ 星空背景（与现网 cosmic-background 同源，静态化） ============ */
+  .cosmos { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(ellipse 42% 34% at 72% 18%, rgba(48, 73, 139, 0.18), transparent 66%),
+      radial-gradient(ellipse 34% 28% at 22% 78%, rgba(229, 160, 68, 0.05), transparent 62%),
+      radial-gradient(ellipse 86% 70% at 50% 52%, rgba(12, 20, 48, 0.42), transparent 76%),
+      linear-gradient(180deg, #050711 0%, #02030a 52%, #000105 100%);
+  }
+  .cosmos::before { content: ""; position: absolute; inset: -20%; opacity: .28; filter: blur(34px);
+    background:
+      radial-gradient(ellipse at 34% 28%, rgba(73, 102, 190, 0.18), transparent 26%),
+      radial-gradient(ellipse at 72% 62%, rgba(229, 160, 68, 0.08), transparent 22%);
+    animation: nebula 34s ease-in-out infinite alternate;
+  }
+  @keyframes nebula { from { transform: translate3d(-1.5%, -1%, 0) scale(1); } to { transform: translate3d(1.5%, 1%, 0) scale(1.05); } }
+  .stars, .stars.s2, .stars.s3 { position: absolute; inset: 0; background-repeat: repeat; }
+  .stars {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.92) 0 .85px, transparent 1.25px),
+      radial-gradient(circle, rgba(156,192,255,.74) 0 .9px, transparent 1.35px),
+      radial-gradient(circle, rgba(255,233,192,.68) 0 .8px, transparent 1.25px);
+    background-position: 0 0, 38px 56px, 84px 24px;
+    background-size: 54px 50px, 86px 78px, 118px 106px;
+    animation: drift 112s linear infinite;
+  }
+  .stars.s2 {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,1) 0 1px, transparent 1.55px),
+      radial-gradient(circle, rgba(190,214,255,.86) 0 1.1px, transparent 1.75px);
+    background-position: 16px 20px, 60px 74px;
+    background-size: 96px 86px, 144px 128px;
+    animation: drift 92s linear infinite;
+  }
+  .stars.s3 {
+    background-image:
+      radial-gradient(circle, rgba(255,236,190,1) 0 1.45px, transparent 2.35px),
+      radial-gradient(circle, rgba(146,184,255,.92) 0 1.2px, transparent 1.9px);
+    background-position: 22px 34px, 76px 12px;
+    background-size: 188px 148px, 254px 214px;
+    animation: drift 74s linear infinite;
+  }
+  @keyframes drift { to { transform: translate3d(40px, 26px, 0); } }
+
+  /* ============ 令牌 ============ */
+  :root {
+    --glass: rgba(255, 255, 255, 0.055);
+    --glass-2: rgba(255, 255, 255, 0.09);
+    --glass-3: rgba(255, 255, 255, 0.13);
+    --glass-line: rgba(255, 255, 255, 0.12);
+    --aurora-c: #22d3ee; --aurora-i: #818cf8; --aurora-f: #e879f9;
+    --ink-1: #f4f6fb; --ink-2: #9aa3b5; --ink-3: #626b7e;
+    --ok: #34d399; --warn: #fbbf24; --bad: #fb7185;
+    --motion: cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+
+  /* ============ 悬浮岛布局 ============ */
+  .shell { position: relative; z-index: 1; display: flex; gap: 18px; padding: 14px; height: 100vh; }
+
+  .dock {
+    width: 224px; flex: 0 0 auto;
+    display: flex; flex-direction: column;
+    border-radius: 20px;
+    background:
+      linear-gradient(180deg, rgba(129, 140, 248, 0.09), rgba(255, 255, 255, 0.01) 30%),
+      var(--glass-2);
+    backdrop-filter: blur(24px) saturate(140%);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45), inset 0 1px 0 var(--glass-line);
+    padding: 18px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #22d3ee, #818cf8 55%, #e879f9);
+    color: #0b1020; font-weight: 800; font-size: 17px;
+    box-shadow: 0 6px 18px rgba(129,140,248,.4);
+  }
+  .brand-name { font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+  .brand-sub { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+
+  .nav-group { margin-top: 10px; }
+  .nav-label { font-size: 11px; color: var(--ink-3); letter-spacing: .12em; padding: 0 10px 6px; }
+  .nav-item {
+    position: relative; display: flex; align-items: center; gap: 10px;
+    height: 38px; padding: 0 10px; border-radius: 12px;
+    color: var(--ink-2); font-size: 13.5px; text-decoration: none;
+    transition: background .18s var(--motion), color .18s var(--motion);
+  }
+  .nav-item:hover { background: var(--glass-2); color: var(--ink-1); }
+  .nav-item.active {
+    color: #fff;
+    background: linear-gradient(90deg, rgba(34,211,238,.16), rgba(129,140,248,.20) 52%, rgba(232,121,249,.16));
+    box-shadow: inset 0 0 0 1px rgba(129,140,248,.25), 0 4px 18px rgba(99,102,241,.18);
+  }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: -1px; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 16px; border-radius: 999px;
+    background: linear-gradient(180deg, #22d3ee, #e879f9);
+    box-shadow: 0 0 10px rgba(129,140,248,.8);
+  }
+  .nav-ico { width: 18px; height: 18px; display: grid; place-items: center; font-size: 13px; opacity: .9; }
+
+  .dock-foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--glass-3); color: var(--ink-1); font-size: 12.5px; font-weight: 700;
+    box-shadow: inset 0 0 0 1px var(--glass-line);
+  }
+  .dock-foot .who { font-size: 12.5px; color: var(--ink-2); }
+  .dock-foot .who b { display: block; color: var(--ink-1); font-size: 13px; }
+
+  /* ============ 内容区 ============ */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 8px 6px 14px; overflow: hidden; }
+
+  .page-head { padding: 8px 10px 0; }
+  .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: .01em; }
+  .head-desc { margin-top: 5px; color: var(--ink-2); font-size: 13px; }
+  .head-actions { display: flex; gap: 10px; }
+
+  .btn { height: 38px; padding: 0 18px; border: 0; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+    transition: filter .18s var(--motion), transform .12s var(--motion), background .18s var(--motion); }
+  .btn:active { transform: scale(.97); }
+  .btn-ghost { background: var(--glass-2); color: var(--ink-1); box-shadow: inset 0 0 0 1px var(--glass-line); }
+  .btn-ghost:hover { background: var(--glass-3); }
+  .btn-primary {
+    color: #0b1020;
+    background: linear-gradient(90deg, #22d3ee, #818cf8 52%, #e879f9);
+    box-shadow: 0 6px 20px rgba(99,102,241,.35);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+
+  /* 页头极光带 + 向量重建细进度 */
+  .aurora-band { margin: 14px 10px 0; height: 2.5px; border-radius: 999px; position: relative;
+    background: linear-gradient(90deg, rgba(34,211,238,.9), rgba(129,140,248,.9) 52%, rgba(232,121,249,.9));
+    box-shadow: 0 0 14px rgba(129,140,248,.45);
+    animation: sweep .9s var(--motion) both;
+  }
+  @keyframes sweep { from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); transform-origin: left; } }
+  .rebuild { display: flex; align-items: center; gap: 10px; margin: 8px 10px 0; color: var(--ink-3); font-size: 11.5px; }
+  .rebuild .bar { flex: 1; height: 3px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .rebuild .bar i { display: block; height: 100%; width: 66%;
+    background: linear-gradient(90deg, #22d3ee, #e879f9); border-radius: 999px;
+    box-shadow: 0 0 10px rgba(129,140,248,.6);
+    animation: breathe 3.2s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+
+  /* 数据胶囊 */
+  .pills { display: flex; gap: 12px; padding: 6px 10px 0; }
+  .pill-stat {
+    display: flex; align-items: baseline; gap: 10px;
+    height: 58px; padding: 0 22px; border-radius: 16px; align-items: center;
+    background: var(--glass); backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: inset 0 1px 0 var(--glass-line), 0 8px 28px rgba(0,0,0,.28);
+  }
+  .pill-stat b { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .pill-stat span { color: var(--ink-2); font-size: 12.5px; }
+  .pill-stat .trend { color: var(--ok); font-size: 11px; margin-left: 2px; }
+
+  /* 工具行 */
+  .toolbar { display: flex; align-items: center; gap: 12px; padding: 4px 10px 0; }
+  .search {
+    flex: 0 0 300px; height: 38px; display: flex; align-items: center; gap: 9px; padding: 0 16px;
+    border-radius: 999px; background: rgba(255,255,255,.06); color: var(--ink-3); font-size: 13px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
+  }
+  .chips { display: flex; gap: 6px; }
+  .chip { height: 30px; padding: 0 14px; border-radius: 999px; border: 0; font-size: 12.5px;
+    background: transparent; color: var(--ink-2); transition: background .18s var(--motion), color .18s var(--motion); }
+  .chip:hover { background: var(--glass-2); color: var(--ink-1); }
+  .chip.on { background: var(--glass-3); color: var(--ink-1); box-shadow: inset 0 0 0 1px var(--glass-line); }
+
+  /* 知识库玻璃卡网格 */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 14px; padding: 8px 10px 0; }
+  .kb-card {
+    position: relative; border-radius: 14px; padding: 18px 18px 16px;
+    background:
+      linear-gradient(180deg, rgba(129, 140, 248, 0.075), rgba(255, 255, 255, 0.008) 34%),
+      var(--glass);
+    backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 8px 28px rgba(0,0,0,.28);
+    transition: transform .2s var(--motion), background .2s var(--motion);
+  }
+  .kb-card:hover { transform: translateY(-2px); background:
+    linear-gradient(180deg, rgba(129, 140, 248, 0.1), rgba(255, 255, 255, 0.012) 34%),
+    rgba(255,255,255,.075); }
+  .kb-top { display: flex; gap: 14px; align-items: flex-start; }
+  .ring { flex: 0 0 auto; width: 52px; height: 52px; }
+  .ring svg { width: 52px; height: 52px; display: block; filter: drop-shadow(0 0 8px rgba(129,140,248,.35)); animation: breathe 6s ease-in-out infinite; }
+  .ring .num { position: absolute; }
+  .kb-card .ring-wrap { position: relative; width: 52px; height: 52px; }
+  .ring-val { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink-1); }
+  .kb-main { min-width: 0; flex: 1; }
+  .kb-name { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-2); }
+  .st i { width: 6px; height: 6px; border-radius: 50%; }
+  .st.ok i { background: var(--ok); box-shadow: 0 0 8px rgba(52,211,153,.6); }
+  .st.warn i { background: var(--warn); box-shadow: 0 0 8px rgba(251,191,36,.6); animation: breathe 2s ease-in-out infinite; }
+  .kb-desc { margin-top: 4px; color: var(--ink-2); font-size: 12.5px; line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .kb-meta { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .kb-meta .nums { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .kb-actions { display: flex; gap: 8px; opacity: 0; transform: translateY(3px); transition: opacity .18s var(--motion), transform .18s var(--motion); }
+  .kb-card:hover .kb-actions { opacity: 1; transform: none; }
+  .mini-btn { height: 28px; padding: 0 12px; border: 0; border-radius: 999px; font-size: 12px; font-weight: 600;
+    background: var(--glass-2); color: var(--ink-1); box-shadow: inset 0 0 0 1px var(--glass-line); }
+  .mini-btn.go { background: rgba(129,140,248,.18); color: #c7d2fe; box-shadow: inset 0 0 0 1px rgba(129,140,248,.35); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars"></span><span class="stars s2"></span><span class="stars s3"></span>
+  </div>
+
+  <div class="shell">
+    <!-- 悬浮玻璃岛侧栏 -->
+    <aside class="dock">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <div class="brand-name">AI 智能平台</div>
+          <div class="brand-sub">AI NEXUS</div>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">核心</div>
+        <a class="nav-item active" href="#"><span class="nav-ico">◈</span>知识库</a>
+        <a class="nav-item" href="#"><span class="nav-ico">✦</span>AI 聊天</a>
+        <a class="nav-item" href="#"><span class="nav-ico">◐</span>AI 生图</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌘</span>文档抽取</a>
+        <a class="nav-item" href="#"><span class="nav-ico">◉</span>智能体</a>
+        <a class="nav-item" href="#"><span class="nav-ico">∿</span>数据分析</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">管理</div>
+        <a class="nav-item" href="#"><span class="nav-ico">✧</span>技能管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">☰</span>任务中心</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⚙</span>模型设置</a>
+      </div>
+
+      <div class="dock-foot">
+        <div class="avatar">A</div>
+        <div class="who"><b>Admin</b>admin</div>
+      </div>
+    </aside>
+
+    <!-- 内容 -->
+    <main class="main">
+      <header class="page-head">
+        <div class="head-row">
+          <div>
+            <h1>知识库</h1>
+            <div class="head-desc">上传资料自动解析、切片、向量化，提问时按库召回并注明引用。</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost">知识缺口分析</button>
+            <button class="btn btn-primary">＋ 新建知识库</button>
+          </div>
+        </div>
+        <div class="aurora-band"></div>
+        <div class="rebuild">
+          <span>向量重建</span>
+          <span class="bar"><i></i></span>
+          <span>8 / 12 · 进行中</span>
+        </div>
+      </header>
+
+      <div class="pills">
+        <div class="pill-stat"><b>4</b><span>知识库</span></div>
+        <div class="pill-stat"><b>50</b><span>可问答</span></div>
+        <div class="pill-stat"><b>60</b><span>文件</span><b class="trend" style="font-size:12px">+6</b></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">⌕&nbsp; 搜索知识库…</div>
+        <div class="chips">
+          <button class="chip on">全部</button>
+          <button class="chip">我创建的</button>
+          <button class="chip">共享给我的</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <div class="ring">
+                <svg viewBox="0 0 52 52">
+                  <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0ea5e9"/>
+                  </linearGradient></defs>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                          stroke-dasharray="103.6 138.2" transform="rotate(-90 26 26)"/>
+                </svg>
+              </div>
+              <div class="ring-val">75%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">测试 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">冒烟测试与演示用库，用于验证解析、切片与召回链路。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">12 文件 · 9 可问答 · 2026/9/28</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <div class="ring">
+                <svg viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                          stroke-dasharray="138.2 138.2" transform="rotate(-90 26 26)"/>
+                </svg>
+              </div>
+              <div class="ring-val">100%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">产品知识库 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">产品手册、FAQ、版本发布说明与接口文档，面向售前与客服团队。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">24 文件 · 24 可问答 · 2026/9/30</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <div class="ring">
+                <svg viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                          stroke-dasharray="84.4 138.2" transform="rotate(-90 26 26)"/>
+                </svg>
+              </div>
+              <div class="ring-val">61%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">研发技术库 <span class="st warn"><i></i>解析中</span></div>
+              <div class="kb-desc">架构设计、评审记录与排障手册，团队共享，按周同步更新。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">18 文件 · 11 可问答 · 2026/10/2</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <div class="ring">
+                <svg viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                          stroke-dasharray="138.2 138.2" transform="rotate(-90 26 26)"/>
+                </svg>
+              </div>
+              <div class="ring-val">100%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">合同文档库 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">标准合同模板、用印规范与审批流程说明，仅授权成员可读。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">6 文件 · 6 可问答 · 2026/8/12</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 次级内容带：最近文档 -->
+      <section style="margin: 16px 10px 10px; padding: 16px 20px 10px; border-radius: 18px;
+        background: linear-gradient(180deg, rgba(129,140,248,.075), rgba(255,255,255,.008) 34%), var(--glass);
+        backdrop-filter: blur(18px) saturate(140%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 8px 28px rgba(0,0,0,.28);">
+        <div style="display:flex; align-items: baseline; gap: 12px; margin-bottom: 8px;">
+          <span style="font-size: 13.5px; font-weight: 700;">最近文档</span>
+          <span style="color: var(--ink-3); font-size: 11.5px;">全部知识库 · 按上传时间</span>
+          <span style="margin-left: auto; color: var(--ink-3); font-size: 12px;">查看全部 →</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding: 9px 2px; font-size: 12.5px;">
+          <span style="width:28px; height:28px; border-radius:8px; display:grid; place-items:center; font-size:10.5px; font-weight:700;
+            color:#cde7ff; background: rgba(56,189,248,.12); box-shadow: inset 0 0 0 1px rgba(56,189,248,.2);">PDF</span>
+          <span style="font-weight:600;">产品手册 v3.2.pdf</span>
+          <span style="color: var(--ink-3); font-size: 11.5px;">产品知识库</span>
+          <span class="st ok"><i></i>可问答</span>
+          <span style="margin-left:auto; color: var(--ink-3); font-size: 11.5px;">24 切片 · 今天 09:41</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding: 9px 2px; font-size: 12.5px; border-top: 1px solid rgba(255,255,255,.05);">
+          <span style="width:28px; height:28px; border-radius:8px; display:grid; place-items:center; font-size:10.5px; font-weight:700;
+            color:#cde7ff; background: rgba(56,189,248,.12); box-shadow: inset 0 0 0 1px rgba(56,189,248,.2);">DOC</span>
+          <span style="font-weight:600;">架构评审纪要-第 14 次.docx</span>
+          <span style="color: var(--ink-3); font-size: 11.5px;">研发技术库</span>
+          <span class="st warn"><i></i>解析中</span>
+          <span style="margin-left:auto; color: var(--ink-3); font-size: 11.5px;">处理 62% · 今天 10:12</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

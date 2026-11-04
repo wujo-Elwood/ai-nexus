@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.FeedbackMapper">
+
+    <insert id="insert" parameterType="com.rag.entity.Feedback" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_feedback (message_id, helpful, source, create_time)
+        VALUES (#{messageId}, #{helpful}, #{source}, NOW())
+    </insert>
+
+    <delete id="deleteByMessageAndSource">
+        DELETE FROM ai_feedback WHERE message_id = #{messageId} AND source = #{source}
+    </delete>
+
+    <!-- 仅删除当前用户自己聊天消息上的 CHAT 反馈 -->
+    <delete id="deleteChatFeedbackForUser">
+        DELETE FROM ai_feedback
+        WHERE message_id = #{messageId}
+          AND source = 'CHAT'
+          AND EXISTS (
+              SELECT 1
+              FROM ai_chat_message m
+              WHERE m.id = ai_feedback.message_id
+                AND m.user_id = #{userId}
+                AND m.role = 'assistant'
+          )
+    </delete>
+
+    <!-- 仅为当前用户自己的助手消息新增 CHAT 反馈 -->
+    <insert id="insertChatFeedbackForUser">
+        INSERT INTO ai_feedback (message_id, helpful, source, create_time)
+        SELECT #{feedback.messageId}, #{feedback.helpful}, 'CHAT', NOW()
+        FROM ai_chat_message m
+        WHERE m.id = #{feedback.messageId}
+          AND m.user_id = #{userId}
+          AND m.role = 'assistant'
+    </insert>
+
+    <!-- 当前用户 AI 聊天会话内全部消息的反馈状态 -->
+    <select id="findByChatSessionId" resultType="com.rag.entity.Feedback">
+        SELECT f.message_id AS messageId,
+               f.helpful,
+               f.source
+        FROM ai_feedback f
+        INNER JOIN ai_chat_message m ON m.id = f.message_id
+        WHERE m.session_id = #{sessionId}
+          AND m.user_id = #{userId}
+          AND f.source = 'CHAT'
+    </select>
+
+    <!-- 智能体会话内全部消息的反馈状态 -->
+    <select id="findByAgentConversationId" resultType="com.rag.entity.Feedback">
+        SELECT f.message_id AS messageId,
+               f.helpful,
+               f.source
+        FROM ai_feedback f
+        INNER JOIN agent_conversation_message m ON m.id = f.message_id
+        WHERE m.conversation_id = #{conversationId}
+          AND f.source = 'AGENT'
+    </select>
+</mapper>

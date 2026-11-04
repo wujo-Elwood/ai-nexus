@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 文档抽取（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a class="active" href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://EXTRACT//BATCH-2601</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>文档抽取</h1>
+            <div class="desc">上传合同与单据，按模板抽取字段，人工校正后导出</div>
+          </div>
+          
+        </div>
+      </div>
+      <div class="readouts"><div class="readout"><div class="val">12</div><div class="lab">文档</div></div><div class="readout"><div class="val">86</div><div class="lab">字段</div></div><div class="readout"><div class="val">96%</div><div class="lab">平均置信度</div></div></div>
+      
+      <div style="display:flex;gap:0;margin-bottom:26px;font-family:var(--mono);font-size:12px;">
+        <span style="color:var(--text-3);padding:6px 18px;border-bottom:1px solid var(--divider);">1 模板 ✓</span>
+        <span style="color:var(--text-3);padding:6px 18px;border-bottom:1px solid var(--divider);">2 上传 ✓</span>
+        <span style="color:var(--primary-hi);padding:6px 18px;border-bottom:2px solid var(--primary);">3 校正</span>
+        <span style="color:var(--text-3);padding:6px 18px;border-bottom:1px solid var(--divider);">4 导出</span>
+      </div>
+      <div class="toolbar"><h1 style="font-size:16px;font-weight:600;">校正 · 采购合同批次</h1><div class="spacer"></div>
+        <button class="btn-primary">导出 Excel</button></div>
+      <div class="hud-list">
+        <div class="hud-row">
+          <span class="idx"><b>01</b></span>
+          <div class="row-main"><div class="row-name">采购合同-HT-2601.pdf</div>
+          <div class="row-desc">12 个字段已抽取 · 平均置信度 96%</div></div>
+          <span class="st ok"><span class="dot ok"></span>待人工确认</span>
+          <a class="row-cta" href="#">进入校正 →</a>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>02</b></span>
+          <div class="row-main"><div class="row-name">采购合同-HT-2602.pdf</div>
+          <div class="row-desc">12 个字段已抽取 · 金额字段置信度偏低 71%</div></div>
+          <span class="st warn"><span class="dot warn"></span>需复核</span>
+          <a class="row-cta" href="#">进入校正 →</a>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>03</b></span>
+          <div class="row-main"><div class="row-name">采购合同-HT-2603.pdf</div>
+          <div class="row-desc">12 个字段已抽取 · 平均置信度 94%</div></div>
+          <span class="st ok"><span class="dot ok"></span>待人工确认</span>
+          <a class="row-cta" href="#">进入校正 →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

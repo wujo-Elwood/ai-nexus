@@ -1,0 +1,296 @@
+/* =====================================================================
+   AI Nexus · 「星图年鉴 STAR ATLAS」样机共享样式 v3
+   设计文档：docs/新版页面UI设计文档-v3.md
+   语法：无卡片 · 无渐变 · 无发光 —— 通栏横线 + 编号索引 + 目录点线 + 衬线大字
+   ===================================================================== */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
+body {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #ece9e1;
+  background: #02030a;
+  min-width: 1280px;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.7;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+::selection { color: #140503; background: #ff6b57; }
+
+.mono { font-family: "JetBrains Mono", Consolas, monospace; }
+.serif { font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif; }
+
+/* ---------- 星空背景（与现网 cosmic-background 同源，静态化） ---------- */
+.cosmos {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  background:
+    radial-gradient(ellipse 42% 34% at 72% 18%, rgba(48, 73, 139, 0.18), transparent 66%),
+    radial-gradient(ellipse 34% 28% at 22% 78%, rgba(229, 160, 68, 0.05), transparent 62%),
+    radial-gradient(ellipse 86% 70% at 50% 52%, rgba(12, 20, 48, 0.42), transparent 76%),
+    linear-gradient(180deg, #050711 0%, #02030a 52%, #000105 100%);
+}
+.cosmos::before {
+  content: ""; position: absolute; inset: -20%; opacity: .28; filter: blur(34px);
+  background:
+    radial-gradient(ellipse at 34% 28%, rgba(73, 102, 190, 0.18), transparent 26%),
+    radial-gradient(ellipse at 72% 62%, rgba(229, 160, 68, 0.08), transparent 22%);
+  animation: nebula 34s ease-in-out infinite alternate;
+}
+@keyframes nebula {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+  to { transform: translate3d(1.5%, 1%, 0) scale(1.05); }
+}
+.stars { position: absolute; inset: 0; background-repeat: repeat; opacity: .72; }
+.stars.far {
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,.85) 0 .8px, transparent 1.2px),
+    radial-gradient(circle, rgba(156,192,255,.6) 0 .9px, transparent 1.3px);
+  background-position: 0 0, 44px 58px;
+  background-size: 58px 54px, 104px 94px;
+  animation: drift 120s linear infinite;
+}
+.stars.mid {
+  background-image: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px);
+  background-position: 20px 26px; background-size: 130px 118px;
+  animation: drift 95s linear infinite;
+}
+.stars.near {
+  background-image: radial-gradient(circle, rgba(236,233,225,.85) 0 1.3px, transparent 2px);
+  background-position: 34px 44px; background-size: 230px 210px;
+  animation: drift 75s linear infinite;
+}
+@keyframes drift { to { transform: translate3d(34px, 22px, 0); } }
+
+/* ---------- 令牌 ---------- */
+:root {
+  --ink-1: #ece9e1;
+  --ink-2: #9a9890;
+  --ink-3: #5d5b55;
+  --signal: #ff6b57;
+  --signal-soft: rgba(255, 107, 87, 0.12);
+  --rule: rgba(236, 233, 225, 0.10);
+  --rule-strong: rgba(236, 233, 225, 0.22);
+  --row-hover: rgba(236, 233, 225, 0.04);
+  --motion: cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+/* ---------- 页框 ---------- */
+/* 图版底：内容列下垫一层深色「印刷图版」区，让星点退后、排印精确；通栏直边，非浮层 */
+.sheet {
+  position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 40px 72px; min-height: 100vh;
+  background: rgba(2, 3, 10, 0.45);
+  box-shadow: 0 0 0 100vmax rgba(2, 3, 10, 0.45);
+  clip-path: inset(0 -100vmax);
+}
+
+/* ---------- 页眉：编号横排索引 ---------- */
+.masthead-nav {
+  display: flex; align-items: baseline; gap: 24px;
+  padding: 22px 0 16px; border-bottom: 1px solid var(--rule);
+  animation: fadein .24s var(--motion) both;
+}
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.brand { font-size: 13px; font-weight: 700; letter-spacing: .06em; margin-right: 6px; line-height: 1.3; }
+.brand small { display: block; color: var(--ink-3); font-size: 9px; letter-spacing: .34em; margin-top: 1px; }
+.nav-i { display: inline-flex; align-items: baseline; gap: 6px; color: var(--ink-2); font-size: 13px; padding: 2px 0; position: relative; white-space: nowrap; }
+.nav-i i { font-style: normal; font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; color: var(--ink-3); }
+.nav-i:hover { color: var(--ink-1); }
+.nav-i.on { color: var(--ink-1); }
+.nav-i.on i { color: var(--signal); }
+.nav-i.on::after { content: ""; position: absolute; left: 0; bottom: -17px; width: 100%; height: 2px; background: var(--signal); }
+.masthead-nav .coords {
+  margin-left: auto; color: var(--ink-3);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px; letter-spacing: .12em; white-space: nowrap;
+}
+.masthead-nav .coords b { color: var(--ink-2); font-weight: 500; }
+
+/* ---------- 图幅头 ---------- */
+.plate-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding: 34px 0 22px; }
+.kicker { color: var(--signal); font-size: 10px; letter-spacing: .4em; font-family: "JetBrains Mono", Consolas, monospace; margin-bottom: 12px; }
+h1 { font-size: 34px; font-weight: 700; letter-spacing: .02em; line-height: 1.15; }
+.plate-desc { margin-top: 8px; color: var(--ink-2); font-size: 13px; }
+.plate-side { text-align: right; flex: 0 0 auto; }
+.plate-readout {
+  color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px; line-height: 2; letter-spacing: .08em; white-space: nowrap;
+}
+.plate-readout b { color: var(--ink-1); font-weight: 500; font-size: 15px; margin-left: 5px; }
+.plate-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+
+.rule { height: 1px; background: var(--rule-strong); }
+
+/* 重建读数行：细线 + mono */
+.rebuild { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--ink-3); font-size: 11px; }
+.rebuild .line { position: relative; flex: 1; height: 1px; background: var(--rule); }
+.rebuild .line i { position: absolute; left: 0; top: -0.5px; height: 2px; background: var(--ink-1); }
+.rebuild .mono { color: var(--ink-2); letter-spacing: .06em; }
+
+/* ---------- 目录表原语 ---------- */
+.toc-head { display: flex; align-items: baseline; padding: 26px 0 10px; }
+.toc-head .cap { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+.toc-head .filters { margin-left: auto; display: flex; gap: 20px; }
+.toc-head .filters a { color: var(--ink-2); font-size: 12px; padding-bottom: 2px; }
+.toc-head .filters a.on { color: var(--ink-1); border-bottom: 1px solid var(--signal); }
+.toc-head .filters a:hover { color: var(--ink-1); }
+
+.entry {
+  position: relative; display: flex; align-items: baseline; gap: 18px;
+  padding: 22px 0 20px; border-bottom: 1px solid var(--rule);
+  transition: background .15s var(--motion);
+}
+.entry:hover { background: var(--row-hover); }
+.e-no { width: 34px; flex: 0 0 auto; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; }
+.e-main { flex: 0 1 auto; min-width: 0; }
+.e-name { font-size: 21px; font-weight: 700; letter-spacing: .01em; display: flex; align-items: baseline; gap: 14px; }
+.e-name:hover { cursor: pointer; }
+.e-name:hover .nm { color: #fff; }
+.e-desc { margin-top: 6px; color: var(--ink-2); font-size: 12.5px; max-width: 560px; line-height: 1.7; }
+
+/* 状态词：仅形状符号，不引入彩色；告警才用朱砂 */
+.st { color: var(--ink-3); font-size: 11px; letter-spacing: .1em; white-space: nowrap; }
+.st::before { content: "●"; font-size: 8px; margin-right: 7px; vertical-align: 2px; }
+.st.busy::before { content: "◐"; font-size: 11px; }
+.st.busy { color: var(--ink-2); }
+.st.bad::before { content: "×"; font-size: 12px; font-weight: 700; }
+.st.bad { color: var(--signal); }
+
+/* 点线引导 */
+.leaders { flex: 1; min-width: 40px; border-bottom: 1px dotted rgba(236,233,225,.32); transform: translateY(-4px); }
+
+/* 读数 */
+.e-readout {
+  flex: 0 0 auto; text-align: right; color: var(--ink-3);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px; line-height: 1.9; letter-spacing: .06em; white-space: nowrap;
+}
+.e-readout b { color: var(--ink-1); font-weight: 500; }
+
+/* 行内动作 */
+.e-act { flex: 0 0 auto; display: flex; gap: 14px; align-items: baseline; }
+.e-act a { color: var(--ink-2); font-size: 12.5px; border-bottom: 1px solid transparent; padding-bottom: 2px; white-space: nowrap; }
+.e-act a:hover { color: var(--ink-1); border-bottom-color: var(--rule-strong); }
+.e-act a.go { color: var(--ink-1); }
+.e-act a.go:hover { color: var(--signal); border-bottom-color: var(--signal); }
+
+/* ---------- 按钮：方角 ---------- */
+.btn {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 20px;
+  border: 1px solid var(--rule-strong); color: var(--ink-1);
+  font-size: 12.5px; background: none; letter-spacing: .04em;
+  transition: border-color .15s var(--motion), background .15s var(--motion), color .15s var(--motion);
+}
+.btn:hover { border-color: var(--ink-2); }
+.btn-signal { background: var(--signal); border-color: var(--signal); color: #140503; font-weight: 700; }
+.btn-signal:hover { background: #ff8471; border-color: #ff8471; color: #140503; }
+
+/* ---------- 通用小件 ---------- */
+.cap-label { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+.mono-num { font-family: "JetBrains Mono", Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+/* 图版脚注：每页统一的收底（收束横线 + 图版编号 + 条目数） */
+.plate-foot {
+  display: flex; align-items: baseline; gap: 22px;
+  margin-top: 40px; padding: 12px 0 0; border-top: 1px solid var(--rule-strong);
+  color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px; letter-spacing: .18em;
+}
+.plate-foot .right { margin-left: auto; }
+
+/* =====================================================================
+   扩展原语：行式表单 / 目录表 / 状态词 / 细线条形 / 步骤日志 / 文字开关
+   ===================================================================== */
+
+/* 行式表单：标签左 · 控件右 · 横线分行（无卡片表单） */
+.form-line {
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 0; border-bottom: 1px solid var(--rule);
+}
+.form-line > label { flex: 0 0 168px; color: var(--ink-2); font-size: 12.5px; }
+.form-line > label small { display: block; color: var(--ink-3); font-size: 10.5px; margin-top: 1px; }
+.form-line .fld { flex: 1; display: flex; align-items: center; gap: 12px; }
+.form-line input[type="text"], .form-line input[type="password"], .form-line input[type="number"],
+.form-line input[type="url"], .form-line textarea, .form-line select {
+  flex: 1; background: rgba(236, 233, 225, 0.04); border: 1px solid var(--rule);
+  outline: none; color: var(--ink-1); font-family: inherit; font-size: 13px;
+  padding: 8px 12px; border-radius: 0;
+  transition: border-color .15s var(--motion);
+}
+.form-line textarea { resize: vertical; min-height: 76px; line-height: 1.7; }
+.form-line input:focus, .form-line textarea:focus, .form-line select:focus { border-color: var(--rule-strong); }
+.form-line input::placeholder, .form-line textarea::placeholder { color: var(--ink-3); }
+.form-line .hint { color: var(--ink-3); font-size: 11px; }
+
+/* 目录表（多列数据，无底色容器） */
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--rule-strong);
+  color: var(--ink-3); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .22em; font-family: "JetBrains Mono", Consolas, monospace; white-space: nowrap;
+}
+.table td { padding: 12px 10px; border-bottom: 1px solid rgba(236, 233, 225, 0.06); font-size: 13px; vertical-align: baseline; }
+.table tr:hover td { background: var(--row-hover); }
+.table .num { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.table .op a { color: var(--ink-2); font-size: 12px; margin-right: 12px; white-space: nowrap; }
+.table .op a:hover { color: var(--ink-1); border-bottom: 1px solid var(--rule-strong); }
+.table .op a.go { color: var(--ink-1); }
+.table .op a.go:hover { color: var(--signal); border-bottom-color: var(--signal); }
+.table .op a.danger:hover { color: var(--signal); border-bottom-color: var(--signal); }
+
+/* 文字开关：[ON] / [OFF] mono 词 */
+.sw { font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; letter-spacing: .1em; color: var(--ink-1); white-space: nowrap; }
+.sw.off { color: var(--ink-3); }
+.sw.sig { color: var(--signal); }
+
+/* 细线条形（进度/用量，非图表卡） */
+.linebar { position: relative; height: 3px; background: rgba(236, 233, 225, 0.08); min-width: 90px; align-self: center; }
+.linebar i { position: absolute; left: 0; top: 0; height: 100%; background: var(--ink-1); }
+.linebar.sig i { background: var(--signal); }
+
+/* 步骤日志（工具调用过程，航行日志语法） */
+.steps { margin: 10px 0 4px; padding: 10px 0 4px; border-top: 1px solid var(--rule); }
+.steps .cap { margin-bottom: 6px; }
+.steps .ln { display: flex; gap: 14px; align-items: baseline; padding: 4px 0; color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; letter-spacing: .03em; }
+.steps .ln .no { color: var(--ink-3); flex: 0 0 44px; }
+.steps .ln .ok { color: var(--ink-1); }
+.steps .ln .ms { margin-left: auto; color: var(--ink-3); }
+
+/* 虚线上传条（通栏，非卡片） */
+.ghost-upload {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 26px 20px; border: 1px dashed var(--rule-strong);
+  color: var(--ink-2); font-size: 13px; text-align: center;
+  transition: border-color .15s var(--motion), color .15s var(--motion);
+}
+.ghost-upload:hover { border-color: var(--ink-2); color: var(--ink-1); }
+.ghost-upload .plus { color: var(--ink-1); font-size: 18px; }
+
+/* 双栏图版布局（左主栏 + 右窄栏，横线中缝） */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 44px; align-items: start; }
+.cols > .aside { border-left: 1px solid var(--rule); padding-left: 32px; }
+
+/* 分节标题（页内小节） */
+.sec { display: flex; align-items: baseline; gap: 16px; padding: 30px 0 12px; }
+.sec .cap { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+.sec .t { font-size: 17px; font-weight: 700; }
+.sec .more { margin-left: auto; color: var(--ink-2); font-size: 12px; }
+.sec .more:hover { color: var(--ink-1); }
+
+/* 文字 Tab（权限管理三段等） */
+.tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--rule-strong); }
+.tabs a { color: var(--ink-2); font-size: 13.5px; padding: 8px 2px 10px; position: relative; }
+.tabs a:hover { color: var(--ink-1); }
+.tabs a.on { color: var(--ink-1); }
+.tabs a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--signal); }
+
+/* 通栏读数总列（无卡片的数字行，四栏以细竖线分隔） */
+.ledger { display: flex; padding: 20px 0 18px; }
+.ledger .cell { flex: 1; }
+.ledger .cell + .cell { border-left: 1px solid var(--rule); padding-left: 30px; }
+.ledger .k { color: var(--ink-3); font-size: 10px; letter-spacing: .3em; font-family: "JetBrains Mono", Consolas, monospace; }
+.ledger .v { margin-top: 10px; color: var(--ink-1); font-family: "JetBrains Mono", Consolas, monospace; font-size: 34px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1.1; }
+.ledger .v small { font-size: 16px; color: var(--ink-3); margin-left: 4px; letter-spacing: .02em; }
+.ledger .delta { margin-top: 6px; color: var(--ink-2); font-size: 11px; font-family: "JetBrains Mono", Consolas, monospace; }

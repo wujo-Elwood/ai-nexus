@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>数据分析 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  .work { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 0; height: calc(100vh - 128px); }
+  .sheet.workpad { padding-bottom: 0; }
+  /* 左：表格索引 */
+  .tbl-idx { border-right: 1px solid var(--rule); padding: 24px 26px 24px 0; display: flex; flex-direction: column; overflow: hidden; }
+  .tbl-idx .ghost-upload { padding: 18px 14px; font-size: 12px; }
+  .sheet-meta { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .sheet-meta .cap { display: block; margin-bottom: 6px; }
+  .sheet-meta .cols-def { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; line-height: 2; letter-spacing: .04em; }
+  /* 右：手稿区（复用 chat 语法） */
+  .manuscript { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-left: 34px; }
+  .ms-head { display: flex; align-items: flex-end; justify-content: space-between; padding: 24px 0 14px; border-bottom: 1px solid var(--rule); }
+  .ms-head .t { font-size: 17px; font-weight: 700; }
+  .ms-head .m { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; letter-spacing: .12em; }
+  .ms-scroll { flex: 1; overflow-y: auto; padding: 24px 0 10px; scrollbar-width: none; }
+  .ms-scroll::-webkit-scrollbar { display: none; }
+  .u-line { position: relative; padding-left: 18px; margin: 0 0 26px; }
+  .u-line::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; background: var(--signal); }
+  .u-line .who { color: var(--ink-3); font-size: 10px; letter-spacing: .2em; font-family: "JetBrains Mono", Consolas, monospace; display: block; margin-bottom: 5px; }
+  .u-line .txt { font-size: 14.5px; line-height: 1.75; }
+  .a-line { margin: 0 0 30px; }
+  .a-line .who { color: var(--ink-3); font-size: 10px; letter-spacing: .2em; font-family: "JetBrains Mono", Consolas, monospace; display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .a-line .txt { font-size: 14px; line-height: 1.85; }
+  .result-table { width: 100%; border-collapse: collapse; margin: 12px 0 6px; }
+  .result-table th { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule-strong); color: var(--ink-3); font-size: 9.5px; letter-spacing: .2em; font-family: "JetBrains Mono", Consolas, monospace; }
+  .result-table td { padding: 8px 10px; border-bottom: 1px solid rgba(236,233,225,.06); font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; color: var(--ink-1); }
+  .result-table td.r { text-align: right; }
+  .steps { margin: 10px 0 4px; padding: 10px 0 4px; border-top: 1px solid var(--rule); }
+  .steps .ln { display: flex; gap: 14px; align-items: baseline; padding: 4px 0; color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; }
+  .steps .ln .no { color: var(--ink-3); flex: 0 0 44px; }
+  .steps .ln .ms { margin-left: auto; color: var(--ink-3); }
+  .ms-input { border-top: 1px solid var(--rule-strong); padding: 14px 0 22px; }
+  .ms-input .row { display: flex; align-items: center; gap: 16px; }
+  .ms-input input { flex: 1; background: none; border: 0; outline: none; color: var(--ink-1); font-size: 14px; font-family: inherit; padding: 8px 0; }
+  .ms-input input::placeholder { color: var(--ink-3); }
+  .ms-input .send { color: var(--ink-3); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet workpad" style="height:100vh; display:flex; flex-direction:column;">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i on" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <div class="work">
+      <!-- 表格索引 -->
+      <aside class="tbl-idx">
+        <span class="cap-label cap">已上传表格 · 02</span>
+        <div style="height:10px"></div>
+        <div class="idx-item on" style="border-bottom:1px solid rgba(236,233,225,.05); display:flex; align-items:baseline; gap:10px; padding:10px 0; color:var(--ink-1); font-size:13px;"><span class="mono" style="font-size:10px; color:var(--signal);">01</span><span style="flex:1;">退货订单-2026Q3.xlsx</span><span class="mono" style="font-size:9.5px; color:var(--ink-3);">18,204 行</span></div>
+        <div class="idx-item" style="border-bottom:1px solid rgba(236,233,225,.05); display:flex; align-items:baseline; gap:10px; padding:10px 0; color:var(--ink-2); font-size:13px;"><span class="mono" style="font-size:10px; color:var(--ink-3);">02</span><span style="flex:1;">用户增长月度.xlsx</span><span class="mono" style="font-size:9.5px; color:var(--ink-3);">6,880 行</span></div>
+        <div class="ghost-upload" style="margin-top:16px;">＋ 拖入 .xlsx<br><span style="font-size:11px; color:var(--ink-3);">首行为列名 · 最多 10 万行</span></div>
+
+        <div class="sheet-meta">
+          <span class="cap-label cap">表结构 · 退货订单-2026Q3</span>
+          <div class="cols-def">
+            order_id &nbsp;STRING<br>
+            sku &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STRING<br>
+            amount &nbsp;&nbsp;&nbsp;DECIMAL<br>
+            refund_at &nbsp;DATETIME<br>
+            reason &nbsp;&nbsp;&nbsp;STRING<br>
+            channel &nbsp;&nbsp;STRING
+          </div>
+        </div>
+      </aside>
+
+      <!-- 手稿 -->
+      <main class="manuscript">
+        <div class="ms-head">
+          <div>
+            <div class="kicker" style="margin-bottom:6px;">PLATE VI — DATA ANALYSIS · 手稿</div>
+            <span class="t">数据分析</span>
+          </div>
+          <span class="m">表：退货订单-2026Q3 · 智能体 数据问答 · 导出 <a href="#" style="color:var(--ink-2)">Excel</a> / <a href="#" style="color:var(--ink-2)">CSV</a></span>
+        </div>
+
+        <div class="ms-scroll">
+          <div class="u-line">
+            <span class="who">Q · 21:40</span>
+            <div class="txt">上个月退货率最高的三个 SKU 是哪些？各占多少？</div>
+          </div>
+
+          <div class="a-line">
+            <span class="who">A · 数据问答智能体<span style="letter-spacing:.06em;">3 步 · 4.1s</span></span>
+            <div class="txt">9 月退货集中在 3 个 SKU，合计占全部退货金额的 <strong>61.3%</strong>：</div>
+            <table class="result-table">
+              <thead><tr><th>SKU</th><th>退货件数</th><th style="text-align:right">退货金额</th><th style="text-align:right">占比</th></tr></thead>
+              <tbody>
+                <tr><td>AP-2204 无线耳机</td><td>412</td><td class="r">¥ 86,520.00</td><td class="r">28.4%</td></tr>
+                <tr><td>KB-1181 机械键盘</td><td>351</td><td class="r">¥ 63,180.00</td><td class="r">20.8%</td></tr>
+                <tr><td>MS-0730 显示器支架</td><td>289</td><td class="r">¥ 36,860.00</td><td class="r">12.1%</td></tr>
+              </tbody>
+            </table>
+            <div class="steps">
+              <span class="cap-label cap">执行过程 · 3 STEPS（服务端确定性计算）</span>
+              <div class="ln"><span class="no">STEP 1</span><span>list_tables()</span><span class="ms">OK · 88ms</span></div>
+              <div class="ln"><span class="no">STEP 2</span><span>describe_table(退货订单-2026Q3)</span><span class="ms">OK · 96ms</span></div>
+              <div class="ln"><span class="no">STEP 3</span><span>sql_query(SELECT sku, COUNT, SUM ... GROUP BY sku ORDER BY SUM DESC LIMIT 3)</span><span class="ok">→ 3 rows</span><span class="ms">OK · 1.2s</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ms-input">
+          <div class="row">
+            <input placeholder="用自然语言查数，Enter 发送" />
+            <a class="send" href="#">发送 ⏎</a>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

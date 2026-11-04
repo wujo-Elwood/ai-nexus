@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.agent.mapper.AgentInfoMapper">
+
+    <sql id="baseColumns">
+        id,
+        agent_code AS agentCode,
+        agent_name AS agentName,
+        description,
+        scene,
+        system_prompt AS systemPrompt,
+        enabled,
+        built_in AS builtIn,
+        sort_no AS sortNo,
+        create_user AS createUser,
+        create_time AS createTime,
+        update_time AS updateTime
+    </sql>
+
+    <select id="findAll" resultType="com.rag.agent.entity.AgentInfo">
+        SELECT <include refid="baseColumns"/>
+        FROM agent_info
+        ORDER BY sort_no, id
+    </select>
+
+    <select id="findAllEnabled" resultType="com.rag.agent.entity.AgentInfo">
+        SELECT <include refid="baseColumns"/>
+        FROM agent_info
+        WHERE enabled = 1
+        ORDER BY sort_no, id
+    </select>
+
+    <select id="findByCode" resultType="com.rag.agent.entity.AgentInfo">
+        SELECT <include refid="baseColumns"/>
+        FROM agent_info
+        WHERE agent_code = #{agentCode}
+    </select>
+
+    <select id="findPromptByCode" resultType="string">
+        SELECT system_prompt FROM agent_info WHERE agent_code = #{agentCode}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO agent_info (agent_code, agent_name, description, scene, system_prompt, enabled, built_in, sort_no, create_user)
+        VALUES (#{agentCode}, #{agentName}, #{description}, #{scene}, #{systemPrompt},
+                #{enabled}, #{builtIn}, #{sortNo}, #{createUser})
+    </insert>
+
+    <update id="update">
+        UPDATE agent_info
+        SET agent_name = #{agentName},
+            description = #{description},
+            scene = #{scene},
+            system_prompt = #{systemPrompt}
+        WHERE agent_code = #{agentCode}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE agent_info SET enabled = #{enabled} WHERE agent_code = #{agentCode}
+    </update>
+
+    <delete id="deleteByCode">
+        DELETE FROM agent_info WHERE agent_code = #{agentCode}
+    </delete>
+</mapper>
