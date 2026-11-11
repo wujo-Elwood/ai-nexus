@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>知识缺口 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  .prio { font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; letter-spacing: .12em; }
+  .prio.high { color: var(--signal); }
+  .prio.mid { color: var(--ink-1); }
+  .prio.low { color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i on" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE VII — KNOWLEDGE GAPS</div>
+        <h1 class="serif">知识缺口</h1>
+        <p class="plate-desc">聚合拒答、低置信度与负反馈问题，指导下一批资料补充；报告按时间窗自动聚类生成。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          时间窗&nbsp;<a href="#" style="color:var(--ink-1); border-bottom:1px solid var(--signal); padding-bottom:1px;">最近 7 天</a>&nbsp;·&nbsp;<a href="#" style="color:var(--ink-3)">最近 30 天</a>
+        </div>
+        <div class="plate-actions">
+          <a class="btn btn-signal" href="#">立即重新分析</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <!-- 报告状态 + 读数列 -->
+    <div class="rebuild" style="padding:12px 0;">
+      <span class="mono">报告已生成 · 2026 / 10 / 3 06:00</span>
+    </div>
+    <div class="ledger" style="border-top:0; padding-top:0;">
+      <div class="cell"><div class="k">问题样本</div><div class="v">46</div><div class="delta">拒答 + 低置信 + 负反馈</div></div>
+      <div class="cell"><div class="k">拒答次数</div><div class="v">12</div><div class="delta">多为流程类提问</div></div>
+      <div class="cell"><div class="k">低置信度</div><div class="v">21</div><div class="delta">置信度 &lt; 60%</div></div>
+      <div class="cell"><div class="k">无帮助反馈</div><div class="v">13</div><div class="delta">用户点踩</div></div>
+    </div>
+
+    <!-- 缺口主题目录 -->
+    <div class="toc-head"><span class="cap">CLUSTERS · 03 TOPICS</span></div>
+    <table class="table">
+      <thead><tr><th style="width:44px">NO.</th><th style="width:190px">主题</th><th style="width:90px">问题数</th><th>代表问题</th><th>建议补充</th><th style="width:90px">优先级</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="num">01</td><td style="font-weight:700">生鲜品类退货时效</td><td class="num">14</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">「生鲜超过 48 小时还能退吗」「冷链商品运费谁承担」</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">补充《生鲜品类售后细则 V2》入库</td>
+          <td><span class="prio high">[HIGH]</span></td>
+        </tr>
+        <tr>
+          <td class="num">02</td><td style="font-weight:700">发票专项开具流程</td><td class="num">9</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">「专票和普票有什么区别」「抬头写错了怎么改」</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">更新 2026 版发票开具说明</td>
+          <td><span class="prio high">[HIGH]</span></td>
+        </tr>
+        <tr>
+          <td class="num">03</td><td style="font-weight:700">企业账户多人协作</td><td class="num">6</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">「子账号怎么开」「成员权限能不能按库分」</td>
+          <td style="color:var(--ink-2); font-size:12.5px;">补写《团队协作使用手册》</td>
+          <td><span class="prio mid">[MID]</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer class="plate-foot">
+      <span>PLATE VII</span>
+      <span>KNOWLEDGE GAPS · 03 CLUSTERS · 46 SAMPLES</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

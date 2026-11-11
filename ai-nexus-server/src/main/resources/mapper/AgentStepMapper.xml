@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.agent.mapper.AgentStepMapper">
+
+    <select id="findByAgent" resultType="com.rag.agent.entity.AgentStep">
+        SELECT id, agent_code, step_no, step_name, step_type, tool_name, args_template, instruction, enabled
+        FROM agent_step
+        WHERE agent_code = #{agentCode}
+        ORDER BY step_no ASC
+    </select>
+
+    <delete id="deleteByAgent">
+        DELETE FROM agent_step WHERE agent_code = #{agentCode}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO agent_step (
+            agent_code, step_no, step_name, step_type, tool_name, args_template, instruction, enabled, create_time
+        ) VALUES
+        <foreach collection="steps" item="step" separator=",">
+            (#{step.agentCode}, #{step.stepNo}, #{step.stepName}, #{step.stepType},
+             #{step.toolName}, #{step.argsTemplate}, #{step.instruction}, #{step.enabled}, NOW())
+        </foreach>
+    </insert>
+
+</mapper>

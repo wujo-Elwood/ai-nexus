@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>RAG 评测 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  .add-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; }
+  .add-row input { flex: 1; background: rgba(236,233,225,.04); border: 1px solid var(--rule); outline: none; color: var(--ink-1); font-family: inherit; font-size: 13px; padding: 9px 12px; border-radius: 0; }
+  .add-row input::placeholder { color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i on" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE VIII — EVALUATION</div>
+        <h1 class="serif">RAG 评测</h1>
+        <p class="plate-desc">维护典型评测问题，批量检查知识库的召回命中与来源命中情况。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          题数<b>12</b>&nbsp;&nbsp;最近召回命中<b>91%</b>&nbsp;&nbsp;来源命中<b>83%</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">选择知识库：测试 ▾</a>
+          <a class="btn btn-signal" href="#">▶ 运行评测</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <!-- 新增评测问题 -->
+    <div class="add-row">
+      <input placeholder="新增评测问题…" />
+      <input placeholder="期望来源文件名，可选" style="max-width:320px;" />
+      <a class="btn" href="#">＋ 添加</a>
+    </div>
+
+    <div class="cols" style="align-items:start; margin-top:10px;">
+      <!-- 评测问题 -->
+      <div>
+        <div class="sec" style="padding-top:16px;"><span class="cap">CASES</span><span class="t">评测问题 · 12</span></div>
+        <table class="table">
+          <thead><tr><th style="width:44px">NO.</th><th>问题</th><th style="width:190px">期望来源</th><th style="width:60px; text-align:right">操作</th></tr></thead>
+          <tbody>
+            <tr><td class="num">01</td><td>平台的退款政策是什么？</td><td style="color:var(--ink-3); font-size:12px;">退款政策说明.pdf</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+            <tr><td class="num">02</td><td>发票抬头写错了怎么修改？</td><td style="color:var(--ink-3); font-size:12px;">发票与结算规范.docx</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+            <tr><td class="num">03</td><td>企业账户如何开子账号？</td><td style="color:var(--ink-3); font-size:12px;">—</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+            <tr><td class="num">04</td><td>接口超时的默认阈值是多少？</td><td style="color:var(--ink-3); font-size:12px;">接口变更清单-0930.md</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+            <tr><td class="num">05</td><td>冷链商品的退货运费由谁承担？</td><td style="color:var(--ink-3); font-size:12px;">—</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+            <tr><td class="num">06</td><td>存储卷空间不足如何扩容？</td><td style="color:var(--ink-3); font-size:12px;">故障排查手册-存储卷.pdf</td><td class="op" style="text-align:right"><a href="#" class="danger">删除</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 运行历史 -->
+      <div class="aside">
+        <div class="sec" style="padding-top:16px;"><span class="cap">RUNS</span><span class="t">运行历史</span></div>
+        <table class="table">
+          <thead><tr><th>时间</th><th style="width:56px">题数</th><th style="width:80px">召回命中</th><th style="width:80px">来源命中</th></tr></thead>
+          <tbody>
+            <tr><td class="num">10/03 06:00</td><td class="num">12</td><td class="num" style="color:var(--ink-1)">11 · 91%</td><td class="num">10 · 83%</td></tr>
+            <tr><td class="num">10/02 06:00</td><td class="num">12</td><td class="num" style="color:var(--ink-1)">10 · 83%</td><td class="num">9 · 75%</td></tr>
+            <tr><td class="num">10/01 06:00</td><td class="num">10</td><td class="num" style="color:var(--ink-1)">9 · 90%</td><td class="num">8 · 80%</td></tr>
+            <tr><td class="num">09/30 06:00</td><td class="num">10</td><td class="num" style="color:var(--ink-1)">8 · 80%</td><td class="num">8 · 80%</td></tr>
+          </tbody>
+        </table>
+        <p class="hint" style="margin-top:12px;">来源命中偏低时优先检查期望来源是否已更新文件名。</p>
+      </div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE VIII</span>
+      <span>EVALUATION · 12 CASES · 04 RUNS</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>知识库 · AI 智能平台</title>
+<link rel="stylesheet" href="aurora.css">
+<style>
+  /* 星环：数据可视化用单色系青（数据语义），不占用极光三处纪律 */
+  .ring-wrap { position: relative; width: 52px; height: 52px; flex: 0 0 auto; }
+  .ring-wrap svg { width: 52px; height: 52px; display: block; filter: drop-shadow(0 0 8px rgba(56,189,248,.3)); animation: breathe 6s ease-in-out infinite; }
+  .ring-val { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 14px; padding: 8px 10px 0;
+  }
+  .grid::-webkit-scrollbar { width: 6px; }
+  .grid::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.12); }
+
+  .kb-card { padding: 18px 18px 16px; }
+  .kb-top { display: flex; gap: 14px; align-items: flex-start; }
+  .kb-main { min-width: 0; flex: 1; }
+  .kb-name { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .kb-desc {
+    margin-top: 4px; color: var(--ink-2); font-size: 12.5px; line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .kb-meta { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .kb-meta .nums { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .kb-actions { display: flex; gap: 8px; opacity: 0; transform: translateY(3px); transition: opacity .18s var(--motion), transform .18s var(--motion); }
+  .kb-card:hover .kb-actions { opacity: 1; transform: none; }
+
+  /* 新建卡片（虚位） */
+  .kb-new {
+    border-radius: var(--r-card); min-height: 148px;
+    display: grid; place-items: center; gap: 6px; align-content: center;
+    color: var(--ink-3); font-size: 13px;
+    background: rgba(255,255,255,.025);
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.09);
+    transition: background .18s var(--motion), box-shadow .18s var(--motion);
+  }
+  .kb-new:hover { background: rgba(255,255,255,.045); box-shadow: inset 0 0 0 1.5px rgba(129,140,248,.4); color: var(--ink-2); }
+  .kb-new .plus { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--glass-2); font-size: 18px; color: var(--ink-1); }
+
+  /* 次级内容带：最近文档（收口首屏，避免死星空） */
+  .recent { margin: 16px 10px 6px; padding: 16px 20px 10px; }
+  .recent .r-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .recent .r-title { font-size: 13.5px; font-weight: 700; }
+  .recent .r-sub { color: var(--ink-3); font-size: 11.5px; }
+  .recent .r-more { margin-left: auto; color: var(--ink-3); font-size: 12px; }
+  .recent .r-more:hover { color: var(--ink-1); }
+  .rrow { display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-top: 1px solid rgba(255,255,255,.05); font-size: 12.5px; }
+  .rrow:first-of-type { border-top: 0; }
+  .rrow .f-ico { width: 28px; height: 28px; flex: 0 0 auto; border-radius: 8px; display: grid; place-items: center;
+    font-size: 10.5px; font-weight: 700; color: #cde7ff;
+    background: rgba(56,189,248,.12); box-shadow: inset 0 0 0 1px rgba(56,189,248,.2); }
+  .rrow .f-name { color: var(--ink-1); font-weight: 600; }
+  .rrow .f-kb { color: var(--ink-3); font-size: 11.5px; }
+  .rrow .f-meta { margin-left: auto; color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .main { overflow-y: auto; }
+  .main::-webkit-scrollbar { width: 6px; }
+  .main::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span>
+  </div>
+
+  <div class="shell">
+    <aside class="dock">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <div class="brand-name">AI 智能平台</div>
+          <div class="brand-sub">AI NEXUS</div>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">核心</div>
+        <a class="nav-item active" href="kb.html"><span class="nav-ico">◈</span>知识库</a>
+        <a class="nav-item" href="chat.html"><span class="nav-ico">✦</span>AI 聊天</a>
+        <a class="nav-item" href="#"><span class="nav-ico">◐</span>AI 生图</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌘</span>文档抽取</a>
+        <a class="nav-item" href="agents.html"><span class="nav-ico">◉</span>智能体</a>
+        <a class="nav-item" href="#"><span class="nav-ico">∿</span>数据分析</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">洞察</div>
+        <a class="nav-item" href="stats.html"><span class="nav-ico">▥</span>用量统计</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌁</span>知识缺口</a>
+        <a class="nav-item" href="#"><span class="nav-ico">✓</span>RAG 评测</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">管理</div>
+        <a class="nav-item" href="#"><span class="nav-ico">✧</span>技能管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">☰</span>任务中心</a>
+        <a class="nav-item" href="#"><span class="nav-ico">▧</span>权限管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⚙</span>模型设置</a>
+        <a class="nav-item" href="#"><span class="nav-ico">❤</span>系统健康</a>
+      </div>
+
+      <div class="dock-foot">
+        <div class="avatar">A</div>
+        <div class="who"><b>Admin</b>admin</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-head">
+        <div class="head-row">
+          <div>
+            <h1>知识库</h1>
+            <div class="head-desc">上传资料自动解析、切片、向量化，提问时按库召回并注明引用。</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost">知识缺口分析</button>
+            <button class="btn btn-primary">＋ 新建知识库</button>
+          </div>
+        </div>
+        <div class="aurora-band"></div>
+        <div class="rebuild">
+          <span>向量重建</span>
+          <span class="bar"><i style="width:66%"></i></span>
+          <span>8 / 12 · 进行中</span>
+        </div>
+      </header>
+
+      <div class="pills">
+        <div class="pill-stat"><b>4</b><span>知识库</span></div>
+        <div class="pill-stat"><b>50</b><span>可问答</span></div>
+        <div class="pill-stat"><b>60</b><span>文件</span><span class="trend">+6 本周</span></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">⌕&nbsp; 搜索知识库…</div>
+        <div class="chips">
+          <button class="chip on">全部</button>
+          <button class="chip">我创建的</button>
+          <button class="chip">共享给我的</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card hoverable kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 52 52">
+                <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0ea5e9"/>
+                </linearGradient></defs>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                        stroke-dasharray="103.6 138.2" transform="rotate(-90 26 26)"/>
+              </svg>
+              <div class="ring-val">75%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">测试 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">冒烟测试与演示用库，用于验证解析、切片与召回链路。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">12 文件 · 9 可问答 · 2026/9/28</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                        stroke-dasharray="138.2 138.2" transform="rotate(-90 26 26)"/>
+              </svg>
+              <div class="ring-val">100%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">产品知识库 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">产品手册、FAQ、版本发布说明与接口文档，面向售前与客服团队。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">24 文件 · 24 可问答 · 2026/9/30</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                        stroke-dasharray="84.4 138.2" transform="rotate(-90 26 26)"/>
+              </svg>
+              <div class="ring-val">61%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">研发技术库 <span class="st warn"><i></i>解析中</span></div>
+              <div class="kb-desc">架构设计、评审记录与排障手册，团队共享，按周同步更新。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">18 文件 · 11 可问答 · 2026/10/2</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable kb-card">
+          <div class="kb-top">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="4"/>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"
+                        stroke-dasharray="138.2 138.2" transform="rotate(-90 26 26)"/>
+              </svg>
+              <div class="ring-val">100%</div>
+            </div>
+            <div class="kb-main">
+              <div class="kb-name">合同文档库 <span class="st ok"><i></i>可问答</span></div>
+              <div class="kb-desc">标准合同模板、用印规范与审批流程说明，仅授权成员可读。</div>
+            </div>
+          </div>
+          <div class="kb-meta">
+            <span class="nums">6 文件 · 6 可问答 · 2026/8/12</span>
+            <div class="kb-actions">
+              <button class="mini-btn">管理文件</button>
+              <button class="mini-btn go">去提问 →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-new">
+          <span class="plus">＋</span>
+          <span>新建知识库</span>
+        </div>
+      </div>
+
+      <!-- 次级内容带：最近文档 -->
+      <section class="panel recent">
+        <div class="r-head">
+          <span class="r-title">最近文档</span>
+          <span class="r-sub">全部知识库 · 按上传时间</span>
+          <a class="r-more" href="#">查看全部 →</a>
+        </div>
+        <div class="rrow">
+          <span class="f-ico">PDF</span>
+          <span class="f-name">产品手册 v3.2.pdf</span>
+          <span class="f-kb">产品知识库</span>
+          <span class="st ok"><i></i>可问答</span>
+          <span class="f-meta">24 切片 · 今天 09:41</span>
+        </div>
+        <div class="rrow">
+          <span class="f-ico">DOC</span>
+          <span class="f-name">架构评审纪要-第 14 次.docx</span>
+          <span class="f-kb">研发技术库</span>
+          <span class="st warn"><i></i>解析中</span>
+          <span class="f-meta">处理 62% · 今天 10:12</span>
+        </div>
+        <div class="rrow">
+          <span class="f-ico">XLS</span>
+          <span class="f-name">退货与结算规则.xlsx</span>
+          <span class="f-kb">测试</span>
+          <span class="st ok"><i></i>可问答</span>
+          <span class="f-meta">9 切片 · 昨天 17:26</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

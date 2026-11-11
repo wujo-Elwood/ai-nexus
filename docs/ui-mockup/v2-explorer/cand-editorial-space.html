@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>C · 编辑部深空 Editorial Space</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #e8eaf0;
+    background: #010208;
+    min-width: 1280px;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+  .serif { font-family: "Noto Serif SC", "Songti SC", SimSun, serif; }
+
+  /* 星空背景（同源静态化，C 里星更暗更远，衬托版面） */
+  .cosmos { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(ellipse 40% 30% at 80% 20%, rgba(28, 40, 78, 0.16), transparent 66%),
+      linear-gradient(180deg, #04050e 0%, #010208 60%, #000004 100%);
+  }
+  .stars, .stars.s2 { position: absolute; inset: 0; background-repeat: repeat; opacity: .55; }
+  .stars {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.8) 0 .8px, transparent 1.2px),
+      radial-gradient(circle, rgba(160,190,255,.55) 0 .9px, transparent 1.3px);
+    background-position: 0 0, 48px 64px;
+    background-size: 64px 58px, 108px 96px;
+    animation: drift 120s linear infinite;
+  }
+  .stars.s2 {
+    background-image: radial-gradient(circle, rgba(255,255,255,.85) 0 1px, transparent 1.5px);
+    background-position: 24px 30px; background-size: 130px 118px;
+    animation: drift 95s linear infinite;
+  }
+  @keyframes drift { to { transform: translate3d(30px, 20px, 0); } }
+
+  :root {
+    --ink: #0d1017;           /* 墨色面板 */
+    --ink-2: #12151f;
+    --hair: rgba(232, 234, 240, 0.14);
+    --t1: #e8eaf0; --t2: #a7adbc; --t3: #6a7181;
+    --ice: #7dd3fc;
+    --motion: cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+
+  /* 顶部极简导航 */
+  .topnav { position: relative; z-index: 2; display: flex; align-items: center; gap: 28px; height: 64px; padding: 0 44px; }
+  .brand { font-family: "Noto Serif SC", serif; font-weight: 700; font-size: 16px; letter-spacing: .06em; }
+  .brand small { color: var(--t3); font-family: "Noto Sans SC", sans-serif; font-weight: 400; font-size: 11px; letter-spacing: .3em; margin-left: 12px; }
+  .navlinks { display: flex; gap: 26px; flex: 1; }
+  .nl { color: var(--t2); font-size: 13.5px; text-decoration: none; padding: 6px 0; border-bottom: 1px solid transparent; transition: color .16s var(--motion); }
+  .nl:hover { color: var(--t1); }
+  .nl.on { color: var(--t1); border-bottom-color: var(--ice); }
+  .who { color: var(--t3); font-size: 13px; }
+
+  /* 版心：不对称栅格 */
+  .sheet { position: relative; z-index: 1; max-width: 1160px; margin: 0 auto; padding: 16px 44px 32px; }
+
+  /* 通栏大标题 */
+  .masthead { border-top: 1px solid var(--hair); padding-top: 22px; }
+  .kicker { color: var(--ice); font-size: 11px; letter-spacing: .42em; margin-bottom: 14px; }
+  h1 { font-family: "Noto Serif SC", serif; font-weight: 700; font-size: 46px; line-height: 1.12; letter-spacing: .02em; }
+  .lede { margin-top: 12px; color: var(--t2); font-size: 14px; line-height: 1.8; max-width: 560px; }
+  .mastrow { display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; }
+  .act { display: flex; gap: 12px; }
+  .btn { height: 40px; padding: 0 20px; border: 0; border-radius: 4px; font-size: 13.5px; font-weight: 600; letter-spacing: .04em;
+    transition: background .16s var(--motion); }
+  .btn-ice { color: #04121c; background: var(--ice); }
+  .btn-ice:hover { background: #a5e0fb; }
+  .btn-line { color: var(--t1); background: transparent; box-shadow: inset 0 0 0 1px var(--hair); }
+  .btn-line:hover { background: rgba(255,255,255,.05); }
+
+  /* 读数：衬线大数字，一行横排，细线分隔 */
+  .figures { display: flex; margin-top: 24px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+  .fig { flex: 1; padding: 16px 26px 14px; border-right: 1px solid var(--hair); }
+  .fig:last-child { border-right: 0; }
+  .fig .n { font-family: "Noto Serif SC", serif; font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fig .n em { font-style: normal; font-size: 16px; color: var(--t3); margin-left: 6px; }
+  .fig .l { margin-top: 8px; color: var(--t3); font-size: 11px; letter-spacing: .28em; }
+  .fig .trend { color: #6ee7b7; font-size: 12px; margin-top: 4px; }
+
+  /* 重建状态行 */
+  .rebuild { display: flex; align-items: baseline; gap: 16px; margin-top: 18px; color: var(--t3); font-size: 12px; letter-spacing: .08em; }
+  .rebuild .bar { flex: 1; height: 2px; background: rgba(255,255,255,.08); position: relative; top: -3px; }
+  .rebuild .bar i { position: absolute; left: 0; top: 0; height: 100%; width: 66%; background: var(--ice); }
+
+  /* 不对称双栏列表：宽主栏 + 窄元数据栏 */
+  .list-head { display: flex; align-items: baseline; gap: 18px; margin: 30px 0 4px; }
+  .list-head h2 { font-family: "Noto Serif SC", serif; font-size: 20px; font-weight: 700; }
+  .list-head .cnt { color: var(--t3); font-size: 12px; letter-spacing: .18em; }
+  .list-head .filters { margin-left: auto; display: flex; gap: 18px; }
+  .f { color: var(--t2); font-size: 12.5px; text-decoration: none; }
+  .f.on { color: var(--ice); }
+  .f:hover { color: var(--t1); }
+
+  .entry { display: grid; grid-template-columns: 56px minmax(0, 1fr) 190px 150px; gap: 24px;
+    padding: 20px 0 18px; border-bottom: 1px solid var(--hair); transition: background .16s var(--motion); }
+  .entry:hover { background: rgba(255,255,255,.02); }
+  .e-no { color: var(--t3); font-family: "Noto Serif SC", serif; font-size: 13px; padding-top: 5px; }
+  .e-main { min-width: 0; }
+  .e-name { font-family: "Noto Serif SC", serif; font-size: 20px; font-weight: 700; line-height: 1.3; }
+  .e-name .st { display: inline-block; vertical-align: 4px; margin-left: 12px; font-family: "Noto Sans SC", sans-serif;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--ice); border: 1px solid rgba(125,211,252,.4);
+    border-radius: 3px; padding: 2px 8px; }
+  .e-name .st.warn { color: #fbbf24; border-color: rgba(251,191,36,.4); }
+  .e-desc { margin-top: 7px; color: var(--t2); font-size: 13px; line-height: 1.75; max-width: 520px; }
+  .e-num { padding-top: 6px; }
+  .e-num .big { font-family: "Noto Serif SC", serif; font-size: 26px; font-weight: 700; }
+  .e-num .lab { color: var(--t3); font-size: 11px; letter-spacing: .22em; margin-top: 3px; }
+  .e-act { padding-top: 6px; text-align: right; }
+  .go { display: inline-block; color: var(--ice); font-size: 13px; text-decoration: none; border-bottom: 1px solid rgba(125,211,252,.5);
+    padding-bottom: 3px; transition: color .16s var(--motion), border-color .16s var(--motion); }
+  .go:hover { color: #bae6fd; border-color: #bae6fd; }
+  .e-meta { margin-top: 10px; color: var(--t3); font-size: 11.5px; letter-spacing: .04em; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars"></span><span class="stars s2"></span></div>
+
+  <header class="topnav">
+    <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+    <nav class="navlinks">
+      <a class="nl on" href="#">知识库</a>
+      <a class="nl" href="#">AI 聊天</a>
+      <a class="nl" href="#">AI 生图</a>
+      <a class="nl" href="#">文档抽取</a>
+      <a class="nl" href="#">智能体</a>
+      <a class="nl" href="#">数据分析</a>
+      <a class="nl" href="#">任务中心</a>
+      <a class="nl" href="#">设置</a>
+    </nav>
+    <div class="who">Admin</div>
+  </header>
+
+  <div class="sheet">
+    <section class="masthead">
+      <div class="mastrow">
+        <div>
+          <div class="kicker">KNOWLEDGE BASE</div>
+          <h1>知识库</h1>
+          <p class="lede">上传资料自动解析、切片、向量化；提问时按库召回，回答注明出处。</p>
+        </div>
+        <div class="act">
+          <button class="btn btn-line">知识缺口分析</button>
+          <button class="btn btn-ice">＋ 新建知识库</button>
+        </div>
+      </div>
+
+      <div class="figures">
+        <div class="fig"><div class="n">4<em>个</em></div><div class="l">知识库</div><div class="trend">▲ 全部可用</div></div>
+        <div class="fig"><div class="n">50<em>/ 60</em></div><div class="l">可问答</div></div>
+        <div class="fig"><div class="n">60<em>份</em></div><div class="l">文件</div><div class="trend">▲ 本周 +6</div></div>
+        <div class="fig"><div class="n">96<em>%</em></div><div class="l">平均召回命中</div></div>
+      </div>
+      <div class="rebuild">
+        <span>向量重建</span>
+        <span class="bar"><i></i></span>
+        <span>8 / 12 · 进行中</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="list-head">
+        <h2>藏书目录</h2>
+        <span class="cnt">04 ENTRIES</span>
+        <div class="filters">
+          <a class="f on" href="#">全部</a>
+          <a class="f" href="#">我创建的</a>
+          <a class="f" href="#">共享给我的</a>
+        </div>
+      </div>
+
+      <div class="entry">
+        <div class="e-no">01</div>
+        <div class="e-main">
+          <div class="e-name">测试<span class="st">可问答</span></div>
+          <p class="e-desc">上传资料自动解析、切片、向量化，聊天时按库召回并注明引用。</p>
+          <div class="e-meta">更新于 2026 / 9 / 28 · 12 文件 · 9 可问答</div>
+        </div>
+        <div class="e-num">
+          <div class="big">75<span style="font-size:14px">%</span></div>
+          <div class="lab">就绪度 · 12 文件</div>
+        </div>
+        <div class="e-act"><a class="go" href="#">去提问 →</a></div>
+      </div>
+
+      <div class="entry">
+        <div class="e-no">02</div>
+        <div class="e-main">
+          <div class="e-name">产品知识库<span class="st">可问答</span></div>
+          <p class="e-desc">产品手册、FAQ、版本发布说明与接口文档，面向售前与客服团队。</p>
+          <div class="e-meta">更新于 2026 / 9 / 30 · 24 文件 · 24 可问答</div>
+        </div>
+        <div class="e-num">
+          <div class="big">100<span style="font-size:14px">%</span></div>
+          <div class="lab">就绪度 · 24 文件</div>
+        </div>
+        <div class="e-act"><a class="go" href="#">去提问 →</a></div>
+      </div>
+
+      <div class="entry">
+        <div class="e-no">03</div>
+        <div class="e-main">
+          <div class="e-name">研发技术库<span class="st warn">解析中</span></div>
+          <p class="e-desc">架构设计、评审记录与排障手册，团队共享，按周同步更新。</p>
+          <div class="e-meta">更新于 2026 / 10 / 2 · 18 文件 · 11 可问答</div>
+        </div>
+        <div class="e-num">
+          <div class="big">61<span style="font-size:14px">%</span></div>
+          <div class="lab">就绪度 · 18 文件</div>
+        </div>
+        <div class="e-act"><a class="go" href="#">去提问 →</a></div>
+      </div>
+
+      <div class="entry">
+        <div class="e-no">04</div>
+        <div class="e-main">
+          <div class="e-name">合同文档库<span class="st">可问答</span></div>
+          <p class="e-desc">标准合同模板、用印规范与审批流程说明，仅授权成员可读。</p>
+          <div class="e-meta">更新于 2026 / 8 / 12 · 6 文件 · 6 可问答</div>
+        </div>
+        <div class="e-num">
+          <div class="big">100<span style="font-size:14px">%</span></div>
+          <div class="lab">就绪度 · 6 文件</div>
+        </div>
+        <div class="e-act"><a class="go" href="#">去提问 →</a></div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

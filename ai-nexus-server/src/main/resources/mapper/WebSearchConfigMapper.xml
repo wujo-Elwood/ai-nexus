@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.skill.mapper.WebSearchConfigMapper">
+
+    <select id="findByUserId" resultType="com.rag.skill.entity.WebSearchConfig">
+        SELECT id,
+               user_id AS userId,
+               provider,
+               api_key AS apiKey,
+               base_url AS baseUrl,
+               max_results AS maxResults,
+               create_time AS createTime,
+               update_time AS updateTime
+        FROM web_search_config
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO web_search_config (user_id, provider, api_key, base_url, max_results)
+        VALUES (#{userId}, #{provider}, #{apiKey}, #{baseUrl}, #{maxResults})
+        ON DUPLICATE KEY UPDATE provider = VALUES(provider),
+                                api_key = VALUES(api_key),
+                                base_url = VALUES(base_url),
+                                max_results = VALUES(max_results)
+    </insert>
+
+    <delete id="deleteByUserId">
+        DELETE FROM web_search_config WHERE user_id = #{userId}
+    </delete>
+</mapper>

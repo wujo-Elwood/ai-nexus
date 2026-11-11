@@ -15,6 +15,7 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 ### 知识库与文件管理
 
 - 创建、编辑、删除知识库，支持私有和公开可见范围。
+- 知识库共享授权：创建者可把私有知识库授权给指定用户（或角色/组），分「可阅读」和「可管理」两级；被授权人在列表、问答检索、文件查看中可见可用，移除授权立即生效。
 - 本地磁盘存储，上传文件、预览、下载、删除和重新处理。
 - 普通上传和大文件分片上传；支持断点续传、进度查询、暂停后继续、取消和过期分片清理。
 - 文件处理阶段、百分比进度、失败原因、累计尝试次数和定时自动重试。
@@ -24,24 +25,29 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 - 知识库处理策略：切片大小、重叠长度、标题层级切片和表格保留策略。
 - 知识库检索策略：Top K、相似度阈值、向量权重和关键词权重。
 - 知识库统计面板和健康评分，统计空文件、低质量切片、重复文件、重复内容、向量缺失和处理失败。
+- 口径冲突检测：在洞察页一键扫描同一知识库内"说同一件事、数值或期限却不同"的切片（如两版制度里的年假 5 天 / 10 天），列出两侧原文、差异取值与文本相似度，支持确认冲突与忽略；规则法实现，不调用大模型，也不依赖 Qdrant。
 - 知识库 ZIP 导出、备份恢复和重复文件幂等恢复。
 
 ### 文档解析与入库
 
-- 支持 PDF、DOC、DOCX、XLSX、TXT 和 Markdown。
+- 支持 PDF、DOC、DOCX、XLSX、PPT/PPTX、TXT 和 Markdown；PNG/JPG 等图片可独立入库。
 - Apache Tika 负责 PDF、Office 和文本内容提取。
 - Apache POI 将 XLSX 工作表转换为保留行列结构的 Markdown 表格。
 - PDF 表格提取文字内容，但不保证恢复原始行列结构。
 - 按段落、句子和固定长度自适应切片，支持知识库级切片参数。
-- Embedding 批量向量化并写入 Qdrant，切片原文同步保存到 MySQL。
+- Embedding 批量向量化并写入 Qdrant，切片原文同步保存到 MySQL；批量接口不可用时自动回退逐条向量化，不影响入库。
 
 ### 检索与可信问答
 
-- 向量检索与关键词检索混合召回。
+- 向量检索与关键词检索混合召回；关键词召回走 MySQL 全文索引（ngram 分词）并按相关度排序，索引不可用时自动回退 `LIKE` 匹配。
+- 关键词分数细化：把全文索引返回的相关度归一化到 `[0.2, 1]` 参与融合打分，不再只有"命中/未命中"两档。
 - 查询改写、候选集扩展、融合打分、重排序和结果去重。
+- 多轮追问改写：识别出"它的上限是多少"这类指代式追问时，结合最近几轮会话历史补全成独立问题再检索；独立问题不触发模型调用，改写失败一律回退原句，检索缓存按最终检索问题存取。
+- 并行检索：关键词检索与向量化、向量检索并发执行，减少一次完整网络往返。
 - 检索缓存、上下文压缩和多样性控制。
+- 口径冲突提示：检索命中已登记的冲突切片时，在引用上标记"口径冲突"并把差异写进上下文，要求模型说明两版区别而不是只报一个数值；冲突配对的两个切片豁免去重，配对片段没被召回时自动从库里补取，保证两版并排可见。
 - 召回测试和检索诊断台，可查看改写问题、候选结果、分数和来源。
-- SSE 流式问答、会话历史、回答反馈和用量统计。
+- SSE 流式问答、会话历史、回答反馈和用量统计；语音提问与回答朗读（Web Speech API，按浏览器能力自动降级）。
 - 可信回答控制：没有有效知识证据时拒答，避免脱离知识库自由编造。
 - 回答引用校验和来源展示，可追溯文件、切片、匹配方式及分数。
 - 回答置信度：结合引用分数、引用数量和证据覆盖率输出 HIGH、MEDIUM、LOW 或 NONE。
@@ -51,22 +57,30 @@ AI Nexus 是一个基于 Spring Boot、LangChain4j、Vue 3、MySQL 和 Qdrant �
 ### 企业管理能力
 
 - 统一任务中心：聚合文件处理、分片上传、文档抽取和生图任务；支持文件任务重试和分片上传取消。
-- RAG 评测中心：维护测试集，执行召回评测，统计命中、引用命中和平均耗时。
+- RAG 评测中心：维护测试集，用与线上一致的检索链路跑评测（不调用大模型），统计命中率、MRR、拒答率和平均耗时，并保留逐条明细与历史运行用于横向对比。
 - 系统健康面板：检查 MySQL、Qdrant、Embedding、LLM、磁盘空间和线程池状态。
 - RBAC：菜单、角色、角色菜单、用户角色和用户管理。
-- 模型供应商按创建人隔离：普通用户只能查看和操作自己创建的供应商及其 API Key，管理员可查看全部；他人创建且正在使用的供应商对普通用户只展示名称和模型，不下发密钥。
 - 用户资料和密码修改；注册时校验两次密码一致。
+- 登录失败限流：同一用户名 + IP 连续失败 5 次后锁定 10 分钟。
+- 密码强度策略：注册和修改密码都需要 8–64 位并同时包含字母与数字。
+- Token 版本失效：改密或强制下线时递增 `sys_user.token_version`，旧 Token 立即失效。
+- 模型供应商按创建人隔离：普通用户只能查看和操作自己创建的供应商及其 API Key，管理员可查看全部；他人创建且正在使用的供应商对普通用户只展示名称和模型，不下发密钥；接口响应中的 API Key 一律脱敏为 `前4****后4`，提交时保留 `****` 表示不修改。
+- 联网搜索配置权限：`scope=platform` 的平台默认 Key 只有管理员可以读写。
 - 允许通过 `localhost`、`127.0.0.1` 和实际局域网 IP 访问前端开发服务。
 
 ### 扩展工作台
 
 - 文档抽取：文档上传、抽取模板、字段配置、异步任务、人工修正和结果导出。
 - AI 生图：OpenAI 兼容生图供应商、异步生成任务、历史记录、查看、下载和删除。
-- 智能体管理：智能体入口总览（当前为天气查询智能体）。
+- 智能体管理：智能体入口总览（天气查询智能体、货币换算智能体、视觉智能体）、自定义智能体与技能绑定。
+- 智能体步骤编排：给智能体写一串固定顺序的步骤（调用技能 / 模型处理 / 收尾要求），运行时有步骤就按步骤顺序执行、没有步骤继续走模型自主编排；步骤参数支持 `${input}`（用户这句话）与 `${step1}`、`${step2}`（前面步骤的结果）占位符，单个智能体最多 20 步，任一步失败即终止并回显失败步骤。
 - 天气查询智能体：模型自主调用城市定位与天气查询工具（Open-Meteo，无需 API Key），每个执行步骤实时推送到前端并落库 `agent_tool_step`，支持事后回放。
+- 货币换算智能体：调用实时汇率工具（Frankfurter，无需 API Key）与安全计算器完成多币种换算，执行过程逐步可见。
+- 视觉智能体：上传图片进行识别与分析（截图、照片中的文字与物体），结合计算工具可完成图中金额合计等多步分析。
+- 联网搜索智能体：调用 web_search 技能实时搜索互联网并基于结果回答，注明来源链接；搜索源支持 Tavily、Serper、博查和自建 SearXNG，API Key 在技能管理页按用户配置（平台默认兜底），每个执行步骤实时可见。
 - 能力展示：粒子文字、赛博城市、贾维斯 HUD、分形隧道、黑洞、水墨等多套 WebGL 视觉展示页。
 
-> 当前不包含图片 OCR、图片语义理解或流程图理解。AI 生图是独立功能，不参与知识库文档检索。
+> 知识库开启「视觉解析」后自动识别扫描版 PDF 页面与图片内容（OCR 走视觉模型，按知识库开关与页数上限控制成本）；PPT 页内表格与逐页标题保留结构。AI 生图是独立功能，不参与知识库文档检索。
 > 自动生成业务报告不在当前范围；智能体质量报告属于既有质检功能。
 
 ## 技术栈
@@ -102,7 +116,7 @@ ai-nexus
 ├── docker-compose.yml                # MySQL/Qdrant/Ollama/前后端一键部署编排
 ├── database/                         # 初始化和历史数据库升级脚本
 ├── docs/                             # 设计、计划和模块说明
-├── rag-server/
+├── ai-nexus-server/
 │   └── src/main/java/com/rag/
 │       ├── agent/                    # 智能体与工具调用框架
 │       ├── ai/                       # 聊天、Embedding 和模型调用
@@ -119,7 +133,7 @@ ai-nexus
 │       ├── rbac/                     # 菜单、角色和用户权限
 │       ├── service/                  # 文件、知识库和分片上传服务
 │       └── task/                     # 统一任务中心
-├── rag-web/
+├── ai-nexus-web/
 │   ├── public/                       # 前端静态资源
 │   ├── scripts/                      # 前端辅助脚本
 │   └── src/
@@ -262,7 +276,7 @@ ollama serve
 
 ### 5. 配置后端
 
-编辑 `rag-server/src/main/resources/application.yml`，至少检查数据库账号、上传目录和 JWT 密钥。不要把生产密码或 API Key 提交到仓库。
+编辑 `ai-nexus-server/src/main/resources/application.yml`，至少检查数据库账号、上传目录和 JWT 密钥。不要把生产密码或 API Key 提交到仓库。
 
 ```yaml
 server:
@@ -308,21 +322,21 @@ jwt:
 
 启动后在“模型设置”页面新增 OpenAI 兼容供应商并激活。聊天需要 `base_url`、`api_key` 和 `model`；AI 生图可单独配置 `image_base_url`、`image_api_key` 和 `image_model`，留空时沿用聊天配置。
 
-供应商会记录创建人：普通用户只看到并只能修改、删除、激活自己创建的供应商，管理员可以看到并操作全部，列表额外展示创建人。`is_active` 仍是全局单值，全系统共用同一个激活供应商，因此普通用户列表中会出现一项只读的“平台供应商”用于展示当前正在使用的模型，其密钥不下发。
+供应商会记录创建人：普通用户只看到并只能修改、删除自己创建的供应商，管理员可以看到并操作全部，列表额外展示创建人。聊天模型在 AI 聊天和智能体页面的输入框右下角切换（全局激活一个供应商）；生图供应商在模型设置页单独”设为生图”（`image_active`），未单独设置时生图回落到聊天激活的供应商。普通用户列表中会出现一项只读的”平台供应商”用于展示当前正在使用的模型，其密钥不下发。
 
 ### 7. 启动后端
 
 Windows：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd spring-boot:run
 ```
 
 macOS / Linux：
 
 ```bash
-cd rag-server
+cd ai-nexus-server
 mvn spring-boot:run
 ```
 
@@ -331,7 +345,7 @@ mvn spring-boot:run
 ### 8. 启动前端
 
 ```bash
-cd rag-web
+cd ai-nexus-web
 npm install
 npm run dev
 ```
@@ -344,22 +358,46 @@ npm run dev
 
 ## 历史数据库升级
 
-已有数据库不要重新执行整库初始化。先备份 `rag_db`，再从仓库根目录按以下顺序执行升级脚本。脚本按 MySQL 5.7 编写，支持重复执行。
+已有数据库不要重新执行整库初始化。先备份 `rag_db`，再从仓库根目录按以下顺序执行升级脚本。当前模块使用的表结构已纳入 `init.sql`；下表脚本用于把旧库升级到当前版本。
 
 | 顺序 | 脚本 | 作用 |
 | --- | --- | --- |
 | 1 | `extract_v2_upgrade.sql` | 抽取模板创建人、任务进度、失败原因和结果修正字段 |
 | 2 | `rbac_management.sql` | 菜单、角色、用户角色和角色菜单表结构 |
-| 3 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
-| 4 | `image_history.sql` | 生图异步任务和历史记录 |
-| 5 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
-| 6 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
-| 7 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
-| 8 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
-| 9 | `system_health_upgrade.sql` | 系统健康面板相关表结构 |
-| 10 | `kb_second_priority_upgrade.sql` | 知识库策略、任务中心和 RAG 评测表结构 |
-| 11 | `kb_summary_upgrade.sql` | 为历史数据库增加知识库摘要内容和更新时间字段 |
-| 12 | `model_provider_owner_upgrade.sql` | 为模型供应商增加创建人字段和归属索引 |
+| 3 | `agent_manage_upgrade.sql` | 智能体注册表和内置智能体 |
+| 4 | `agent_custom_upgrade.sql` | 智能体创建人字段 |
+| 5 | `image_model_provider_upgrade.sql` | 模型供应商生图配置字段 |
+| 6 | `image_history.sql` | 生图异步任务和历史记录 |
+| 7 | `kb_file_process_upgrade.sql` | 文件处理阶段、进度和失败原因 |
+| 8 | `kb_file_process_reliability_upgrade.sql` | 文件处理重试次数和下次重试时间 |
+| 9 | `kb_multipart_upload_upgrade.sql` | 大文件分片上传会话和分片记录 |
+| 10 | `kb_capabilities_upgrade.sql` | 文件版本、哈希、目录、标签、分类和质量字段 |
+| 11 | `system_health_upgrade.sql` | 系统健康面板菜单数据修正 |
+| 12 | `kb_second_priority_upgrade.sql` | 知识库策略和 RAG 评测表结构 |
+| 13 | `kb_summary_upgrade.sql` | 知识库摘要内容和更新时间字段 |
+| 14 | `model_provider_owner_upgrade.sql` | 模型供应商创建人字段和归属索引 |
+| 15 | `image_active_upgrade.sql` | 生图供应商标记，解耦生图与聊天模型切换 |
+| 16 | `vision_parse_upgrade.sql` | 视觉模型配置和知识库视觉解析开关 |
+| 17 | `chat_user_isolation_upgrade.sql` | 聊天消息用户归属字段和查询索引；无法确认归属的历史消息保持未归属 |
+| 18 | `ai_feedback_source_upgrade.sql` | 反馈来源字段，区分聊天与智能体消息 |
+| 19 | `knowledge_gap_analysis.sql` | 答案质量和知识缺口报告表 |
+| 20 | `conversation_history_upgrade.sql` | 智能体会话及消息历史表 |
+| 21 | `data_analysis_upgrade.sql` | 用户数据分析文件表 |
+| 22 | `kb_grant_upgrade.sql` | 知识库用户/角色授权表 |
+| 23 | `skill_module_upgrade.sql` | 技能注册表、智能体绑定及菜单授权 |
+| 24 | `skill_stats_upgrade.sql` | 技能调用记录表和智能体统计字段 |
+| 25 | `web_search_upgrade.sql` | 联网搜索配置、内置智能体和技能绑定 |
+| 26 | `ai_news_upgrade.sql` | AI 资讯智能体和技能绑定 |
+| 27 | `mascot_prefs_upgrade.sql` | 用户吉祥物外观偏好字段 |
+| 28 | `agent_step_upgrade.sql` | 智能体步骤编排表 `agent_step`（步骤顺序、类型、技能与参数模板） |
+| 29 | `kb_fulltext_search_upgrade.sql` | `kb_chunk` 全文索引（ngram 分词）替代 `LIKE` 关键词召回；库不支持 ngram 时输出提示并跳过，程序自动回退 `LIKE` |
+| 30 | `security_hardening_upgrade.sql` | `sys_user.token_version`：改密或强制下线时递增，使旧 Token 立即失效 |
+| 31 | `rag_eval_metrics_upgrade.sql` | RAG 评测台补 `mrr` 与 `matched_rank` 两列 |
+| 32 | `kb_conflict_detection_upgrade.sql` | 文档口径冲突表 `kb_conflict`：同话题片段数值不一致时记录冲突对，供人工确认口径 |
+
+这些升级脚本按 MySQL 5.7 编写并支持重复执行。`database/agent_tool_step.sql` 是单独建表脚本；已有旧表时请执行上表中的 `skill_stats_upgrade.sql` 补齐统计字段。
+
+第 28–32 个脚本用 `information_schema` 探测 + `PREPARE` 动态执行 DDL，因此在低版本或不支持 ngram 的数据库上也不会中断，只会跳过并打印提示——可以放心放进批量脚本里重复跑。
 
 普通终端示例：
 
@@ -373,7 +411,7 @@ Windows PowerShell 单个脚本示例：
 
 ```powershell
 Get-Content -Raw -Encoding UTF8 database/kb_capabilities_upgrade.sql |
-  mysql --default-character-set=utf8mb4 -u root -p
+  mysql --default-character-set=utf8mb4 -u root -p rag_db
 ```
 
 Windows PowerShell 批量升级：
@@ -382,6 +420,8 @@ Windows PowerShell 批量升级：
 $scripts = @(
   'extract_v2_upgrade.sql',
   'rbac_management.sql',
+  'agent_manage_upgrade.sql',
+  'agent_custom_upgrade.sql',
   'image_model_provider_upgrade.sql',
   'image_history.sql',
   'kb_file_process_upgrade.sql',
@@ -391,12 +431,30 @@ $scripts = @(
   'system_health_upgrade.sql',
   'kb_second_priority_upgrade.sql',
   'kb_summary_upgrade.sql',
-  'model_provider_owner_upgrade.sql'
+  'model_provider_owner_upgrade.sql',
+  'image_active_upgrade.sql',
+  'vision_parse_upgrade.sql',
+  'chat_user_isolation_upgrade.sql',
+  'ai_feedback_source_upgrade.sql',
+  'knowledge_gap_analysis.sql',
+  'conversation_history_upgrade.sql',
+  'data_analysis_upgrade.sql',
+  'kb_grant_upgrade.sql',
+  'skill_module_upgrade.sql',
+  'skill_stats_upgrade.sql',
+  'web_search_upgrade.sql',
+  'ai_news_upgrade.sql',
+  'mascot_prefs_upgrade.sql',
+  'agent_step_upgrade.sql',
+  'kb_fulltext_search_upgrade.sql',
+  'security_hardening_upgrade.sql',
+  'rag_eval_metrics_upgrade.sql',
+  'kb_conflict_detection_upgrade.sql'
 )
 
 foreach ($script in $scripts) {
   Get-Content -Raw -Encoding UTF8 "database/$script" |
-    mysql --default-character-set=utf8mb4 -u root -p
+    mysql --default-character-set=utf8mb4 -u root -p rag_db
 }
 ```
 
@@ -409,14 +467,14 @@ foreach ($script in $scripts) {
 | `/login` | 登录/注册 | 登录、注册、双密码一致性校验 |
 | `/kb` | 知识库 | 创建、编辑、删除和进入知识库 |
 | `/file/:kbId` | 文件管理 | 上传、分片续传、版本、目录、标签、分类、备份恢复和健康评分 |
-| `/kb/:kbId/insights` | 知识库洞察 | 策略配置、统计、检索诊断和知识摘要 |
-| `/chat` | AI 聊天 | RAG 流式问答、引用和历史记录 |
+| `/kb/:kbId/insights` | 知识库洞察 | 策略配置、统计、检索诊断、知识摘要和口径冲突检测 |
+| `/chat` | AI 聊天 | RAG 流式问答、引用与置信度、口径冲突提示和历史记录 |
 | `/tasks` | 任务中心 | 任务状态、重试和取消 |
-| `/eval` | RAG 评测 | 测试集和评测运行 |
+| `/eval` | RAG 评测 | 测试集管理、运行评测、命中率/MRR/拒答率、逐条明细与历史对比 |
 | `/health` | 系统健康 | MySQL、Qdrant、Embedding、LLM、磁盘和线程池 |
 | `/extract` | 文档抽取 | 模板、字段、任务、审核和导出 |
 | `/image` | AI 生图 | 异步生成、历史、查看和下载 |
-| `/agents` | 智能体管理 | 智能体入口总览 |
+| `/agents` | 智能体管理 | 智能体入口总览、自定义智能体、技能绑定和执行步骤编排 |
 | `/agent-tools` | 天气查询智能体 | 实时天气查询对话，执行过程逐步可见 |
 | `/knowledge-gaps` | 知识缺口分析 | 查看最近 7 天或 30 天的拒答、低质量问题聚类 |
 | `/rbac` | 权限管理 | 菜单、角色、授权和用户管理 |
@@ -440,31 +498,35 @@ foreach ($script in $scripts) {
 | 目录与标签 | `GET /kb/{kbId}/catalog`、文件夹新增/修改/删除、标签新增/删除 |
 | 备份恢复 | `GET /kb/{kbId}/backup/export`、`POST /kb/{kbId}/backup/restore` |
 | 健康与统计 | `GET /kb/{kbId}/health`、`GET /kb/{kbId}/stats` |
+| 口径冲突 | `GET /kb/{kbId}/conflicts?status=PENDING`、`POST /kb/{kbId}/conflicts/detect`、`PUT /kb/{kbId}/conflicts/{conflictId}`（确认或忽略） |
 | 聊天检索 | `POST /chat/send`、`POST /chat/stream`、会话历史、召回测试、`POST /chat/diagnose` 和反馈 |
 | 任务中心 | `GET /tasks`、`POST /tasks/{taskType}/{taskId}/retry`、取消任务 |
 | 知识缺口 | `GET /knowledge-gaps/report?days=7|30`、`POST /knowledge-gaps/analyze?days=7|30`（管理员） |
-| RAG 评测 | 评测用例新增/查询/删除、评测运行和运行列表 |
+| RAG 评测 | 评测用例新增/查询/删除、评测运行、运行列表与运行明细（含命中率/MRR/拒答率） |
 | 系统健康 | `GET /system-health/overview` |
 | 文档抽取 | 模板、文档上传、任务、结果修正和导出接口 |
 | AI 生图 | 生成、任务、历史、查看、下载和删除接口 |
-| 智能体 | 智能体列表 |
+| 智能体 | 智能体列表、自定义智能体增删改查（`POST/PUT/DELETE /agents/custom`，请求体含 `skills` 与 `steps` 数组）、技能管理 |
 | 天气查询智能体 | `POST /agent-tools/chat/stream`（SSE：open/step_start/step_result/answer/done/error）、`GET /agent-tools/tools` |
+| 搜索源配置 | `GET/PUT/DELETE /api/skills/web-search/config`（按用户维度存 Key，Key 脱敏下发，scope=platform 存平台默认） |
+| 知识库共享 | `GET/POST/DELETE /api/kb/{id}/grants`、`GET /api/kb/share-users`（仅编号与展示名） |
 | RBAC | 当前菜单、菜单管理、角色管理、角色授权、用户和用户角色 |
-| 模型与统计 | 模型供应商增删改查、激活供应商（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
+| 模型与统计 | 模型供应商增删改查、激活与设为生图（均按创建人隔离，管理员可见全部）、`GET /usage/stats` |
 
 ## 主要数据库表
 
 | 领域 | 数据表 |
 | --- | --- |
 | 用户与权限 | `sys_user`、`sys_menu`、`sys_role`、`sys_user_role`、`sys_role_menu` |
-| 知识库 | `kb_knowledge_base`、`kb_file`、`kb_chunk` |
+| 知识库 | `kb_knowledge_base`、`kb_file`、`kb_chunk`、`kb_grant`、`kb_conflict` |
 | 上传与版本 | `kb_upload_session`、`kb_upload_chunk`、`kb_file_version` |
 | 目录与标签 | `kb_file_folder`、`kb_file_tag`、`kb_file_tag_rel` |
 | 聊天与模型 | `ai_chat_message`、`ai_model_provider`、`ai_usage_log`、`ai_feedback` |
 | RAG 评测 | `kb_eval_case`、`kb_eval_run`、`kb_eval_run_item` |
 | 文档抽取 | `extract_document`、`extract_template`、`extract_field`、`extract_task`、`extract_result`、`extract_review_record`、`extract_export_record` |
 | AI 生图 | `ai_image_task`、`ai_image_history` |
-| 智能体工具步骤 | `agent_tool_step` |
+| 智能体工具步骤 | `agent_tool_step`（运行记录）、`agent_step`（步骤编排定义） |
+| 技能与绑定 | `skill`、`agent_skill`、`agent_info`、`agent_conversation`、`agent_conversation_message`、`web_search_config` |
 | 知识缺口分析 | `ai_answer_quality`、`kb_gap_report` |
 
 ## 核心流程
@@ -475,38 +537,40 @@ foreach ($script in $scripts) {
 2. 后端将原始文件保存到本地磁盘并计算 SHA-256。
 3. 系统执行重复文件检查和同名文件版本处理。
 4. 后台任务解析文档、切片并保存 MySQL。
-5. Embedding 服务生成向量，Qdrant 批量写入向量点。
+5. Embedding 服务生成向量（按批调用，失败自动回退逐条），Qdrant 批量写入向量点。
 6. 文件状态更新为完成；失败时记录阶段和原因，并按策略重试。
 
 ### RAG 问答
 
-1. 系统改写用户问题并查询检索缓存。
-2. 同时执行 Qdrant 向量召回和 MySQL 关键词召回。
-3. 融合分数、重排序、去重并压缩上下文。
-4. LLM 根据带来源标识的证据生成回答。
-5. 可信控制校验回答引用；证据不足时返回拒答结果。
-6. 前端通过 SSE 展示回答，并显示文件与切片引用。
+1. 识别本轮是否为追问（指代、省略或短问句），是则结合最近几轮会话历史把问题补全成独立问题；不是则跳过模型改写。
+2. 用最终检索问题查询检索缓存，命中则直接复用上次的切片，不再调用 Embedding 与 Qdrant。
+3. 关键词检索（MySQL 全文索引）与 Embedding 向量化、Qdrant 向量召回并发执行。
+4. 融合分数（向量分 + 归一化后的关键词相关度）、过滤低分、去除高度重复片段；命中口径冲突的配对切片豁免去重，另一侧没被召回时从库里补取。
+5. 组装带 `[来源: 文件名, 第N段]` 标识的上下文，必要时压缩；冲突片段附带差异说明。
+6. LLM 根据带来源标识的证据生成回答，冲突片段要求说明两版区别。
+7. 可信控制校验回答引用；证据不足时返回拒答结果。
+8. 前端通过 SSE 展示回答，并显示文件与切片引用、置信度与口径冲突提示。
 
 ## 测试与构建
 
 后端测试：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd test
 ```
 
 前端生产构建：
 
 ```powershell
-cd rag-web
+cd ai-nexus-web
 npm.cmd run build
 ```
 
 后端打包：
 
 ```powershell
-cd rag-server
+cd ai-nexus-server
 mvn.cmd clean package
 ```
 
@@ -564,8 +628,11 @@ curl -X POST http://localhost:8888/api/kb/rebuild-vectors -H "Authorization: Bea
 
 ## 安全说明
 
-- 生产环境必须修改 JWT 密钥、数据库密码和模型 API Key。
+- 生产环境必须修改 JWT 密钥、数据库密码和模型 API Key；`jwt.secret` 内置默认值仅用于本地开箱即用，长度不足 32 位或仍在使用仓库示例密钥时后端会拒绝启动，建议用 `JWT_SECRET` 环境变量覆盖。
+- 已知旧 Token 的处理：改密或强制下线会递增 `sys_user.token_version`，此前签发的 Token 立即失效，需要重新登录。
+- 模型供应商的 API Key 在接口响应中一律脱敏，数据库仍以明文保存，生产环境建议改用外部密钥管理并限制数据库访问。
 - 建议通过外部配置或密钥管理服务注入敏感信息。
+- 登录接口已内置失败限流（同一用户名 + IP 连续失败 5 次锁定 10 分钟），反向代理部署时应配置真实 IP 透传，否则所有用户会共享同一个 IP 计数。
 - 上传目录只应授予应用进程必要权限，并定期备份 MySQL、Qdrant 和本地文件目录。
 - 对外部署时应增加 HTTPS、反向代理、请求限流、文件安全扫描和日志脱敏。
 

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 用量统计</title>
+<link rel="stylesheet" href="paper.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+    <div class="group">功能</div>
+    <a href="#">知识库</a>
+    <a href="#">AI 聊天</a>
+    <a href="#">AI 生图</a>
+    <a href="#">文档抽取</a>
+    <a href="#">数据分析</a>
+    <a href="#">智能体</a>
+    <a href="#">技能管理</a>
+    <a href="#">模型设置</a>
+    <a class="active" href="#">用量统计</a>
+    <a href="#">系统健康</a>
+    <a href="#">任务中心</a>
+    <div class="group">管理</div>
+    <a href="#">权限管理</a>
+    <a href="#">RAG 评测</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h1>用量统计</h1>
+          <div class="desc">模型调用次数、Token 消耗与最近 7 天趋势。</div>
+        </div>
+      </div>
+
+      <div class="num-strip">
+        <div class="num-item"><b>1,382</b><span>今日调用</span></div>
+        <div class="num-item"><b>4.6M</b><span>今日 Token</span></div>
+        <div class="num-item"><b>3.1M</b><span>输入 Token</span></div>
+        <div class="num-item"><b>1.5M</b><span>输出 Token</span></div>
+      </div>
+
+      <div class="toolbar">
+        <h1 style="font-size:16px;font-weight:600;">最近 7 天趋势</h1>
+        <div class="spacer"></div>
+        <div class="filters">
+          <a class="on" href="#">按调用</a>
+          <a href="#">按 Token</a>
+        </div>
+      </div>
+      <div class="chart" style="margin-bottom:28px;">
+        <div class="col"><span class="val">862</span><div class="bar" style="height:74%"></div><span class="day">9/27</span></div>
+        <div class="col"><span class="val">1,204</span><div class="bar" style="height:96%"></div><span class="day">9/28</span></div>
+        <div class="col"><span class="val">486</span><div class="bar" style="height:42%"></div><span class="day">9/29</span></div>
+        <div class="col"><span class="val">733</span><div class="bar" style="height:63%"></div><span class="day">9/30</span></div>
+        <div class="col"><span class="val">1,047</span><div class="bar" style="height:85%"></div><span class="day">10/1</span></div>
+        <div class="col"><span class="val">690</span><div class="bar" style="height:56%"></div><span class="day">10/2</span></div>
+        <div class="col"><span class="val">1,382</span><div class="bar" style="height:100%"></div><span class="day">10/3</span></div>
+      </div>
+
+      <div class="page-head" style="padding-top:8px;">
+        <div><h1 style="font-size:16px;">按模型分布 · 近 7 天</h1></div>
+      </div>
+      <div class="row-list">
+        <div class="row-item">
+          <div class="row-main"><div class="row-name">GPT / gpt-6-sol</div></div>
+          <div class="row-meta">1,204 次调用 · 3.8M tokens</div>
+        </div>
+        <div class="row-item">
+          <div class="row-main"><div class="row-name">GPT / gpt-image-2</div></div>
+          <div class="row-meta">86 次调用 · 0.6M tokens</div>
+        </div>
+        <div class="row-item">
+          <div class="row-main"><div class="row-name">bge-m3（嵌入）</div></div>
+          <div class="row-meta">12,048 次调用 · 本地 Ollama</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

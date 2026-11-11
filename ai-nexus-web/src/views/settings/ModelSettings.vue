@@ -1,0 +1,481 @@
+<template>
+  <div class="settings-page page-shell">
+    <section class="page-hero">
+      <div>
+        <span class="eyebrow">Model Providers</span>
+        <h1 class="section-title">模型供应商配置</h1>
+        <p class="section-desc">
+          统一管理大模型 API 地址、密钥和模型名称。AI 生图可以单独配置生图地址、密钥和模型；文档视觉解析可以单独配置视觉模型；不填写时沿用当前供应商的普通模型配置。
+        </p>
+      </div>
+      <el-button type="primary" size="large" @click="openDialog()">
+        <el-icon><Plus /></el-icon>
+        新增供应商
+      </el-button>
+    </section>
+
+    <section class="provider-panel glass-panel">
+      <el-table :data="providerTableList" :row-class-name="getProviderRowClass" stripe class="provider-table">
+        <el-table-column prop="name" label="供应商名称" min-width="150">
+          <template #default="{ row }">
+            <div class="provider-name-cell">
+              <span>{{ row.name }}</span>
+              <span v-if="row.isActive === 1" class="active-provider-mark">使用中</span>
+              <span v-if="isReadonlyRow(row)" class="readonly-provider-mark">平台供应商</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="model" label="对话模型" width="150" show-overflow-tooltip />
+        <el-table-column prop="imageModel" label="生图模型" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.imageModel || '沿用对话模型' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="visionModel" label="视觉模型" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.visionModel || '沿用对话模型' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="baseUrl" label="API 地址" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="createdByName" label="创建人" width="100" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.createdByName || '—' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="130" align="center">
+          <template #default="{ row }">
+            <div class="status-tags">
+              <el-tag :type="row.isActive === 1 ? 'success' : 'info'" size="small">
+                {{ row.isActive === 1 ? '聊天使用中' : '未启用' }}
+              </el-tag>
+              <el-tag v-if="row.imageActive === 1" type="warning" size="small">
+                生图使用中
+              </el-tag>
+              <el-tag v-if="row.visionActive === 1" type="warning" size="small">
+                视觉使用中
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="176" align="center">
+          <template #default="{ row }">
+            <div class="op-grid">
+            <el-button
+              v-if="row.imageActive !== 1"
+              type="primary"
+              link
+              :disabled="isReadonlyRow(row)"
+              @click="handleActivateImage(row)"
+            >
+              设为生图
+            </el-button>
+            <el-button
+              v-if="row.visionActive !== 1"
+              type="primary"
+              link
+              :disabled="isReadonlyRow(row)"
+              @click="handleActivateVision(row)"
+            >
+              设为视觉
+            </el-button>
+            <el-button type="primary" link :disabled="isReadonlyRow(row)" @click="openDialog(row)">
+              编辑
+            </el-button>
+            <el-button
+              type="danger"
+              link
+              :disabled="isReadonlyRow(row) || row.isActive === 1 || row.imageActive === 1 || row.visionActive === 1"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑供应商' : '新增供应商'"
+      width="720px"
+      destroy-on-close
+    >
+      <el-form :model="form" label-position="top" class="provider-form">
+        <div class="form-section">
+          <h3>对话模型配置</h3>
+          <el-form-item label="供应商名称">
+            <el-input v-model="form.name" placeholder="例如：OpenAI、DeepSeek、Mimo" />
+          </el-form-item>
+          <el-form-item label="API 地址">
+            <el-input v-model="form.baseUrl" placeholder="例如：https://api.openai.com" />
+          </el-form-item>
+          <el-form-item label="API 密钥">
+            <el-input v-model="form.apiKey" type="password" show-password placeholder="留空或保持 **** 表示不修改" />
+            <p class="field-hint">已保存的密钥不会回显，界面上的 **** 只是占位；保持原样保存即沿用服务器上的旧密钥。</p>
+          </el-form-item>
+          <el-form-item label="对话模型名称">
+            <el-input v-model="form.model" placeholder="例如：gpt-5.4-mini、deepseek-chat" />
+          </el-form-item>
+        </div>
+
+        <div class="form-section image-section">
+          <h3>AI 生图配置</h3>
+          <p>这里专门给 AI 生图使用。不填地址或密钥时，会沿用上面的普通 API 地址和密钥。</p>
+          <el-form-item label="生图 API 地址">
+            <el-input v-model="form.imageBaseUrl" placeholder="例如：https://zyyc.mxou.cn/v1" />
+          </el-form-item>
+          <el-form-item label="生图 API 密钥">
+            <el-input v-model="form.imageApiKey" type="password" show-password placeholder="不填则沿用普通 API Key；**** 表示不修改" />
+          </el-form-item>
+          <el-form-item label="生图模型名称">
+            <el-input v-model="form.imageModel" placeholder="默认：gpt-image-2" />
+          </el-form-item>
+        </div>
+
+        <div class="form-section vision-section">
+          <h3>视觉解析配置</h3>
+          <p>这里专门给文档入库的图片视觉解析使用（扫描页、图表、内嵌图）。不填地址或密钥时，会沿用上面的普通 API 地址和密钥；模型必须是支持图片输入的视觉模型。</p>
+          <el-form-item label="视觉 API 地址">
+            <el-input v-model="form.visionBaseUrl" placeholder="不填则沿用普通 API 地址" />
+          </el-form-item>
+          <el-form-item label="视觉 API 密钥">
+            <el-input v-model="form.visionApiKey" type="password" show-password placeholder="不填则沿用普通 API Key；**** 表示不修改" />
+          </el-form-item>
+          <el-form-item label="视觉模型名称">
+            <el-input v-model="form.visionModel" placeholder="例如：qwen-vl-max、glm-4v-flash、gpt-4o-mini" />
+          </el-form-item>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import {
+  activateImageModelProvider,
+  activateVisionModelProvider,
+  createModelProvider,
+  deleteModelProvider,
+  getModelProviderList,
+  updateModelProvider
+} from '../../api/modelProvider'
+
+const providerList = ref([])
+const dialogVisible = ref(false)
+const saving = ref(false)
+const editingId = ref(null)
+const form = ref(createEmptyForm())
+
+// 供应商表格列表，当前使用中的供应商固定展示在第一行
+const providerTableList = computed(() => {
+  return [...providerList.value].sort((left, right) => {
+    if (left.isActive === right.isActive) {
+      return 0
+    }
+    return left.isActive === 1 ? -1 : 1
+  })
+})
+
+onMounted(() => {
+  loadList()
+})
+
+// 创建空的供应商表单
+function createEmptyForm() {
+  return {
+    name: '',
+    baseUrl: '',
+    apiKey: '',
+    model: '',
+    imageBaseUrl: '',
+    imageApiKey: '',
+    imageModel: 'gpt-image-2',
+    visionBaseUrl: '',
+    visionApiKey: '',
+    visionModel: ''
+  }
+}
+
+// 加载供应商列表
+async function loadList() {
+  try {
+    const res = await getModelProviderList()
+    providerList.value = res.data || []
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('供应商列表加载失败')
+  }
+}
+
+// 打开新增或编辑弹窗
+function openDialog(row) {
+  if (row) {
+    editingId.value = row.id
+    form.value = {
+      name: row.name || '',
+      baseUrl: row.baseUrl || '',
+      apiKey: row.apiKey || '',
+      model: row.model || '',
+      imageBaseUrl: row.imageBaseUrl || '',
+      imageApiKey: row.imageApiKey || '',
+      imageModel: row.imageModel || 'gpt-image-2',
+      visionBaseUrl: row.visionBaseUrl || '',
+      visionApiKey: row.visionApiKey || '',
+      visionModel: row.visionModel || ''
+    }
+  } else {
+    editingId.value = null
+    form.value = createEmptyForm()
+  }
+  dialogVisible.value = true
+}
+
+// 保存供应商配置
+async function handleSave() {
+  if (!form.value.name || !form.value.baseUrl || !form.value.apiKey || !form.value.model) {
+    ElMessage.warning('请填写对话模型的必填字段')
+    return
+  }
+  saving.value = true
+  try {
+    const payload = normalizePayload(form.value)
+    if (editingId.value) {
+      await updateModelProvider(editingId.value, payload)
+      ElMessage.success('修改成功')
+    } else {
+      await createModelProvider(payload)
+      ElMessage.success('新增成功')
+    }
+    dialogVisible.value = false
+    loadList()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('操作失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+// 清理提交给后端的空字符串
+function normalizePayload(data) {
+  return {
+    ...data,
+    imageBaseUrl: cleanBlank(data.imageBaseUrl),
+    imageApiKey: cleanBlank(data.imageApiKey),
+    imageModel: cleanBlank(data.imageModel) || 'gpt-image-2',
+    visionBaseUrl: cleanBlank(data.visionBaseUrl),
+    visionApiKey: cleanBlank(data.visionApiKey),
+    visionModel: cleanBlank(data.visionModel)
+  }
+}
+
+// 把空白字符串转成空值
+function cleanBlank(value) {
+  const text = String(value || '').trim()
+  return text || null
+}
+
+// 获取供应商表格行样式，当前使用中的供应商整行高亮
+function getProviderRowClass({ row }) {
+  return row.isActive === 1 ? 'active-provider-row' : ''
+}
+
+// 后端不会下发他人创建的供应商密钥，密钥为空即代表当前用户只能查看
+function isReadonlyRow(row) {
+  return !row.apiKey
+}
+
+// 激活供应商
+// 设为生图供应商：与聊天模型切换解耦，生图固定使用该供应商
+async function handleActivateImage(row) {
+  try {
+    await activateImageModelProvider(row.id)
+    ElMessage.success(`生图已切换到 ${row.name}`)
+    loadList()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('设置失败')
+  }
+}
+
+// 设为视觉供应商：与聊天激活解耦，文档入库的图片视觉解析固定使用该供应商
+async function handleActivateVision(row) {
+  try {
+    await activateVisionModelProvider(row.id)
+    ElMessage.success(`视觉解析已切换到 ${row.name}`)
+    loadList()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('设置失败')
+  }
+}
+
+// 删除供应商
+async function handleDelete(row) {
+  try {
+    await ElMessageBox.confirm(`确定要删除供应商“${row.name}”吗？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteModelProvider(row.id)
+    ElMessage.success('已删除')
+    loadList()
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('删除失败')
+  }
+}
+</script>
+
+<style scoped>
+.provider-panel {
+  padding: 22px;
+  border-radius: 0;
+}
+
+/* 操作列：一行两个按钮，2×2 网格 */
+.op-grid {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: center;
+  column-gap: 14px;
+  row-gap: 2px;
+}
+
+.op-grid .el-button {
+  margin-left: 0;
+  padding: 0;
+  height: auto;
+}
+
+.provider-table {
+  width: 100%;
+}
+
+.provider-table :deep(.active-provider-row) {
+  position: relative;
+}
+
+.provider-table :deep(.active-provider-row td) {
+  background: rgba(236, 233, 225, 0.05) !important;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.provider-table :deep(.active-provider-row td:first-child) {
+  border-left: 2px solid rgba(236, 233, 225, 0.86);
+}
+
+.provider-table :deep(.active-provider-row td:last-child) {
+  border-right: 1px solid rgba(236, 233, 225, 0.36);
+}
+
+.provider-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 800;
+}
+
+.active-provider-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(236, 233, 225, 0.48);
+  border-radius: 0;
+  background: rgba(236, 233, 225, 0.14);
+  color: #ece9e1;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.readonly-provider-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b8bcc4;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.provider-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.form-section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line-color);
+  border-radius: 0;
+  background: rgba(247, 245, 242, 0.035);
+}
+
+.form-section h3 {
+  margin: 0 0 14px;
+  color: var(--ink-color);
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.form-section p {
+  margin: -6px 0 14px;
+  color: var(--muted-color);
+  line-height: 1.6;
+}
+
+/* 密钥输入框下方的说明文字 */
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-color);
+}
+
+.image-section {
+  border-color: rgba(236, 233, 225, 0.24);
+  background: transparent;
+}
+
+.vision-section {
+  border-color: rgba(64, 158, 255, 0.24);
+  background: rgba(64, 158, 255, 0.055);
+}
+
+.status-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 760px) {
+  .provider-form {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

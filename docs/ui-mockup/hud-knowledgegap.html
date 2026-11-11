@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 知识缺口（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a class="active" href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://QUALITY//GAP-REPORT</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>知识缺口</h1>
+            <div class="desc">低置信、拒答与被点踩的回答样本，知识库补充的依据</div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="readouts">
+        <div class="readout"><div class="val">12</div><div class="lab">近 7 天样本</div></div>
+        <div class="readout"><div class="val">7</div><div class="lab">低置信回答</div></div>
+        <div class="readout"><div class="val">3</div><div class="lab">无证据拒答</div></div>
+        <div class="readout"><div class="val">2</div><div class="lab">被点踩</div></div>
+      </div>
+      <div class="toolbar"><h1 style="font-size:16px;font-weight:600;">待改进样本</h1><div class="spacer"></div>
+        <div class="filters"><a class="on" href="#">近 7 天</a><a href="#">近 30 天</a></div></div>
+      <div class="hud-list">
+        <div class="hud-row">
+          <span class="idx"><b>01</b></span>
+          <div class="row-main"><div class="row-name">"备用电源切换的响应时间要求？"</div>
+          <div class="row-desc">知识库未覆盖 · 建议补充《备用电源切换规程》</div></div>
+          <div class="row-meta">拒答 · 10/3 09:12</div>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>02</b></span>
+          <div class="row-main"><div class="row-name">"油温异常的处理流程？"</div>
+          <div class="row-desc">证据覆盖率 38% · 置信度低</div></div>
+          <div class="row-meta">低置信 · 10/2 20:44</div>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>03</b></span>
+          <div class="row-main"><div class="row-name">"去年售前方案的中标率？"</div>
+          <div class="row-desc">用户点踩 · 引用了过期方案</div></div>
+          <div class="row-meta">无帮助 · 10/2 14:03</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

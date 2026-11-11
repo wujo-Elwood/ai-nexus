@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>技能管理 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i on" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE V·C — SKILLS</div>
+        <h1 class="serif">技能管理</h1>
+        <p class="plate-desc">技能目录由后端代码自动同步；这里控制技能启停、配置智能体并管理绑定关系，调整后立即对对话生效。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          技能<b>08</b>&nbsp;&nbsp;启用<b>06</b>&nbsp;&nbsp;智能体<b>06</b>
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">⟳ 同步技能</a>
+          <a class="btn btn-signal" href="#">＋ 新建智能体</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <!-- 智能体绑定 -->
+    <div class="sec" style="padding-top:24px;"><span class="cap">BINDINGS</span><span class="t">智能体 · 技能绑定</span></div>
+    <table class="table">
+      <thead><tr><th style="width:44px">NO.</th><th>智能体</th><th style="width:80px">类型</th><th>已绑定技能</th><th style="width:90px">启停</th><th style="width:130px; text-align:right">操作</th></tr></thead>
+      <tbody>
+        <tr><td class="num">01</td><td style="font-weight:700">天气查询</td><td>内置</td><td class="mono" style="font-size:11px; color:var(--ink-2);">weather_now ●默认 · weather_forecast ●默认</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a></td></tr>
+        <tr><td class="num">02</td><td style="font-weight:700">货币换算</td><td>内置</td><td class="mono" style="font-size:11px; color:var(--ink-2);">fx_rate ●默认 · fx_history ●默认 · calculate</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a></td></tr>
+        <tr><td class="num">03</td><td style="font-weight:700">视觉理解</td><td>内置</td><td class="mono" style="font-size:11px; color:var(--ink-2);">vision_parse ●默认</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a></td></tr>
+        <tr><td class="num">04</td><td style="font-weight:700">数据问答</td><td>内置</td><td class="mono" style="font-size:11px; color:var(--ink-2);">sql_query ●默认 · chart_render ●默认</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a></td></tr>
+        <tr><td class="num">05</td><td style="font-weight:700">运维助手</td><td>自定义</td><td class="mono" style="font-size:11px; color:var(--ink-2);">web_search · kb_retrieval</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a><a href="#" class="danger">删除</a></td></tr>
+        <tr><td class="num">06</td><td style="font-weight:700">AI 生图</td><td>内置</td><td class="mono" style="font-size:11px; color:var(--ink-2);">image_gen ●默认</td><td><span class="sw off">[OFF]</span></td><td class="op" style="text-align:right"><a href="#">编辑信息</a></td></tr>
+      </tbody>
+    </table>
+
+    <!-- 技能目录 -->
+    <div class="sec"><span class="cap">CATALOG</span><span class="t">技能目录</span></div>
+    <table class="table">
+      <thead><tr><th style="width:44px">NO.</th><th>技能</th><th>参数</th><th style="width:220px">绑定智能体</th><th style="width:90px">启停</th><th style="width:110px; text-align:right">配置</th></tr></thead>
+      <tbody>
+        <tr><td class="num">01</td><td class="mono" style="font-size:12px;">weather_now</td><td style="color:var(--ink-3); font-size:12px;">city 必填 · date 选填</td><td>天气查询</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right">—</td></tr>
+        <tr><td class="num">02</td><td class="mono" style="font-size:12px;">weather_forecast</td><td style="color:var(--ink-3); font-size:12px;">city 必填 · days 选填</td><td>天气查询</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right">—</td></tr>
+        <tr><td class="num">03</td><td class="mono" style="font-size:12px;">fx_rate</td><td style="color:var(--ink-3); font-size:12px;">base 必填 · quote 必填</td><td>货币换算</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right">—</td></tr>
+        <tr><td class="num">04</td><td class="mono" style="font-size:12px;">web_search</td><td style="color:var(--ink-3); font-size:12px;">query 必填 · count 选填</td><td>运维助手</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right"><a href="#">搜索源配置</a></td></tr>
+        <tr><td class="num">05</td><td class="mono" style="font-size:12px;">kb_retrieval</td><td style="color:var(--ink-3); font-size:12px;">kbId 必填 · question 必填</td><td>运维助手 · 知识库助手</td><td><span class="sw">[ON]</span></td><td class="op" style="text-align:right">—</td></tr>
+        <tr><td class="num">06</td><td class="mono" style="font-size:12px;">image_gen</td><td style="color:var(--ink-3); font-size:12px;">prompt 必填 · size 选填</td><td>AI 生图</td><td><span class="sw off">[OFF]</span></td><td class="op" style="text-align:right">—</td></tr>
+      </tbody>
+    </table>
+
+    <!-- 调用统计 -->
+    <div class="sec"><span class="cap">STATS · 近 7 天</span><span class="t">调用统计</span></div>
+    <div class="ledger" style="border-top:0; padding-top:6px;">
+      <div class="cell"><div class="k">总调用</div><div class="v">1,284</div></div>
+      <div class="cell"><div class="k">成功率</div><div class="v">98.7<small>%</small></div></div>
+      <div class="cell"><div class="k">失败次数</div><div class="v">17</div></div>
+      <div class="cell"><div class="k">平均耗时</div><div class="v">812<small>ms</small></div></div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE V·C</span>
+      <span>SKILLS · 06 SKILLS · 06 AGENTS</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

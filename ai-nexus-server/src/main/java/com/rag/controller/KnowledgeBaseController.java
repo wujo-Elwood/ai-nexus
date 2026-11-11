@@ -1,0 +1,163 @@
+package com.rag.controller;
+
+import com.rag.entity.KbGrant;
+import com.rag.entity.KnowledgeBase;
+import com.rag.service.FileService;
+import com.rag.service.KnowledgeBaseService;
+import com.rag.kb.KnowledgeSummaryService;
+import com.rag.vo.Result;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 知识库控制器
+ * 提供知识库的增删查和权限管理
+ */
+@RestController
+@RequestMapping("/api/kb")
+public class KnowledgeBaseController {
+
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
+
+    /** 知识库摘要服务 */
+    @Autowired
+    private KnowledgeSummaryService knowledgeSummaryService;
+
+    /** 文件服务，用于重建知识库向量 */
+    @Autowired
+    private FileService fileService;
+
+    /** 创建知识库（默认私有） */
+    @PostMapping
+    public Result<KnowledgeBase> create(@RequestBody KnowledgeBase request, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        KnowledgeBase kb = knowledgeBaseService.create(request.getName(), request.getDescription(), userId);
+        return Result.success(kb);
+    }
+
+    /** 查询用户可见的知识库（自己的全部 + 他人公开的） */
+    @GetMapping
+    public Result<List<KnowledgeBase>> list(HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        List<KnowledgeBase> list = knowledgeBaseService.getVisible(userId);
+        return Result.success(list);
+    }
+
+    /** 根据ID查询当前用户有权访问的知识库详情 */
+    @GetMapping("/{id}")
+    public Result<KnowledgeBase> getById(@PathVariable Long id, HttpServletRequest httpRequest) {
+        // 第1步：校验当前用户是否有权访问知识库
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        knowledgeBaseService.checkAccess(id, userId);
+        // 第2步：查询知识库详情
+        KnowledgeBase kb = knowledgeBaseService.getById(id);
+        return Result.success(kb);
+    }
+
+    /** 修改知识库名称、描述和可见范围 */
+    @PutMapping("/{id}")
+    public Result<KnowledgeBase> update(@PathVariable Long id,
+                                        @RequestBody KnowledgeBase request,
+                                        HttpServletRequest httpRequest) {
+        // 第1步：读取当前登录用户编号
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        // 第2步：修改知识库并返回最新信息
+        KnowledgeBase kb = knowledgeBaseService.update(id, request.getName(), request.getDescription(),
+                request.getVisibility(), userId);
+        return Result.success(kb);
+    }
+
+    /** 删除知识库（只有创建者可以删除） */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        knowledgeBaseService.delete(id, userId);
+        return Result.success();
+    }
+
+    /** 重建知识库全部当前版本文件的向量（只有创建者可以操作，用于更换 Embedding 模型后重建） */
+    @PostMapping("/{id}/rebuild-vectors")
+    public Result<Integer> rebuildVectors(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        return Result.success(fileService.reprocessKb(id, userId));
+    }
+
+    /** 管理员重建全部知识库向量 */
+    @PostMapping("/rebuild-vectors")
+    public Result<Integer> rebuildAllVectors(HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        return Result.success(fileService.rebuildAllVectors(userId));
+    }
+
+    /** 查询全局向量重建进度，供任务中心展示 */
+    @GetMapping("/rebuild-vectors/status")
+    public Result<Map<String, Object>> rebuildVectorsStatus() {
+        return Result.success(fileService.getRebuildStatus());
+    }
+
+    /** 查询知识库策略 */
+    @GetMapping("/{id}/strategy")
+    public Result<KnowledgeBase> getStrategy(@PathVariable Long id, HttpServletRequest request) {
+        // 调用知识库服务校验读取权限并查询策略
+        return Result.success(knowledgeBaseService.getStrategy(id, (Long) request.getAttribute("userId")));
+    }
+
+    /** 更新知识库策略 */
+    @PutMapping("/{id}/strategy")
+    public Result<KnowledgeBase> updateStrategy(@PathVariable Long id, @RequestBody KnowledgeBase body, HttpServletRequest request) {
+        // 调用知识库服务校验管理权限并保存策略
+        return Result.success(knowledgeBaseService.updateStrategy(id, body, (Long) request.getAttribute("userId")));
+    }
+
+    /** 查询已保存的知识库摘要 */
+    @GetMapping("/{id}/summary")
+    public Result<KnowledgeBase> getSummary(@PathVariable Long id, HttpServletRequest request) {
+        // 调用摘要服务校验访问权限并读取已保存摘要
+        return Result.success(knowledgeSummaryService.getSummary(id, (Long) request.getAttribute("userId")));
+    }
+
+    /** 生成并保存知识库摘要 */
+    @PostMapping("/{id}/summary")
+    public Result<KnowledgeBase> generateSummary(@PathVariable Long id, HttpServletRequest request) {
+        // 调用摘要服务校验管理权限、生成摘要并返回最新知识库
+        return Result.success(knowledgeSummaryService.generateSummary(id, (Long) request.getAttribute("userId")));
+    }
+
+    /** 查询可授权的用户列表（仅编号与展示名，供共享设置选人使用） */
+    @GetMapping("/share-users")
+    public Result<List<Map<String, Object>>> shareUsers() {
+        return Result.success(knowledgeBaseService.listShareUsers());
+    }
+
+    /** 查询知识库共享授权列表（创建者或 MANAGE 授权者） */
+    @GetMapping("/{id}/grants")
+    public Result<List<KbGrant>> listGrants(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        return Result.success(knowledgeBaseService.listGrants(id, userId));
+    }
+
+    /** 新增共享授权：granteeType=USER/ROLE，granteeId=用户或角色编号，permission=READ/MANAGE */
+    @PostMapping("/{id}/grants")
+    public Result<KbGrant> addGrant(@PathVariable Long id,
+                                    @RequestBody Map<String, Object> body,
+                                    HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        String granteeType = body.get("granteeType") == null ? null : String.valueOf(body.get("granteeType"));
+        Long granteeId = body.get("granteeId") == null ? null : Long.valueOf(String.valueOf(body.get("granteeId")));
+        String permission = body.get("permission") == null ? null : String.valueOf(body.get("permission"));
+        return Result.success(knowledgeBaseService.addGrant(id, userId, granteeType, granteeId, permission));
+    }
+
+    /** 删除共享授权，权限立即收回 */
+    @DeleteMapping("/{id}/grants/{grantId}")
+    public Result<Void> removeGrant(@PathVariable Long id, @PathVariable Long grantId, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        knowledgeBaseService.removeGrant(id, userId, grantId);
+        return Result.success();
+    }
+}

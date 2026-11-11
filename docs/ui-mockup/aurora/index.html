@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>深空玻璃 Aurora Glass · 样机索引</title>
+<link rel="stylesheet" href="aurora.css">
+<style>
+  body { display: grid; place-items: center; }
+  .wrap { position: relative; z-index: 1; width: min(760px, 92vw); padding: 44px 48px; border-radius: 20px;
+    background: var(--glass-2); backdrop-filter: blur(24px) saturate(140%);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45), inset 0 1px 0 var(--glass-line); }
+  h1 { font-size: 28px; }
+  .band { height: 2.5px; border-radius: 999px; margin: 16px 0 22px; background: var(--aurora); box-shadow: 0 0 14px rgba(129,140,248,.45); }
+  .sub { color: var(--ink-2); font-size: 13.5px; }
+  .links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px; }
+  a.tile { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px;
+    background: var(--glass); box-shadow: inset 0 1px 0 var(--glass-line), 0 8px 28px rgba(0,0,0,.28);
+    transition: transform .2s var(--motion), background .2s var(--motion); }
+  a.tile:hover { transform: translateY(-2px); background: rgba(255,255,255,.09); }
+  .tile .glyph { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: 15px;
+    color: #0b1020; font-weight: 700; background: linear-gradient(135deg, var(--g1,#22d3ee), var(--g2,#818cf8)); }
+  .tile b { display: block; font-size: 14px; }
+  .tile span { color: var(--ink-3); font-size: 11.5px; }
+  .note { margin-top: 24px; color: var(--ink-2); font-size: 12px; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span>
+  </div>
+  <div class="wrap">
+    <h1>深空玻璃 Aurora Glass</h1>
+    <div class="band"></div>
+    <p class="sub">AI 智能平台主界面改版样机 · v2.0 · 设计文档见 docs/新版页面UI设计文档-v2.md · 背景与登录页保持不变</p>
+    <div class="links">
+      <a class="tile" href="kb.html"><span class="glyph" style="--g1:#22d3ee;--g2:#818cf8">◈</span><span><b>知识库</b><span>列表页原型：星环 / 极光带 / 卡片网格</span></span></a>
+      <a class="tile" href="chat.html"><span class="glyph" style="--g1:#818cf8;--g2:#a78bfa">✦</span><span><b>AI 聊天</b><span>对话页原型：玻璃气泡 / 引用抽屉 / 输入岛</span></span></a>
+      <a class="tile" href="agents.html"><span class="glyph" style="--g1:#67e8f9;--g2:#38bdf8">◉</span><span><b>智能体</b><span>管理页原型：渐变徽章 / 技能 chips</span></span></a>
+      <a class="tile" href="stats.html"><span class="glyph" style="--g1:#c084fc;--g2:#e879f9">▥</span><span><b>用量统计</b><span>仪表盘原型：数据胶囊 / 极光柱图</span></span></a>
+    </div>
+    <p class="note">另见：方向对比页 docs/ui-mockup/v2-explorer/style-explorer.html（现状 + 三个方向同屏比较）。
+    页面中的数据为示例内容；三个候选方向小样位于 docs/ui-mockup/v2-explorer/。</p>
+  </div>
+</body>
+</html>

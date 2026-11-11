@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智能体 · AI 智能平台</title>
+<link rel="stylesheet" href="atlas.css">
+<style>
+  /* 本页条目多，压缩图版头与行距让六条目完整入镜 */
+  .plate-head { padding: 26px 0 18px; }
+  .entry { padding: 16px 0 14px; }
+  .e-desc { margin-top: 4px; }
+  /* 技能词表：行内 mono 词，空格分隔，无 chip 盒 */
+  .skills { margin-top: 6px; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; letter-spacing: .05em; }
+  .skills b { color: var(--ink-2); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span></div>
+
+  <div class="sheet">
+    <header class="masthead-nav">
+      <div class="brand">AI 智能平台<small>AI NEXUS</small></div>
+      <a class="nav-i" href="kb.html"><i>01</i>知识库</a>
+      <a class="nav-i" href="chat.html"><i>02</i>对话</a>
+      <a class="nav-i" href="image.html"><i>03</i>生图</a>
+      <a class="nav-i" href="extract.html"><i>04</i>抽取</a>
+      <a class="nav-i on" href="agents.html"><i>05</i>智能体</a>
+      <a class="nav-i" href="analysis.html"><i>06</i>分析</a>
+      <a class="nav-i" href="gaps.html"><i>07</i>缺口</a>
+      <a class="nav-i" href="eval.html"><i>08</i>评测</a>
+      <a class="nav-i" href="stats.html"><i>09</i>统计</a>
+      <a class="nav-i" href="tasks.html"><i>10</i>任务</a>
+      <a class="nav-i" href="rbac.html"><i>11</i>权限</a>
+      <a class="nav-i" href="settings.html"><i>12</i>设置</a>
+      <span class="coords">SOL-3 · LOCAL NODE · <b>ADMIN</b></span>
+    </header>
+
+    <section class="plate-head">
+      <div>
+        <div class="kicker">PLATE V — AGENTS</div>
+        <h1 class="serif">智能体</h1>
+        <p class="plate-desc">按场景进入对应智能体；工具调用全过程逐步展示，可随时中断。</p>
+      </div>
+      <div class="plate-side">
+        <div class="plate-readout">
+          智能体<b>06</b>&nbsp;&nbsp;已启用<b>05</b><br>
+          本月调用 <span style="color:var(--ink-1)">1,284</span> · 成功率 98.7%
+        </div>
+        <div class="plate-actions">
+          <a class="btn" href="#">⟳ 刷新</a>
+          <a class="btn btn-signal" href="#">＋ 新建智能体</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="rule"></div>
+
+    <div class="toc-head">
+      <span class="cap">INDEX · 06 ENTRIES</span>
+      <div class="filters">
+        <a class="on" href="#">全部</a>
+        <a href="#">内置</a>
+        <a href="#">自定义</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">01</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">天气查询</span> <span class="st">已启用</span></div>
+        <p class="e-desc">查询全球城市实时天气与未来预报，支持多城市对比；每一步执行过程实时可见。</p>
+        <div class="skills">绑定技能&nbsp; <b>weather_now</b> · <b>weather_forecast</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">对话 gpt-6-sol<br>上次使用 10 / 2</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">02</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">货币换算</span> <span class="st">已启用</span></div>
+        <p class="e-desc">查询实时汇率并结合计算器完成多币种金额换算；每一步执行过程实时可见。</p>
+        <div class="skills">绑定技能&nbsp; <b>fx_rate</b> · <b>fx_history</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">对话 gpt-6-sol<br>上次使用 9 / 30</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">03</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">视觉理解</span> <span class="st">已启用</span></div>
+        <p class="e-desc">上传图片进行识别、描述、表格还原与信息提取。</p>
+        <div class="skills">绑定技能&nbsp; <b>vision_parse</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">视觉 qwen-vl-max<br>上次使用 10 / 1</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">04</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">数据问答</span> <span class="st">已启用</span></div>
+        <p class="e-desc">对已上传表格用自然语言查数，服务端确定性计算并出图。</p>
+        <div class="skills">绑定技能&nbsp; <b>sql_query</b> · <b>chart_render</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">对话 gpt-6-sol<br>上次使用 10 / 2</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">05</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">AI 生图</span> <span class="st">未配置</span></div>
+        <p class="e-desc">文生图智能体，需先在模型设置中启用生图供应商。</p>
+        <div class="skills">绑定技能&nbsp; <b>image_gen</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">生图 未配置<br>对话 gpt-6-sol</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <div class="entry">
+      <span class="e-no">06</span>
+      <div class="e-main">
+        <div class="e-name serif"><span class="nm">运维助手</span> <span class="st">已启用</span></div>
+        <p class="e-desc">绑定 web_search 与知识库检索，回答内部运维问题。</p>
+        <div class="skills">绑定技能&nbsp; <b>web_search</b> · <b>kb_retrieval</b></div>
+      </div>
+      <div class="leaders"></div>
+      <div class="e-readout">对话 gpt-6-sol<br>上次使用 9 / 28</div>
+      <div class="e-act">
+        <a href="#">编辑</a>
+        <a class="go" href="#">进入 →</a>
+      </div>
+    </div>
+
+    <footer class="plate-foot">
+      <span>PLATE V</span>
+      <span>AGENTS · 06 ENTRIES</span>
+      <span class="right">AI NEXUS · 年鉴第三版</span>
+    </footer>
+  </div>
+</body>
+</html>

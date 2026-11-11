@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 权限管理（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a class="active" href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://RBAC//ROLES+USERS</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>权限管理</h1>
+            <div class="desc">角色、菜单授权与用户角色分配</div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+      <div class="sys-label" style="margin-bottom:10px;"><span class="pulse"></span>ROLES // 2</div>
+      <div class="hud-list" style="margin-bottom:30px;">
+        <div class="hud-row">
+          <div class="row-main"><div class="row-name">平台管理员 <span class="mono" style="font-size:11px;color:var(--text-3);margin-left:8px;">admin</span></div>
+          <div class="row-desc">全部菜单 · 用户 2 人</div></div>
+        </div>
+        <div class="hud-row">
+          <div class="row-main"><div class="row-name">普通用户 <span class="mono" style="font-size:11px;color:var(--text-3);margin-left:8px;">user</span></div>
+          <div class="row-desc">业务菜单 · 用户 5 人</div></div>
+        </div>
+      </div>
+      <div class="sys-label" style="margin-bottom:10px;"><span class="pulse"></span>USERS // 7</div>
+      <div class="hud-list">
+        <div class="hud-row">
+          <span class="idx"><b>01</b></span>
+          <div class="row-main"><div class="row-name">wujo</div>
+          <div class="row-desc">平台管理员 · 上次登录 今天 13:20</div></div>
+          <span class="st ok"><span class="dot ok"></span>在线</span>
+          <a class="row-cta" href="#">管理 →</a>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>02</b></span>
+          <div class="row-main"><div class="row-name">admin</div>
+          <div class="row-desc">平台管理员 · 上次登录 昨天 18:02</div></div>
+          <span class="st idle"><span class="dot idle"></span>离线</span>
+          <a class="row-cta" href="#">管理 →</a>
+        </div>
+        <div class="hud-row">
+          <span class="idx"><b>03</b></span>
+          <div class="row-main"><div class="row-name">uinebula</div>
+          <div class="row-desc">普通用户 · 上次登录 3 天前</div></div>
+          <span class="st idle"><span class="dot idle"></span>离线</span>
+          <a class="row-cta" href="#">管理 →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI Nexus · 生图画布（深空 HUD）</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">AI Nexus</div>
+<div class="brand-sub">DEEP·SPACE·CONSOLE</div>
+<div class="group">// 功能</div>
+<a href="#"><span style="margin-right:2px;">▣</span>知识库</a>
+<a href="#"><span style="margin-right:2px;">◇</span>AI 聊天</a>
+<a href="#"><span style="margin-right:2px;">◈</span>AI 生图</a>
+<a class="active" href="#"><span style="margin-right:2px;">▦</span>生图画布</a>
+<a href="#"><span style="margin-right:2px;">≋</span>文档抽取</a>
+<a href="#"><span style="margin-right:2px;">∑</span>数据分析</a>
+<a href="#"><span style="margin-right:2px;">✦</span>智能体</a>
+<a href="#"><span style="margin-right:2px;">❖</span>技能管理</a>
+<a href="#"><span style="margin-right:2px;">⚙</span>模型设置</a>
+<a href="#"><span style="margin-right:2px;">▥</span>用量统计</a>
+<a href="#"><span style="margin-right:2px;">◉</span>系统健康</a>
+<a href="#"><span style="margin-right:2px;">▤</span>任务中心</a>
+<div class="group">// 管理</div>
+<a href="#"><span style="margin-right:2px;">⌁</span>知识缺口</a>
+<a href="#"><span style="margin-right:2px;">✓</span>RAG 评测</a>
+<a href="#"><span style="margin-right:2px;">▧</span>权限管理</a>
+  </aside>
+  <main class="main">
+    <div class="page">
+      <div class="console-head">
+        <div class="console-top">
+          <span class="path">SYS://CANVAS//IMAGE</span>
+          <span class="sys-label"><span class="pulse"></span>ONLINE</span>
+        </div>
+        <div class="head-row">
+          <div>
+            <h1>生图画布</h1>
+            <div class="desc">生成结果直接铺满画布，支持在画布上继续调整</div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+      <div style="min-height:420px;border:1px solid var(--divider);border-radius:2px;display:grid;place-items:center;position:relative;">
+        <div style="text-align:center;color:var(--text-3);">
+          <div style="font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--primary-hi);margin-bottom:10px;">CANVAS // READY</div>
+          <div style="font-size:13px;">输入提示词生成图片后，画布将在此展开</div>
+        </div>
+      </div>
+      <div class="toolbar" style="border-top:none;">
+        <input class="search" style="max-width:none;" placeholder="描述画面，生成结果将铺满上方画布…">
+        <button class="btn-primary">生成</button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

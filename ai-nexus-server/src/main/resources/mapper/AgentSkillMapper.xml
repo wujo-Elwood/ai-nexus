@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.skill.mapper.AgentSkillMapper">
+
+    <select id="findSkillNamesByAgent" resultType="string">
+        SELECT skill_name
+        FROM agent_skill
+        WHERE agent_code = #{agentCode}
+        ORDER BY id
+    </select>
+
+    <select id="findAll" resultType="com.rag.skill.entity.AgentSkillBinding">
+        SELECT id,
+               agent_code AS agentCode,
+               skill_name AS skillName
+        FROM agent_skill
+        ORDER BY agent_code, id
+    </select>
+
+    <delete id="deleteByAgent">
+        DELETE FROM agent_skill WHERE agent_code = #{agentCode}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO agent_skill (agent_code, skill_name) VALUES
+        <foreach collection="skillNames" item="skillName" separator=",">
+            (#{agentCode}, #{skillName})
+        </foreach>
+    </insert>
+</mapper>

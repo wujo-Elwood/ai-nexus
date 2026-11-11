@@ -1,0 +1,214 @@
+/* AI Nexus「深空纸面」样机 —— 宇宙星空背景 + 排版驱动 / 无卡片 */
+:root {
+  --text-1: #f7f5f2;
+  --text-2: #b7bbc4;
+  --text-3: #8b90a0;
+  --primary: #e5a044;
+  --primary-hi: #ffc76d;
+  --primary-soft: rgba(229, 160, 68, 0.12);
+  --hover: rgba(247, 245, 242, 0.045);
+  --divider: rgba(247, 245, 242, 0.1);
+  --danger: #ff8a8a;
+  --success: #7fdfa4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: Inter, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color: var(--text-1);
+  font-size: 14px;
+  line-height: 1.65;
+  background-color: #0b0c10;
+  /* 星空：多层星点 + 一抹靛紫星云 */
+  background-image:
+    radial-gradient(ellipse 60% 40% at 15% -5%, rgba(88, 80, 236, 0.14), transparent),
+    radial-gradient(ellipse 50% 35% at 95% 10%, rgba(192, 132, 252, 0.08), transparent),
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255,255,255,.9) 50%, transparent 51%),
+    radial-gradient(1px 1px at 34% 68%, rgba(255,255,255,.55) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 58% 12%, rgba(255,255,255,.75) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71% 44%, rgba(255,255,255,.5) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 83% 74%, rgba(255,255,255,.8) 50%, transparent 51%),
+    radial-gradient(1px 1px at 45% 86%, rgba(255,255,255,.45) 50%, transparent 51%),
+    radial-gradient(1.1px 1.1px at 92% 32%, rgba(255,255,255,.65) 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 55%, rgba(255,255,255,.5) 50%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 24% 92%, rgba(255,255,255,.7) 50%, transparent 51%),
+    radial-gradient(1px 1px at 64% 60%, rgba(255,255,255,.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 50% 40%, rgba(255,255,255,.35) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 78% 90%, rgba(255,255,255,.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 90% 58%, rgba(255,255,255,.45) 50%, transparent 51%),
+    #0b0c10;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; background: none; border: none; font-size: 14px; }
+
+/* ---------- App Shell ---------- */
+.shell { display: flex; min-height: 100vh; }
+.side {
+  width: 216px; flex-shrink: 0;
+  border-right: 1px solid var(--divider);
+  padding: 22px 12px;
+}
+.side .brand { font-weight: 700; font-size: 15px; padding: 0 10px 18px; letter-spacing: .02em; }
+.side .group {
+  font-size: 11px; letter-spacing: .12em; color: var(--text-3);
+  text-transform: uppercase; padding: 16px 10px 6px;
+}
+.side a {
+  display: block; padding: 7px 10px; border-radius: 6px;
+  color: var(--text-2); font-size: 13.5px; margin-bottom: 1px;
+}
+.side a:hover { background: var(--hover); color: var(--text-1); }
+.side a.active { color: var(--primary-hi); font-weight: 600; background: var(--primary-soft); }
+.main { flex: 1; min-width: 0; }
+
+/* ---------- 页头 ---------- */
+.page { max-width: 1080px; margin: 0 auto; padding: 38px 44px; }
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding-bottom: 20px; border-bottom: 1px solid var(--divider);
+}
+.page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.page-head .desc { color: var(--text-2); font-size: 13px; margin-top: 4px; }
+.btn-primary {
+  background: var(--primary); color: #16130c;
+  padding: 8px 16px; border-radius: 6px;
+  font-size: 13.5px; font-weight: 600;
+}
+.btn-primary:hover { background: var(--primary-hi); }
+.btn-ghost {
+  color: var(--text-2); padding: 7px 13px; border-radius: 6px; font-size: 13px;
+  border: 1px solid var(--divider);
+}
+.btn-ghost:hover { color: var(--text-1); border-color: var(--text-3); }
+
+/* ---------- 数字条 ---------- */
+.num-strip { display: flex; padding: 20px 0; border-bottom: 1px solid var(--divider); }
+.num-item { padding: 0 36px; border-right: 1px solid var(--divider); }
+.num-item:first-child { padding-left: 0; }
+.num-item:last-child { border-right: none; }
+.num-item b { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 600; color: var(--primary-hi); }
+.num-item span { display: block; font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+/* ---------- 工具行 ---------- */
+.toolbar { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+.search {
+  flex: 1; max-width: 420px;
+  border: none; border-bottom: 1px solid var(--divider);
+  padding: 7px 2px; font-size: 14px; outline: none; background: none;
+  color: var(--text-1);
+}
+.search:focus { border-bottom-color: var(--primary); }
+.search::placeholder { color: var(--text-3); }
+.toolbar .spacer { flex: 1; }
+
+/* ---------- 行列表 ---------- */
+.row-list { border-top: 1px solid var(--divider); }
+.row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 15px 10px; border-bottom: 1px solid var(--divider);
+  position: relative;
+}
+.row:hover { background: var(--hover); }
+.row:hover::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px; background: var(--primary);
+}
+.row .icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--primary-soft); color: var(--primary-hi);
+  font-size: 15px; font-weight: 600; flex-shrink: 0;
+}
+.row .name { font-weight: 600; font-size: 14px; }
+.row .name:hover { color: var(--primary-hi); cursor: pointer; }
+.row .desc { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
+.row .meta { margin-left: auto; font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
+.row .status { font-size: 12.5px; white-space: nowrap; }
+.row .ops { color: var(--text-3); padding: 4px 8px; border-radius: 6px; }
+.row .ops:hover { background: var(--hover); color: var(--text-1); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.dot.ok { background: #7fdfa4; }
+.dot.warn { background: #f4b35a; }
+.dot.idle { background: var(--text-3); }
+.st-ok { color: #7fdfa4; }
+.st-warn { color: #f4b35a; }
+.st-idle { color: var(--text-3); }
+
+/* ---------- 登录（宇宙背景 + 居中纸面表单） ---------- */
+.login {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.login .logo { font-size: 20px; font-weight: 700; letter-spacing: .04em; margin-bottom: 10px; }
+.login .logo span { color: var(--primary-hi); }
+.login h1 { font-size: 26px; font-weight: 600; margin-bottom: 6px; }
+.login .sub { color: var(--text-2); font-size: 13.5px; margin-bottom: 36px; }
+.login form { width: 320px; }
+.login .field { margin-bottom: 20px; }
+.login .field label { display: block; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+.login .field input {
+  width: 100%; padding: 9px 2px;
+  border: none; border-bottom: 1px solid var(--divider);
+  background: none; outline: none; font-size: 14px;
+  color: var(--text-1); font-family: inherit;
+}
+.login .field input:focus { border-bottom-color: var(--primary); }
+.login .aux { display: flex; justify-content: space-between; font-size: 12.5px; margin: 14px 0 28px; }
+.login .aux a { color: var(--primary-hi); }
+.login .btn-primary { width: 100%; padding: 11px; font-size: 14px; }
+.login .foot { position: fixed; bottom: 28px; font-size: 12px; color: var(--text-3); }
+
+/* ---------- 聊天（窗格 + 无气泡） ---------- */
+.chat-shell { display: flex; height: 100vh; }
+.chat-side {
+  width: 232px; flex-shrink: 0; border-right: 1px solid var(--divider);
+  padding: 22px 12px; display: flex; flex-direction: column;
+}
+.chat-side .new {
+  border: 1px solid var(--divider); border-radius: 6px;
+  padding: 8px; text-align: center; font-size: 13.5px; color: var(--text-2);
+  margin-bottom: 18px;
+}
+.chat-side .new:hover { border-color: var(--primary); color: var(--primary-hi); }
+.chat-side h3 {
+  font-size: 11px; letter-spacing: .12em; color: var(--text-3);
+  padding: 8px 8px 4px; text-transform: uppercase;
+}
+.chat-side .sess { padding: 8px 10px; border-radius: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.chat-side .sess:hover { background: var(--hover); }
+.chat-side .sess.active { background: var(--primary-soft); color: var(--primary-hi); font-weight: 500; }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.chat-head {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 16px 36px; border-bottom: 1px solid var(--divider);
+}
+.chat-head h1 { font-size: 15px; font-weight: 600; }
+.chat-head .tools { font-size: 12.5px; color: var(--text-3); }
+.chat-scroll { flex: 1; overflow-y: auto; padding: 26px 0; }
+.exchange { padding-bottom: 22px; margin: 0 40px; border-bottom: 1px solid var(--divider); }
+.msg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.msg-head .who { font-size: 13px; font-weight: 600; }
+.msg-head .time { font-size: 12px; color: var(--text-3); }
+.avatar {
+  width: 22px; height: 22px; border-radius: 6px;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.avatar.ai { background: var(--primary-soft); color: var(--primary-hi); }
+.avatar.me { background: rgba(247,245,242,.14); color: var(--text-1); }
+.msg-body { padding-left: 30px; font-size: 14px; color: var(--text-1); }
+.msg-user { border-left: 2px solid var(--primary); padding-left: 14px; color: var(--text-1); }
+.msg-actions { padding-left: 30px; margin-top: 10px; display: flex; gap: 16px; }
+.msg-actions button { font-size: 12.5px; color: var(--text-3); }
+.msg-actions button:hover { color: var(--primary-hi); }
+.followups { padding: 12px 0 0 30px; display: flex; gap: 22px; }
+.followups a { font-size: 13px; color: var(--primary-hi); text-decoration: underline; text-underline-offset: 3px; }
+.chat-input { border-top: 1px solid var(--divider); padding: 14px 40px; }
+.chat-input .line { display: flex; align-items: flex-end; gap: 16px; }
+.chat-input textarea {
+  flex: 1; border: none; outline: none; resize: none;
+  font-family: inherit; font-size: 14px; line-height: 1.6;
+  min-height: 42px; color: var(--text-1);
+  background: transparent;
+}
+.chat-input textarea::placeholder { color: var(--text-3); }
+.send-btn { color: var(--primary-hi); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.mic-btn { color: var(--text-3); font-size: 13px; }

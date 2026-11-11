@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>用量统计 · AI 智能平台</title>
+<link rel="stylesheet" href="aurora.css">
+<style>
+  .boards { flex: 1; display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 14px; padding: 8px 10px 4px; overflow: auto; align-content: start; }
+  .board { padding: 20px 22px; }
+  .board .b-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
+  .board .b-title { font-size: 14.5px; font-weight: 700; }
+  .board .b-sub { color: var(--ink-3); font-size: 11.5px; }
+
+  /* 柱状图：极光渐变柱 */
+  .chart { display: flex; align-items: flex-end; gap: 18px; height: 240px; padding: 0 6px; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
+  .col .v { color: var(--ink-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .col .bar {
+    width: 100%; max-width: 46px; border-radius: 8px 8px 4px 4px;
+    background: linear-gradient(180deg, #7dd3fc, #0ea5e9 70%, #0284c7);
+    box-shadow: 0 0 16px rgba(56,189,248,.22);
+    animation: rise .8s var(--motion) both;
+  }
+  .col.today .bar {
+    background: linear-gradient(180deg, #a5b4fc, #6366f1 70%, #4f46e5);
+    box-shadow: 0 0 18px rgba(99,102,241,.3);
+  }
+  .col:nth-child(2) .bar { animation-delay: .05s; } .col:nth-child(3) .bar { animation-delay: .1s; }
+  .col:nth-child(4) .bar { animation-delay: .15s; } .col:nth-child(5) .bar { animation-delay: .2s; }
+  .col:nth-child(6) .bar { animation-delay: .25s; } .col:nth-child(7) .bar { animation-delay: .3s; }
+  @keyframes rise { from { transform: scaleY(0); transform-origin: bottom; } to { transform: scaleY(1); } }
+  .col .d { color: var(--ink-3); font-size: 11px; }
+  .col.today .v, .col.today .d { color: #c7d2fe; font-weight: 600; }
+
+  /* 模型分布：横向条 */
+  .rows { display: flex; flex-direction: column; gap: 16px; }
+  .row-item .r-head { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 7px; }
+  .row-item .r-head b { font-weight: 600; }
+  .row-item .r-head span { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .row-item .track { height: 7px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .row-item .fill { height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--c1, #22d3ee), var(--c2, #818cf8));
+    box-shadow: 0 0 12px rgba(129,140,248,.3); }
+
+  .tk { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .tk th { text-align: left; padding: 8px 10px; color: var(--ink-3); font-size: 11px; font-weight: 500;
+    letter-spacing: .1em; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .tk td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.05);
+    color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .tk td:first-child { color: var(--ink-1); font-weight: 600; }
+  .tk tr:last-child td { border-bottom: 0; }
+  .tk tr.today td { color: #c7d2fe; }
+  .tk tr.today td:first-child { color: #e0e7ff; }
+
+  .token-strip { display: flex; gap: 12px; margin-top: 16px; }
+  .t-pill { flex: 1; border-radius: 12px; padding: 12px 16px; background: rgba(255,255,255,.04);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+  .t-pill .n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .t-pill .l { color: var(--ink-3); font-size: 11px; margin-top: 2px; }
+  .main { overflow-y: auto; }
+  .main::-webkit-scrollbar { width: 6px; }
+  .main::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true">
+    <span class="stars far"></span><span class="stars mid"></span><span class="stars near"></span>
+  </div>
+
+  <div class="shell">
+    <aside class="dock">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <div class="brand-name">AI 智能平台</div>
+          <div class="brand-sub">AI NEXUS</div>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">核心</div>
+        <a class="nav-item" href="kb.html"><span class="nav-ico">◈</span>知识库</a>
+        <a class="nav-item" href="chat.html"><span class="nav-ico">✦</span>AI 聊天</a>
+        <a class="nav-item" href="#"><span class="nav-ico">◐</span>AI 生图</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌘</span>文档抽取</a>
+        <a class="nav-item" href="agents.html"><span class="nav-ico">◉</span>智能体</a>
+        <a class="nav-item" href="#"><span class="nav-ico">∿</span>数据分析</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">洞察</div>
+        <a class="nav-item active" href="stats.html"><span class="nav-ico">▥</span>用量统计</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⌁</span>知识缺口</a>
+        <a class="nav-item" href="#"><span class="nav-ico">✓</span>RAG 评测</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">管理</div>
+        <a class="nav-item" href="#"><span class="nav-ico">✧</span>技能管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">☰</span>任务中心</a>
+        <a class="nav-item" href="#"><span class="nav-ico">▧</span>权限管理</a>
+        <a class="nav-item" href="#"><span class="nav-ico">⚙</span>模型设置</a>
+        <a class="nav-item" href="#"><span class="nav-ico">❤</span>系统健康</a>
+      </div>
+
+      <div class="dock-foot">
+        <div class="avatar">A</div>
+        <div class="who"><b>Admin</b>admin</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-head">
+        <div class="head-row">
+          <div>
+            <h1>用量统计</h1>
+            <div class="head-desc">模型调用量与 Token 消耗概览，按自然日汇总。</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost">导出报表</button>
+          </div>
+        </div>
+        <div class="aurora-band"></div>
+      </header>
+
+      <div class="pills">
+        <div class="pill-stat"><b>1,284</b><span>今日调用</span><span class="trend">+18%</span></div>
+        <div class="pill-stat"><b>3.2M</b><span>今日 Token</span></div>
+        <div class="pill-stat"><b>2.1M</b><span>输入 Token</span></div>
+        <div class="pill-stat"><b>1.1M</b><span>输出 Token</span></div>
+      </div>
+
+      <div class="boards">
+        <div class="panel board">
+          <div class="b-head">
+            <span class="b-title">最近 7 天调用趋势</span>
+            <span class="b-sub">每日汇总 · 调用次数</span>
+          </div>
+          <div class="chart">
+            <div class="col"><span class="v">862</span><div class="bar" style="height:44%"></div><span class="d">9/27</span></div>
+            <div class="col"><span class="v">975</span><div class="bar" style="height:50%"></div><span class="d">9/28</span></div>
+            <div class="col"><span class="v">1,103</span><div class="bar" style="height:57%"></div><span class="d">9/29</span></div>
+            <div class="col"><span class="v">986</span><div class="bar" style="height:51%"></div><span class="d">9/30</span></div>
+            <div class="col"><span class="v">1,268</span><div class="bar" style="height:66%"></div><span class="d">10/1</span></div>
+            <div class="col"><span class="v">1,410</span><div class="bar" style="height:73%"></div><span class="d">10/2</span></div>
+            <div class="col today"><span class="v">1,284</span><div class="bar" style="height:67%"></div><span class="d">今天</span></div>
+          </div>
+        </div>
+
+        <div class="panel board">
+          <div class="b-head">
+            <span class="b-title">模型分布</span>
+            <span class="b-sub">本月按调用次数</span>
+          </div>
+          <div class="rows">
+            <div class="row-item">
+              <div class="r-head"><b>gpt-6-sol</b><span>6,420 · 61%</span></div>
+              <div class="track"><div class="fill" style="--c1:#818cf8; --c2:#6366f1; width:61%"></div></div>
+            </div>
+            <div class="row-item">
+              <div class="r-head"><b>glm-5-air</b><span>2,318 · 22%</span></div>
+              <div class="track"><div class="fill" style="--c1:#818cf8; --c2:#6366f1; width:22%; opacity:.72"></div></div>
+            </div>
+            <div class="row-item">
+              <div class="r-head"><b>qwen-vl-max</b><span>1,064 · 10%</span></div>
+              <div class="track"><div class="fill" style="--c1:#818cf8; --c2:#6366f1; width:10%; opacity:.5"></div></div>
+            </div>
+            <div class="row-item">
+              <div class="r-head"><b>gpt-image-2</b><span>738 · 7%</span></div>
+              <div class="track"><div class="fill" style="--c1:#818cf8; --c2:#6366f1; width:7%; opacity:.34"></div></div>
+            </div>
+          </div>
+          <div class="token-strip">
+            <div class="t-pill"><div class="n">98.7%</div><div class="l">调用成功率</div></div>
+            <div class="t-pill"><div class="n">1.8s</div><div class="l">平均响应</div></div>
+          </div>
+        </div>
+
+        <div class="panel board" style="grid-column: 1 / -1;">
+          <div class="b-head">
+            <span class="b-title">最近 7 天 Token 明细</span>
+            <span class="b-sub">按自然日汇总 · 含对话 / 抽取 / 智能体全部调用</span>
+          </div>
+          <table class="tk">
+            <thead><tr><th>日期</th><th>调用次数</th><th>输入 Token</th><th>输出 Token</th><th>合计</th><th>平均响应</th></tr></thead>
+            <tbody>
+              <tr><td>9/27</td><td>862</td><td>1.42M</td><td>0.71M</td><td>2.13M</td><td>1.7s</td></tr>
+              <tr><td>9/28</td><td>975</td><td>1.61M</td><td>0.83M</td><td>2.44M</td><td>1.9s</td></tr>
+              <tr><td>9/29</td><td>1,103</td><td>1.88M</td><td>0.95M</td><td>2.83M</td><td>2.0s</td></tr>
+              <tr><td>9/30</td><td>986</td><td>1.66M</td><td>0.86M</td><td>2.52M</td><td>1.8s</td></tr>
+              <tr><td>10/1</td><td>1,268</td><td>2.10M</td><td>1.07M</td><td>3.17M</td><td>1.7s</td></tr>
+              <tr><td>10/2</td><td>1,410</td><td>2.36M</td><td>1.19M</td><td>3.55M</td><td>1.8s</td></tr>
+              <tr class="today"><td>今天</td><td>1,284</td><td>2.13M</td><td>1.09M</td><td>3.22M</td><td>1.8s</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

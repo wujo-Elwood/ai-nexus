@@ -1,0 +1,135 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: ai-nexus-server
+
+  # 邮件发送（SMTP）：配置后「发送邮件」技能可用；QQ 邮箱 host 为 smtp.qq.com(465)
+  # password 填邮箱设置里生成的授权码，不是登录密码
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: 1171568316@qq.com
+    password: blujzttpodnhjdfa
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 20000
+
+  # MySQL
+  datasource:
+    url: jdbc:mysql://localhost:3306/rag_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: Root2022!@#
+
+  # 文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# CORS 白名单：默认仅本机开发地址；局域网/生产部署通过环境变量显式追加，多个规则使用逗号分隔
+security:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173,http://*:5173}
+  # 是否校验 Token 版本号（改密后旧 Token 立即失效），关闭可省掉每请求一次数据库查询
+  token-revocation-enabled: ${TOKEN_REVOCATION_ENABLED:true}
+
+# Embedding 模型（Ollama）
+embedding:
+  api-url: ${EMBEDDING_API_URL:http://localhost:11434/api/embeddings}
+  health-url: ${EMBEDDING_HEALTH_URL:}
+  model: ${EMBEDDING_MODEL:bge-m3}
+  # 入库向量化时单次请求携带的切片条数；地址以 /api/embeddings 结尾时会自动改用批量接口 /api/embed，
+  # 该接口不可用（4xx）时自动回退逐条调用，无需改配置
+  batch-size: ${EMBEDDING_BATCH_SIZE:16}
+
+# 日志
+logging:
+  level:
+    com.rag: DEBUG
+
+# MyBatis
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.rag.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 数据问答智能体：只读数据库账号（建议单独创建仅有 SELECT 权限的账号）
+data-agent:
+  jdbc-url: ${DATA_AGENT_JDBC_URL:jdbc:mysql://localhost:3306/rag_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai}
+  username: ${DATA_AGENT_DB_USER:rag_readonly}
+  password: ${DATA_AGENT_DB_PASSWORD:AgentRead#2026}
+
+# 文件存储目录
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:D:/workspace/ai-nexus/uploads}
+  process:
+    max-attempts: ${FILE_PROCESS_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${FILE_PROCESS_RETRY_DELAY_SECONDS:60}
+    retry-interval-ms: ${FILE_PROCESS_RETRY_INTERVAL_MS:60000}
+  # 视觉解析：开启开关后图片内容（扫描页、大图页、内嵌图、独立图片）送视觉模型转 Markdown
+  vision:
+    max-vision-pages: ${FILE_VISION_MAX_PAGES:50}
+    min-text-chars: ${FILE_VISION_MIN_TEXT_CHARS:30}
+    image-area-ratio: ${FILE_VISION_IMAGE_AREA_RATIO:0.5}
+    dpi: ${FILE_VISION_DPI:144}
+    max-image-edge: ${FILE_VISION_MAX_IMAGE_EDGE:2000}
+    timeout-seconds: ${FILE_VISION_TIMEOUT_SECONDS:180}
+  multipart:
+    max-file-size: ${FILE_MULTIPART_MAX_SIZE:2147483648}
+    chunk-size: ${FILE_MULTIPART_CHUNK_SIZE:10485760}
+    expire-hours: ${FILE_MULTIPART_EXPIRE_HOURS:24}
+    cleanup-interval-ms: ${FILE_MULTIPART_CLEANUP_INTERVAL_MS:3600000}
+
+# Qdrant 向量数据库
+qdrant:
+  base-url: ${QDRANT_BASE_URL:http://${QDRANT_HOST:localhost}:${QDRANT_PORT:6333}}
+  host: ${QDRANT_HOST:localhost}
+  port: ${QDRANT_PORT:6333}
+  collection: ${QDRANT_COLLECTION:rag_chunks}
+  upsert-batch-size: ${QDRANT_UPSERT_BATCH_SIZE:100}
+
+# RAG 参数
+rag:
+  chunk-size: 500
+  chunk-overlap: 100
+  top-k: 5
+  candidate-k: ${RAG_CANDIDATE_K:10}
+  # 正式问答默认不调用额外的大模型改写查询，减少一次串行请求
+  query-rewrite-enabled: ${RAG_QUERY_REWRITE_ENABLED:false}
+  # 正式问答默认不调用额外的大模型压缩上下文，减少一次串行请求
+  context-compression-enabled: ${RAG_CONTEXT_COMPRESSION_ENABLED:false}
+  # 多轮检索改写：追问（如「它的上限是多少」）先结合历史补全成独立问题再检索，默认开启
+  multi-turn-query-enabled: ${RAG_MULTI_TURN_QUERY_ENABLED:true}
+  # 多轮检索改写携带的历史轮数（一问一答算一轮）
+  multi-turn-history-turns: ${RAG_MULTI_TURN_HISTORY_TURNS:3}
+  similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.25}
+
+# 技能执行参数
+skill:
+  # 单次技能调用超时时间（毫秒），超时后向模型返回超时提示；生图任务内部轮询约 90 秒，需大于该值
+  execute-timeout-ms: ${SKILL_EXECUTE_TIMEOUT_MS:120000}
+  # 邮件技能收件人白名单：逗号分隔，支持精确地址和 *@域名.com 通配；留空=禁止所有发送
+  email:
+    allowed-recipients: ${MAIL_ALLOWED_RECIPIENTS:1171568316@qq.com}
+  vector-weight: ${RAG_VECTOR_WEIGHT:0.6}
+  keyword-weight: ${RAG_KEYWORD_WEIGHT:0.4}
+  diversity-threshold: ${RAG_DIVERSITY_THRESHOLD:0.85}
+
+# 系统健康检查参数
+health:
+  timeout-ms: ${HEALTH_TIMEOUT_MS:3000}
+  disk-warning-percent: ${HEALTH_DISK_WARNING_PERCENT:85}
+
+# JWT
+jwt:
+  # 签名密钥（至少 32 个字符）。这里直接内置了一个随机固定值，保证本地重启后端不会踢掉登录态；
+  # 生产部署建议用环境变量 JWT_SECRET 覆盖成独有密钥，不要与开发环境共用。
+  # 注意：仍拒绝历史上的公开示例密钥，长度不足 32 也会直接拒绝启动。
+  secret: ${JWT_SECRET:FyKt7bgUaxBzJD8q8OZ0tcEZ4Lho2MPzdwOZlgHFozGcYaNP}
+  expiration: ${JWT_EXPIRATION:86400000}

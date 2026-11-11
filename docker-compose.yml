@@ -65,7 +65,7 @@ services:
 
   rag-server:
     build:
-      context: ./rag-server
+      context: ./ai-nexus-server
       args:
         MAVEN_MIRROR: ${MAVEN_MIRROR:-}
     container_name: ai-nexus-server
@@ -78,7 +78,9 @@ services:
       EMBEDDING_API_URL: http://ollama:11434/api/embeddings
       EMBEDDING_MODEL: bge-m3
       FILE_UPLOAD_DIR: /data/uploads
-      JWT_SECRET: ${JWT_SECRET:-ai-nexus-compose-jwt-secret-please-change-me}
+      # 与 application.yml 内置的默认值保持一致，保证本地直跑与容器部署签发的 Token 互相通用；
+      # 生产环境请在根目录 .env 里写 JWT_SECRET 覆盖成独有密钥
+      JWT_SECRET: ${JWT_SECRET:-FyKt7bgUaxBzJD8q8OZ0tcEZ4Lho2MPzdwOZlgHFozGcYaNP}
     volumes:
       - ./uploads:/data/uploads
     ports:
@@ -97,7 +99,7 @@ services:
 
   rag-web:
     build:
-      context: ./rag-web
+      context: ./ai-nexus-web
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-}
     container_name: ai-nexus-web

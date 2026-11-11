@@ -1,0 +1,30 @@
+root = true
+
+# 通用约定：UTF-8、LF、文件末尾保留一个换行、去掉行尾空白
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# 前端源码与配置按 2 空格缩进
+[*.{js,mjs,cjs,ts,vue,json,yml,yaml,md,html,css}]
+indent_size = 2
+
+# Java 继续用 4 空格（与现有代码一致）
+[*.java]
+indent_size = 4
+
+# Markdown 保留行尾空格（两个空格是换行语法）
+[*.md]
+trim_trailing_whitespace = false
+
+# SQL 脚本保持 4 空格
+[*.sql]
+indent_size = 4
+
+# Windows 批处理需要 CRLF
+[*.{bat,cmd}]
+end_of_line = crlf

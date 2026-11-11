@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>B · 航行看板 FLIGHT BOARD</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #f2f2ee;
+    background: #04050a;
+    min-width: 1280px;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: "JetBrains Mono", Consolas, monospace; }
+
+  /* 星空背景 */
+  .cosmos { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background:
+      radial-gradient(ellipse 50% 40% at 80% 12%, rgba(30, 46, 90, 0.25), transparent 66%),
+      linear-gradient(180deg, #06070e 0%, #04050a 55%, #020308 100%);
+  }
+  .stars, .stars.s2 { position: absolute; inset: 0; background-repeat: repeat; opacity: .7; }
+  .stars {
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,.8) 0 .8px, transparent 1.2px),
+      radial-gradient(circle, rgba(160,190,255,.55) 0 .9px, transparent 1.3px);
+    background-position: 0 0, 48px 64px;
+    background-size: 64px 58px, 110px 100px;
+    animation: drift 115s linear infinite;
+  }
+  .stars.s2 {
+    background-image: radial-gradient(circle, rgba(255,255,255,.85) 0 1px, transparent 1.5px);
+    background-position: 26px 34px; background-size: 140px 126px;
+    animation: drift 90s linear infinite;
+  }
+  @keyframes drift { to { transform: translate3d(30px, 20px, 0); } }
+
+  :root {
+    --ink-1: #f2f2ee; --ink-2: #a3a49e; --ink-3: #5f6058;
+    --go: #45e890; --busy: #ffb454;
+    --rule: rgba(242, 242, 238, 0.12);
+  }
+
+  .frame { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+
+  /* 左索引轨：仅编号 */
+  .rail {
+    width: 64px; flex: 0 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 22px 0; border-right: 1px solid var(--rule);
+  }
+  .rail .mark { width: 10px; height: 10px; background: var(--go); margin-bottom: 18px; }
+  .rail a {
+    width: 40px; height: 30px; display: grid; place-items: center;
+    color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px;
+    letter-spacing: .08em;
+  }
+  .rail a:hover { color: var(--ink-1); }
+  .rail a.on { background: #f2f2ee; color: #04050a; font-weight: 700; }
+
+  .board { flex: 1; min-width: 0; padding: 0 44px 60px; }
+
+  /* 顶部状态行 */
+  .statusline {
+    display: flex; align-items: center; gap: 22px;
+    padding: 14px 0; border-bottom: 1px solid var(--rule);
+    font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px;
+    color: var(--ink-3); letter-spacing: .1em;
+  }
+  .statusline b { color: var(--ink-1); font-weight: 500; }
+  .statusline .tag-go { color: var(--go); }
+  .statusline .tag-busy { color: var(--busy); }
+  .statusline .who { margin-left: auto; }
+
+  /* 板面标题 */
+  .board-head { display: flex; align-items: flex-end; justify-content: space-between; padding: 34px 0 26px; }
+  .board-kicker { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10px; letter-spacing: .34em; margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: .12em; }
+  .board-desc { margin-top: 8px; color: var(--ink-2); font-size: 12.5px; }
+  .board-actions { display: flex; gap: 0; }
+  .btn {
+    height: 40px; display: inline-flex; align-items: center; padding: 0 22px;
+    border: 1px solid var(--rule); border-right: 0;
+    color: var(--ink-1); font-size: 12.5px; background: none; letter-spacing: .06em;
+  }
+  .btn:last-child { border-right: 1px solid var(--rule); }
+  .btn:hover { background: rgba(242,242,238,.06); }
+  .btn-go { background: var(--go); border-color: var(--go); color: #04140b; font-weight: 700; }
+  .btn-go:hover { background: #6ff0ab; }
+
+  /* 信息板表格 */
+  .sheet-head, .row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1.15fr) minmax(0, 2fr) 130px 100px 110px 90px;
+    gap: 18px; align-items: baseline;
+  }
+  .sheet-head {
+    padding: 10px 8px; border-bottom: 1px solid var(--rule);
+    color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 9.5px; letter-spacing: .22em;
+  }
+  .row {
+    padding: 17px 8px; border-bottom: 1px solid rgba(242,242,238,.07);
+    transition: background .1s linear, color .1s linear;
+  }
+  .row:hover { background: #f2f2ee; color: #04050a; }
+  .row:hover .c-desc, .row:hover .c-no, .row:hover .c-meta { color: #4a4b46; }
+  .row:hover .tag { color: #04050a; }
+  .c-no { color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; }
+  .c-name { font-size: 16.5px; font-weight: 700; letter-spacing: .02em; }
+  .c-desc { color: var(--ink-2); font-size: 12px; line-height: 1.6; }
+  .c-meta, .c-stat { color: var(--ink-2); font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; }
+  .c-stat b { color: var(--ink-1); font-weight: 500; }
+  .tag { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11px; letter-spacing: .06em; color: var(--go); }
+  .tag.busy { color: var(--busy); }
+  .c-act { text-align: right; }
+  .c-act a { font-size: 12.5px; color: var(--ink-1); }
+  .c-act a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+  .foot { padding: 16px 8px; color: var(--ink-3); font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; letter-spacing: .12em; display: flex; gap: 24px; }
+</style>
+</head>
+<body>
+  <div class="cosmos" aria-hidden="true"><span class="stars"></span><span class="stars s2"></span></div>
+
+  <div class="frame">
+    <!-- 左索引轨 -->
+    <nav class="rail">
+      <span class="mark"></span>
+      <a href="#">01</a>
+      <a class="on" href="#">02</a>
+      <a href="#">03</a>
+      <a href="#">04</a>
+      <a href="#">05</a>
+      <a href="#">06</a>
+      <a href="#">07</a>
+      <a href="#">08</a>
+      <a href="#">09</a>
+      <a href="#">10</a>
+      <a href="#">11</a>
+      <a href="#">12</a>
+    </nav>
+
+    <main class="board">
+      <div class="statusline">
+        <span>AI NEXUS 深空港</span>
+        <span>2026-10-03 <b>21:47</b></span>
+        <span>库 <b>04</b> 文件 <b>60</b> 可问答 <b>50</b></span>
+        <span>重建 <b>8/12</b> <span class="tag-busy">[BUSY]</span></span>
+        <span class="who">ADMIN</span>
+      </div>
+
+      <header class="board-head">
+        <div>
+          <div class="board-kicker">KNOWLEDGE BASE — 02</div>
+          <h1>知识库目录</h1>
+          <p class="board-desc">上传资料自动解析、切片、向量化；提问时按库召回，回答注明出处。</p>
+        </div>
+        <div class="board-actions">
+          <a class="btn" href="#">缺口分析</a>
+          <a class="btn btn-go" href="#">＋ 新建知识库</a>
+        </div>
+      </header>
+
+      <div class="sheet-head">
+        <span>NO.</span><span>名称</span><span>说明</span><span>文件 / 可问答</span><span>就绪</span><span>状态</span><span style="text-align:right">操作</span>
+      </div>
+
+      <div class="row">
+        <span class="c-no">01</span>
+        <span class="c-name">测试</span>
+        <span class="c-desc">冒烟测试与演示用库，验证解析、切片与召回链路。</span>
+        <span class="c-meta">12 / <b>9</b></span>
+        <span class="c-stat"><b>75%</b></span>
+        <span class="tag">[READY]</span>
+        <span class="c-act"><a href="#">提问 →</a></span>
+      </div>
+      <div class="row">
+        <span class="c-no">02</span>
+        <span class="c-name">产品知识库</span>
+        <span class="c-desc">产品手册、FAQ、版本说明与接口文档。</span>
+        <span class="c-meta">24 / <b>24</b></span>
+        <span class="c-stat"><b>100%</b></span>
+        <span class="tag">[READY]</span>
+        <span class="c-act"><a href="#">提问 →</a></span>
+      </div>
+      <div class="row">
+        <span class="c-no">03</span>
+        <span class="c-name">研发技术库</span>
+        <span class="c-desc">架构设计、评审记录与排障手册，按周同步更新。</span>
+        <span class="c-meta">18 / <b>11</b></span>
+        <span class="c-stat"><b>61%</b></span>
+        <span class="tag busy">[BUSY]</span>
+        <span class="c-act"><a href="#">提问 →</a></span>
+      </div>
+      <div class="row">
+        <span class="c-no">04</span>
+        <span class="c-name">合同文档库</span>
+        <span class="c-desc">标准合同模板、用印规范与审批流程说明。</span>
+        <span class="c-meta">6 / <b>6</b></span>
+        <span class="c-stat"><b>100%</b></span>
+        <span class="tag">[READY]</span>
+        <span class="c-act"><a href="#">提问 →</a></span>
+      </div>
+
+      <div class="foot">
+        <span>04 ENTRIES</span>
+        <span>全部 / 我创建的 / 共享给我的</span>
+        <span style="margin-left:auto">⟳ 刷新</span>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

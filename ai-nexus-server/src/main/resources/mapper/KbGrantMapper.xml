@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rag.mapper.KbGrantMapper">
+
+    <!-- 查询单条授权 -->
+    <select id="findById" resultType="com.rag.entity.KbGrant">
+        SELECT id,
+               kb_id AS kbId,
+               grantee_type AS granteeType,
+               grantee_id AS granteeId,
+               permission,
+               create_user AS createUser,
+               create_time AS createTime
+        FROM kb_grant
+        WHERE id = #{id}
+    </select>
+
+    <!-- 查询知识库全部授权，按对象类型关联用户/角色表取展示名称 -->
+    <select id="findByKbId" resultType="com.rag.entity.KbGrant">
+        SELECT g.id,
+               g.kb_id AS kbId,
+               g.grantee_type AS granteeType,
+               g.grantee_id AS granteeId,
+               g.permission,
+               g.create_user AS createUser,
+               g.create_time AS createTime,
+               CASE g.grantee_type
+                   WHEN 'USER' THEN COALESCE(u.nickname, u.username, CONCAT('用户#', g.grantee_id))
+                   WHEN 'ROLE' THEN COALESCE(r.role_name, CONCAT('角色#', g.grantee_id))
+                   ELSE g.grantee_type
+               END AS granteeName
+        FROM kb_grant g
+        LEFT JOIN sys_user u ON g.grantee_type = 'USER' AND u.id = g.grantee_id
+        LEFT JOIN sys_role r ON g.grantee_type = 'ROLE' AND r.id = g.grantee_id
+        WHERE g.kb_id = #{kbId}
+        ORDER BY g.create_time DESC, g.id DESC
+    </select>
+
+    <!-- 用户是否持有可读授权：USER 授权直接命中，ROLE 授权通过用户-角色关联命中 -->
+    <select id="countReadable" resultType="int">
+        SELECT COUNT(*)
+        FROM kb_grant g
+        WHERE g.kb_id = #{kbId}
+          AND (
+              (g.grantee_type = 'USER' AND g.grantee_id = #{userId})
+              OR (g.grantee_type = 'ROLE' AND g.grantee_id IN (
+                  SELECT ur.role_id FROM sys_user_role ur WHERE ur.user_id = #{userId}
+              ))
+          )
+    </select>
+
+    <!-- 用户是否持有可管理授权（MANAGE），判定逻辑与可读一致但收紧权限级别 -->
+    <select id="countManageable" resultType="int">
+        SELECT COUNT(*)
+        FROM kb_grant g
+        WHERE g.kb_id = #{kbId}
+          AND g.permission = 'MANAGE'
+          AND (
+              (g.grantee_type = 'USER' AND g.grantee_id = #{userId})
+              OR (g.grantee_type = 'ROLE' AND g.grantee_id IN (
+                  SELECT ur.role_id FROM sys_user_role ur WHERE ur.user_id = #{userId}
+              ))
+          )
+    </select>
+
+    <!-- 用户被授权可读的知识库编号集合 -->
+    <select id="findReadableKbIds" resultType="long">
+        SELECT DISTINCT g.kb_id
+        FROM kb_grant g
+        WHERE (g.grantee_type = 'USER' AND g.grantee_id = #{userId})
+           OR (g.grantee_type = 'ROLE' AND g.grantee_id IN (
+               SELECT ur.role_id FROM sys_user_role ur WHERE ur.user_id = #{userId}
+           ))
+    </select>
+
+    <!-- 新增授权；唯一键冲突时忽略，避免重复授权报错 -->
+    <insert id="insert" parameterType="com.rag.entity.KbGrant">
+        INSERT IGNORE INTO kb_grant (kb_id, grantee_type, grantee_id, permission, create_user)
+        VALUES (#{kbId}, #{granteeType}, #{granteeId}, #{permission}, #{createUser})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM kb_grant WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByKbId">
+        DELETE FROM kb_grant WHERE kb_id = #{kbId}
+    </delete>
+</mapper>
