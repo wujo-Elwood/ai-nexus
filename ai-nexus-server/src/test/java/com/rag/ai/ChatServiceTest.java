@@ -185,11 +185,12 @@ class ChatServiceTest {
         // 第3步：打开查询改写以验证业务异常透传链路
         ReflectionTestUtils.setField(service, "queryRewriteEnabled", true);
         ReflectionTestUtils.setField(service, "knowledgeBaseMapper", knowledgeBaseMapper);
-        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources", String.class, Long.class);
+        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources",
+                String.class, Long.class, List.class);
         buildContext.setAccessible(true);
 
         InvocationTargetException thrown = assertThrows(InvocationTargetException.class,
-                () -> buildContext.invoke(service, "公司有没有住房补贴", 3L));
+                () -> buildContext.invoke(service, "公司有没有住房补贴", 3L, Collections.emptyList()));
 
         // 第3步：确认业务异常原样透传而不是被包装成 RuntimeException
         assertSame(mismatch, thrown.getCause());
@@ -231,9 +232,10 @@ class ChatServiceTest {
         ReflectionTestUtils.setField(service, "knowledgeBaseMapper", mock(com.rag.mapper.KnowledgeBaseMapper.class));
 
         // 第3步：执行私有检索流程并确认没有调用查询改写模型
-        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources", String.class, Long.class);
+        Method buildContext = ChatService.class.getDeclaredMethod("buildContextWithSources",
+                String.class, Long.class, List.class);
         buildContext.setAccessible(true);
-        KnowledgeContext context = (KnowledgeContext) buildContext.invoke(service, "年假多少天", 3L);
+        KnowledgeContext context = (KnowledgeContext) buildContext.invoke(service, "年假多少天", 3L, Collections.emptyList());
 
         // 第4步：确认检索上下文有效且改写器未被调用
         assertTrue(context.hasContext());

@@ -14,6 +14,12 @@ public interface EvalMapper {
     int deleteCase(@Param("id") Long id, @Param("userId") Long userId);
     /** 新增运行摘要 */
     int insertRun(EvalRun run);
+    /** 新增运行明细 */
+    int insertItem(EvalRunItem item);
+    /** 查询某次运行的全部明细 */
+    List<EvalRunItem> listItemsByRun(@Param("runId") Long runId);
+    /** 查询单次运行摘要 */
+    EvalRun findRunById(@Param("id") Long id);
     /** 查询运行历史 */
     List<EvalRun> listRuns(@Param("kbId") Long kbId, @Param("userId") Long userId);
     /** 删除知识库评测运行明细 */

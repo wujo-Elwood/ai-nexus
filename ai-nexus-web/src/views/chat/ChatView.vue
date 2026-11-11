@@ -131,6 +131,7 @@
               </span>
               <span class="evidence-pill">证据覆盖率 {{ Number(msg._answerMeta.evidenceCoverage ?? 0) }}%</span>
               <span class="evidence-pill">{{ Number(msg._answerMeta.citationCount ?? 0) }} 条引用</span>
+              <span v-if="hasCitationConflict(msg)" class="evidence-pill conflict-pill">口径存在冲突</span>
             </div>
             <div v-if="msg.role === 'assistant' && !msg._streaming && msg._grounded && msg._citations?.length" class="citation-block">
               <button class="citation-toggle" type="button" @click="toggleCitations(msg)">
@@ -142,8 +143,15 @@
                     <strong>{{ citation.fileName }}</strong>
                     <span class="cite-loc">第 {{ Number(citation.chunkIndex ?? 0) + 1 }} 段</span>
                     <span class="cite-type">{{ getMatchTypeText(citation.matchType) }}</span>
+                    <span v-if="citation.conflict" class="cite-conflict" :title="citation.conflictNote">⚠ 口径冲突</span>
                   </div>
-                  <p>{{ citation.contentPreview }}</p>
+                  <p>
+                    {{ citation.contentPreview }}
+                    <span
+                      v-if="citation.conflict && citation.conflictNote"
+                      class="cite-conflict-note"
+                    >{{ citation.conflictNote }}</span>
+                  </p>
                   <div class="citation-actions">
                     <el-button text size="small" @click="openCitation(citation)">
                       <el-icon><Download /></el-icon>
@@ -1165,15 +1173,15 @@ async function handleRecallTest() {
 
 // 获取召回命中方式文案
 function getMatchTypeText(matchType) {
-  // 第1步：按后端诊断类型显示中文文案
-  const texts = { VECTOR: '向量', KEYWORD: '关键词', HYBRID: '混合命中' }
+  // 第1步：按后端诊断类型显示中文文案，CONFLICT 表示这是为对照冲突而补进来的另一版
+  const texts = { VECTOR: '向量', KEYWORD: '关键词', HYBRID: '混合命中', CONFLICT: '冲突对照' }
   return texts[matchType] || '召回'
 }
 
 // 获取召回命中方式标签样式
 function getMatchTypeTag(matchType) {
-  // 第1步：混合命中强调成功色，关键词使用警告色
-  const types = { VECTOR: 'info', KEYWORD: 'warning', HYBRID: 'success' }
+  // 第1步：混合命中强调成功色，关键词与冲突对照使用警告色
+  const types = { VECTOR: 'info', KEYWORD: 'warning', HYBRID: 'success', CONFLICT: 'danger' }
   return types[matchType] || 'info'
 }
 
@@ -1181,6 +1189,14 @@ function getMatchTypeTag(matchType) {
 function formatRecallScore(score) {
   // 第1步：将0到1的相似度显示为百分比
   return `${(Number(score) * 100).toFixed(1)}%`
+}
+
+// 判断这条回答的引用里是否有片段被标记为口径冲突（后端 ConflictDetectionService 检出）
+function hasCitationConflict(msg) {
+  // 第1步：没有引用列表时直接返回 false，避免长回答里每条消息都扫一遍
+  if (!msg || !Array.isArray(msg._citations)) return false
+  // 第2步：任意一条引用带 conflict 标记就提示，用户展开引用能看到具体差异
+  return msg._citations.some((citation) => citation && citation.conflict)
 }
 
 // 提交答案反馈
@@ -1733,6 +1749,28 @@ function exportChat() {
   border-top: 1px solid rgba(236, 233, 225, 0.06);
   background: none;
   border-radius: 0;
+}
+
+/* 口径冲突标记：同一话题的两段内容数值不一致时，引用条目上给出提醒 */
+.cite-conflict {
+  color: var(--signal);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  border-bottom: 1px dotted var(--signal);
+  cursor: help;
+}
+
+.cite-conflict-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--signal);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.evidence-pill.conflict-pill {
+  color: var(--signal);
+  border-bottom-color: var(--signal);
 }
 
 .followup-chip {

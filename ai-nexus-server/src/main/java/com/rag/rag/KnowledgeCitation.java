@@ -1,5 +1,6 @@
 package com.rag.rag;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
@@ -27,4 +28,10 @@ public class KnowledgeCitation {
     private Float finalScore;
     /** 命中方式 */
     private String matchType;
+    /** 该片段是否与同库其他文档存在口径冲突（数值或期限不一致） */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean conflict;
+    /** 冲突说明：与哪份文档哪一段、哪个口径、两个取值分别是什么 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String conflictNote;
 }

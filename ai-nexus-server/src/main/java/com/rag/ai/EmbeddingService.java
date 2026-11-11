@@ -33,6 +33,13 @@ public class EmbeddingService {
     private final RestTemplate restTemplate = buildTimeoutRestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** 批量向量化时单次请求携带的文本条数：Ollama 一次推理多条的吞吐远高于逐条往返 */
+    @Value("${embedding.batch-size:16}")
+    private int embeddingBatchSize;
+
+    /** 批量接口可用性缓存：null=还没试过，true=可用，false=已知不支持（避免每一批都白试一次） */
+    private volatile Boolean batchSupported = null;
+
     /**
      * 构建带超时的 RestTemplate
      * 连接 5 秒、读取 120 秒：单条向量化很快，但知识库入库会批量调用，CPU 推理慢时单次也可能偏慢
@@ -103,16 +110,137 @@ public class EmbeddingService {
 
     /**
      * 批量将多条文本转换为向量
-     * 内部逐条调用 {@link #embed(String)} 方法，适用于知识库上传文件后对每个文本块批量生成向量。
+     *
+     * 优先用批量接口（Ollama `/api/embed` 或 OpenAI 兼容 `/v1/embeddings`，两者都接受 input 数组），
+     * 一次请求处理一批文本；接口不被支持（返回 4xx）时自动降级为逐条调用，且只降级一次，
+     * 后续批次不再重复试探。向量库写入是批量 100 条一批，这里按 embedding.batch-size 切分，
+     * 让「向量化」与「写 Qdrant」都保持小批次，避免整份大文件堆在内存里。
      *
      * @param texts 待向量化的文本列表（通常是文件拆分后的多个文本块）
-     * @return 与输入文本顺序对应的向量列表
+     * @return 与输入文本顺序一一对应的向量列表
      */
     public List<float[]> embedBatch(List<String> texts) {
         List<float[]> embeddings = new ArrayList<>();
-        for (String text : texts) {
-            embeddings.add(embed(text));
+        if (texts == null || texts.isEmpty()) {
+            return embeddings;
+        }
+        int size = Math.max(1, embeddingBatchSize);
+        for (int start = 0; start < texts.size(); start += size) {
+            int end = Math.min(start + size, texts.size());
+            embeddings.addAll(embedSlice(texts.subList(start, end)));
         }
         return embeddings;
+    }
+
+    /**
+     * 向量化一批文本：先试批量接口，确认不支持后走逐条
+     */
+    private List<float[]> embedSlice(List<String> texts) {
+        if (Boolean.FALSE.equals(batchSupported)) {
+            return embedSequentially(texts);
+        }
+        try {
+            List<float[]> vectors = postBatch(texts);
+            batchSupported = Boolean.TRUE;
+            return vectors;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            // 4xx 说明该地址没有批量语义（例如只支持单条 prompt 的老接口），降级并记住
+            log.warn("Embedding 批量接口不可用（HTTP {}），已回退逐条向量化: {}",
+                    e.getStatusCode().value(), e.getStatusText());
+            batchSupported = Boolean.FALSE;
+            return embedSequentially(texts);
+        } catch (Exception e) {
+            // 网络抖动、超时等偶发问题不应改变"是否支持批量"的判断，直接抛出由上层重试；
+            // 文案与单条路径保持一致，避免前端/日志里突然出现一种新的错误措辞
+            throw new RuntimeException("Failed to generate embedding", e);
+        }
+    }
+
+    /**
+     * 逐条向量化（原有行为，作为批量接口的后备实现）
+     */
+    private List<float[]> embedSequentially(List<String> texts) {
+        List<float[]> vectors = new ArrayList<>(texts.size());
+        for (String text : texts) {
+            vectors.add(embed(text));
+        }
+        return vectors;
+    }
+
+    /**
+     * 调用批量接口并解析结果
+     */
+    private List<float[]> postBatch(List<String> texts) throws Exception {
+        Map<String, Object> request = Map.of("model", embeddingModel, "input", texts);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> entity = new HttpEntity<>(objectMapper.writeValueAsString(request), headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(batchUrl(), entity, String.class);
+        JsonNode root = objectMapper.readTree(response.getBody());
+        return parseBatchResponse(root, texts.size());
+    }
+
+    /**
+     * 批量接口地址：Ollama 的单条接口是 /api/embeddings，批量接口是 /api/embed；
+     * OpenAI 兼容的 /v1/embeddings 本身就支持数组，原样使用
+     */
+    private String batchUrl() {
+        String url = embeddingApiUrl == null ? "" : embeddingApiUrl.trim();
+        if (url.endsWith("/api/embeddings")) {
+            return url.substring(0, url.length() - "/api/embeddings".length()) + "/api/embed";
+        }
+        return url;
+    }
+
+    /**
+     * 解析批量响应：兼容 Ollama 的 embeddings 数组与 OpenAI 的 data[].embedding
+     */
+    private List<float[]> parseBatchResponse(JsonNode root, int expected) {
+        List<float[]> vectors = new ArrayList<>(expected);
+        JsonNode ollamaShape = root == null ? null : root.get("embeddings");
+        if (ollamaShape != null && ollamaShape.isArray()) {
+            for (JsonNode node : ollamaShape) {
+                vectors.add(toVector(node));
+            }
+            return validated(vectors, expected);
+        }
+        JsonNode data = root == null ? null : root.get("data");
+        if (data == null || !data.isArray()) {
+            throw new IllegalStateException("批量向量响应缺少 embeddings 或 data 字段");
+        }
+        List<JsonNode> ordered = new ArrayList<>();
+        for (JsonNode node : data) {
+            ordered.add(node);
+        }
+        // OpenAI 风格结果可能乱序，按 index 归位；没有 index 字段时 stable sort 保持原顺序
+        ordered.sort(java.util.Comparator.comparingInt(node -> node.path("index").asInt(0)));
+        for (JsonNode node : ordered) {
+            vectors.add(toVector(node.get("embedding")));
+        }
+        return validated(vectors, expected);
+    }
+
+    /**
+     * 校验批量结果条数，防止上游少返回时把向量错配到别的文本块上
+     */
+    private List<float[]> validated(List<float[]> vectors, int expected) {
+        if (vectors.size() != expected) {
+            throw new IllegalStateException("批量向量数量不匹配：期望 " + expected + " 条，实际 " + vectors.size() + " 条");
+        }
+        return vectors;
+    }
+
+    /**
+     * JSON 数组转 float[]
+     */
+    private float[] toVector(JsonNode embedding) {
+        if (embedding == null || !embedding.isArray()) {
+            throw new IllegalStateException("批量向量响应中的向量格式不正确");
+        }
+        float[] vector = new float[embedding.size()];
+        for (int i = 0; i < embedding.size(); i++) {
+            vector[i] = (float) embedding.get(i).asDouble();
+        }
+        return vector;
     }
 }

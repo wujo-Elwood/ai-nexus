@@ -21,6 +21,8 @@ public class KbChunk {
     private String content;
     /** 来源信息，如"文件名, 第N段"，用于引用溯源 */
     private String sourceInfo;
+    /** 全文索引相关度（MATCH ... AGAINST 的原始分值），仅全文检索路径有值；LIKE 兜底与普通查询为 null */
+    private Double relevance;
     /** 创建时间 */
     private LocalDateTime createTime;
 }

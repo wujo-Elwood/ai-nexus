@@ -66,6 +66,18 @@
     <span v-if="mascot.state.starEyes" class="fx fx-stareye s1">✦</span>
     <span v-if="mascot.state.starEyes" class="fx fx-stareye s2">✦</span>
 
+    <!-- 被拎起来：汗珠乱飞 + 头顶惊叹号（配合挣扎动作） -->
+    <template v-if="mascot.state.dragging">
+      <span class="fx fx-drag-sweat">💦</span>
+      <span class="fx fx-drag-sweat fx-ds2">💦</span>
+      <span class="fx fx-drag-bang">!</span>
+    </template>
+    <!-- 放下后眩晕：两颗 @ 绕着脑袋转 -->
+    <template v-if="mascot.state.action === 'dizzy'">
+      <span class="fx fx-dizzy">@</span>
+      <span class="fx fx-dizzy fx-dz2">@</span>
+    </template>
+
     <!-- 走路：脚步尘土（两只脚交替） -->
     <span v-if="mascot.state.mode === 'walking'" class="fx fx-step">●</span>
     <span v-if="mascot.state.mode === 'walking'" class="fx fx-step fx-s2">●</span>
@@ -149,14 +161,14 @@
     <span v-if="mascot.state.badge" class="mascot-badge">🎖 {{ mascot.state.badge }}</span>
     <svg class="mascot-body" viewBox="0 9 130 68" shape-rendering="crispEdges" aria-hidden="true">
       <rect x="31" y="9" width="68" height="47" :fill="skinColor" />
-      <rect class="pt-arm" x="17" y="27" width="14" height="13" :fill="skinColor" />
-      <rect class="pt-arm" x="100" y="27" width="14" height="13" :fill="skinColor" />
+      <rect class="pt-arm pt-arm-l" x="17" y="27" width="14" height="13" :fill="skinColor" />
+      <rect class="pt-arm pt-arm-r" x="100" y="27" width="14" height="13" :fill="skinColor" />
       <rect class="pt-eye" :x="42 + eyeDx" :y="20 + eyeDy" width="7" height="8" fill="#101014" />
       <rect class="pt-eye" :x="78 + eyeDx" :y="20 + eyeDy" width="7" height="8" fill="#101014" />
-      <rect x="37" y="56" width="7" height="11" :fill="skinColor" class="pt-leg" />
-      <rect x="49" y="56" width="8" height="11" :fill="skinColor" class="pt-leg" />
-      <rect x="74" y="56" width="7" height="11" :fill="skinColor" class="pt-leg" />
-      <rect x="86" y="56" width="7" height="11" :fill="skinColor" class="pt-leg" />
+      <rect x="37" y="56" width="7" height="11" :fill="skinColor" class="pt-leg pt-leg-1" />
+      <rect x="49" y="56" width="8" height="11" :fill="skinColor" class="pt-leg pt-leg-2" />
+      <rect x="74" y="56" width="7" height="11" :fill="skinColor" class="pt-leg pt-leg-3" />
+      <rect x="86" y="56" width="7" height="11" :fill="skinColor" class="pt-leg pt-leg-4" />
       <rect v-if="mascot.state.festival === 'scarf'" x="31" y="47" width="68" height="8" fill="#e05252" />
       <rect v-if="mascot.state.festival === 'scarf'" x="38" y="55" width="13" height="9" fill="#c14444" />
       <rect v-if="mascot.state.festival === 'nose'" x="59" y="27" width="8" height="7" fill="#e05252" />
@@ -1484,18 +1496,84 @@ onBeforeUnmount(() => {
 }
 
 /* ===== 拖拽挣扎 / 节日飘雪 ===== */
-/* 拖拽中：四条腿乱蹬（错峰相位） */
+/* 被鼠标拎起来时：四条腿乱蹬、双臂乱挥、身体扭动，喊"放开我" */
+/* 注：动画定向到 .pt-leg-1~4 / .pt-arm-l,r 这些显式类名，
+   不用 nth-of-type —— rect 兄弟节点太多，序号不稳定，之前四条腿其实一直没蹬起来 */
 .mascot-actor.dragging .pt-leg {
   transform-box: fill-box;
   transform-origin: top center;
   animation: pt-kick 0.22s ease-in-out infinite alternate;
 }
-.mascot-actor.dragging .pt-leg:nth-of-type(7) { animation-delay: 0.05s; }
-.mascot-actor.dragging .pt-leg:nth-of-type(8) { animation-delay: 0.1s; }
-.mascot-actor.dragging .pt-leg:nth-of-type(9) { animation-delay: 0.15s; }
+.mascot-actor.dragging .pt-leg-2 { animation-delay: 0.05s; animation-duration: 0.26s; }
+.mascot-actor.dragging .pt-leg-3 { animation-delay: 0.1s; animation-duration: 0.19s; }
+.mascot-actor.dragging .pt-leg-4 { animation-delay: 0.15s; animation-duration: 0.24s; }
 @keyframes pt-kick {
-  0% { transform: rotate(-24deg) translateY(0); }
-  100% { transform: rotate(24deg) translateY(-2px); }
+  0% { transform: rotate(-30deg) translateY(0); }
+  100% { transform: rotate(30deg) translateY(-3px); }
+}
+
+/* 双臂乱挥：像在喊"放开我" */
+.mascot-actor.dragging .pt-arm {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: pt-flail 0.26s ease-in-out infinite alternate;
+}
+.mascot-actor.dragging .pt-arm-r { animation-delay: 0.13s; }
+@keyframes pt-flail {
+  0% { transform: rotate(-28deg); }
+  100% { transform: rotate(24deg); }
+}
+
+/* 整体扭动：被拎着左右晃 */
+.mascot-actor.dragging .mascot-body {
+  transform-origin: 50% 92%;
+  animation: pt-drag-wobble 0.52s ease-in-out infinite;
+}
+@keyframes pt-drag-wobble {
+  0% { transform: rotate(-5deg) scale(1.04, 0.96); }
+  50% { transform: rotate(5deg) scale(1.02, 0.98); }
+  100% { transform: rotate(-5deg) scale(1.04, 0.96); }
+}
+
+/* 挣扎特效：两侧汗珠 + 头顶惊叹号 */
+.fx-drag-sweat {
+  top: -10px;
+  left: -4px;
+  font-size: 10px;
+  animation: fx-drag-fly 0.9s ease-out infinite;
+}
+.fx-drag-sweat.fx-ds2 { left: auto; right: -2px; animation-delay: 0.45s; }
+@keyframes fx-drag-fly {
+  0% { opacity: 0; transform: translateY(2px) scale(0.8); }
+  30% { opacity: 1; transform: translateY(-3px) scale(1); }
+  100% { opacity: 0; transform: translateY(-11px) scale(0.9); }
+}
+.fx-drag-bang {
+  top: -19px;
+  left: 50%;
+  margin-left: -3px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--signal);
+  animation: fx-drag-bang 0.48s ease-in-out infinite alternate;
+}
+@keyframes fx-drag-bang {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-2px) scale(1.18); }
+}
+
+/* 放下后眩晕：站不稳地晃两下 */
+.mascot-actor.act-dizzy .mascot-body {
+  transform-origin: 50% 92%;
+  animation: mascot-dizzy 1.5s ease-in-out;
+}
+@keyframes mascot-dizzy {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(-8deg) translateX(-2px); }
+  35% { transform: rotate(7deg) translateX(2px); }
+  55% { transform: rotate(-5deg) translateX(-1px); }
+  75% { transform: rotate(3deg); }
+  100% { transform: rotate(0deg); }
 }
 
 /* 换装配件已改为 SVG 子元素（见模板 svg 内 outfit-* 分组），随身体动作，无 HTML 定位 */
@@ -1533,14 +1611,11 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* 拖拽态：去过渡 + 抓手 */
+/* 拖拽态：去过渡 + 抓手（身体的缩放/扭动交给 .dragging .mascot-body 的动画） */
 .mascot-actor.dragging {
   transition: none !important;
   cursor: grabbing;
   z-index: 60;
-}
-.mascot-actor.dragging .mascot-body {
-  transform: scale(1.06, 0.94);
 }
 
 /* 投喂饼干 */

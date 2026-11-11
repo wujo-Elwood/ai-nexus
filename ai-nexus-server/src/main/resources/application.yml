@@ -43,6 +43,9 @@ embedding:
   api-url: ${EMBEDDING_API_URL:http://localhost:11434/api/embeddings}
   health-url: ${EMBEDDING_HEALTH_URL:}
   model: ${EMBEDDING_MODEL:bge-m3}
+  # 入库向量化时单次请求携带的切片条数；地址以 /api/embeddings 结尾时会自动改用批量接口 /api/embed，
+  # 该接口不可用（4xx）时自动回退逐条调用，无需改配置
+  batch-size: ${EMBEDDING_BATCH_SIZE:16}
 
 # 日志
 logging:
@@ -101,6 +104,10 @@ rag:
   query-rewrite-enabled: ${RAG_QUERY_REWRITE_ENABLED:false}
   # 正式问答默认不调用额外的大模型压缩上下文，减少一次串行请求
   context-compression-enabled: ${RAG_CONTEXT_COMPRESSION_ENABLED:false}
+  # 多轮检索改写：追问（如「它的上限是多少」）先结合历史补全成独立问题再检索，默认开启
+  multi-turn-query-enabled: ${RAG_MULTI_TURN_QUERY_ENABLED:true}
+  # 多轮检索改写携带的历史轮数（一问一答算一轮）
+  multi-turn-history-turns: ${RAG_MULTI_TURN_HISTORY_TURNS:3}
   similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.25}
 
 # 技能执行参数

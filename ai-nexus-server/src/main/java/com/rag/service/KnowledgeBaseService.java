@@ -49,6 +49,10 @@ public class KnowledgeBaseService {
     @Autowired
     private FileService fileService;
 
+    /** 口径冲突清理器：删库时同步清理冲突记录；表未建时为空，不影响删除流程 */
+    @Autowired(required = false)
+    private com.rag.kb.KbConflictMapper kbConflictMapper;
+
     /** 创建知识库，默认私有 */
     public KnowledgeBase create(String name, String description, Long userId) {
         KnowledgeBase kb = new KnowledgeBase();
@@ -132,6 +136,10 @@ public class KnowledgeBaseService {
             //数据库无外键约束，必须先清理关联数据，否则文件、切片和向量全部残留
             fileService.deleteKbData(id);
             kbGrantMapper.deleteByKbId(id);
+            //冲突记录同属知识库数据，知识库删掉后必须一起清，否则会留下指向已删切片的孤儿行
+            if (kbConflictMapper != null) {
+                kbConflictMapper.deleteByKb(id);
+            }
             knowledgeBaseMapper.deleteById(id);
         } finally {
             DELETING_KB_IDS.remove(id);

@@ -397,36 +397,34 @@ public class FileService {
     }
 
     private void saveVectorsBatch(KbFile kbFile, List<KbChunk> savedChunks) {
-        List<QdrantService.VectorPoint> vectorPoints = new ArrayList<>();
-        for (KbChunk chunk : savedChunks) {
-            //向量化
-            addVectorPoint(vectorPoints, kbFile, chunk);
-            //判断是否达到批量阈值，达到就批量插入向量库
-            flushVectorPointsIfNeeded(vectorPoints);
+        // 按向量库批量阈值切片：一组一次向量化请求 + 一次写库，避免整份大文件同时压进内存
+        for (int start = 0; start < savedChunks.size(); start += qdrantUpsertBatchSize) {
+            int end = Math.min(start + qdrantUpsertBatchSize, savedChunks.size());
+            List<KbChunk> window = savedChunks.subList(start, end);
+            // 第1步：整组一次性向量化（批量接口不可用时由 EmbeddingService 自动回退逐条）
+            List<String> texts = new ArrayList<>(window.size());
+            for (KbChunk chunk : window) {
+                texts.add(chunk.getContent());
+            }
+            List<float[]> embeddings = embeddingService.embedBatch(texts);
+            // 第2步：组装向量点，顺序与窗口内的切片一一对应
+            List<QdrantService.VectorPoint> vectorPoints = new ArrayList<>(window.size());
+            for (int i = 0; i < window.size(); i++) {
+                vectorPoints.add(buildVectorPoint(kbFile, window.get(i), embeddings.get(i)));
+            }
+            // 第3步：写入向量库
+            flushVectorPoints(vectorPoints);
         }
-        flushVectorPoints(vectorPoints);
     }
 
-    private void addVectorPoint(List<QdrantService.VectorPoint> vectorPoints, KbFile kbFile, KbChunk chunk) {
-        // 第1步：生成文本切片向量，失败时中止本次文件处理
-        String chunkText = chunk.getContent();
-        float[] embedding = embeddingService.embed(chunkText);
-        // 第2步：准备向量检索需要的来源字段
+    private QdrantService.VectorPoint buildVectorPoint(KbFile kbFile, KbChunk chunk, float[] embedding) {
+        // 向量检索需要的来源字段
         Map<String, Object> payload = new HashMap<>();
         payload.put("kb_id", kbFile.getKbId());
         payload.put("file_id", kbFile.getId());
         payload.put("chunk_id", chunk.getId());
-        payload.put("content", chunkText);
-        vectorPoints.add(new QdrantService.VectorPoint(chunk.getId(), embedding, payload));
-    }
-
-    private void flushVectorPointsIfNeeded(List<QdrantService.VectorPoint> vectorPoints) {
-        // 检查条件：当前集合中的点数 < 批量阈值
-        if (vectorPoints.size() < qdrantUpsertBatchSize) {
-            return;// 未达标，什么都不做，直接返回
-        }
-        // 达标了，执行批量写入
-        flushVectorPoints(vectorPoints);
+        payload.put("content", chunk.getContent());
+        return new QdrantService.VectorPoint(chunk.getId(), embedding, payload);
     }
 
     private void flushVectorPoints(List<QdrantService.VectorPoint> vectorPoints) {

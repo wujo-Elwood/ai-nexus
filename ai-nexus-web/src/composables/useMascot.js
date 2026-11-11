@@ -113,7 +113,14 @@ function homePos() {
 }
 
 // —— 拖拽定居：抓住拖到任意位置放下 ——
+// 被拎起来时的挣扎台词（用户主动拖拽，属"用户触发的反应"，不受闲聊开关限制）
+const STRUGGLE_LINES = ['放开我！', '别拽我！', '我要生气了！', '放我下来嘛！', '哎哎哎，轻点…', '我自己会走！']
+// 被放下后的眩晕台词
+const DIZZY_LINES = ['…晕了…', '地、地在转…', '哼，不理你了', '下次温柔点嘛']
+
 let lastStruggleAt = 0
+let lastDizzyAt = 0
+
 function beginDrag() {
   if (!enabled.value) return
   walkSeq++
@@ -123,9 +130,9 @@ function beginDrag() {
   state.action = 'none'
   state.speak = ''
   const now = Date.now()
-  if (now - lastStruggleAt > 20000) {   // 挣扎台词 20s 节流：常拖定居的人不被刷屏
+  if (now - lastStruggleAt > 6000) {   // 挣扎台词 6s 节流：连着拖也不刷屏
     lastStruggleAt = now
-    showSpeak('放开我！')
+    showSpeak(STRUGGLE_LINES[Math.floor(Math.random() * STRUGGLE_LINES.length)])
   }
 }
 
@@ -140,6 +147,15 @@ function endDrag() {
     clearCustomHome()   // 拖回侧栏 = 回家
   } else {
     saveCustomHome(state.x, state.y)
+    // 落地眩晕：被拎了一路，放下先晃两下再站稳（6s 节流，避免连拖连晕）
+    const now = Date.now()
+    if (now - lastDizzyAt > 6000) {
+      lastDizzyAt = now
+      playAction('dizzy')
+      if (Math.random() < 0.65) {
+        setTimeout(() => showSpeak(DIZZY_LINES[Math.floor(Math.random() * DIZZY_LINES.length)]), 260)
+      }
+    }
   }
 }
 
@@ -918,7 +934,7 @@ async function applyServerPrefs() {
 let hotspotList = []
 let reactTimes = []
 
-const ACTION_DUR = { jump: 1150, cheer: 1300, roll: 950, spin: 850, inspect: 1300, nod: 900, shake: 1000, backflip: 1100, wave: 1100, excited: 900, hearteyes: 1400, lookaround: 1200, tiptoe: 1300, headstand: 1400, eat: 1300, pushups: 2400, moonwalk: 1500, slip: 1700, sign: 2100, idea: 1400, magic: 1900, peek: 1900, meditate: 3200, sip: 1900, sulk: 2100, goodbye: 1900, type: 2600, sneeze: 1500, clap: 1400, juggle: 1800, call: 2600, fingerheart: 1600, shrug: 1500, cover: 1700, draw: 2200, stretch: 2600, salute: 1700 }
+const ACTION_DUR = { jump: 1150, cheer: 1300, roll: 950, spin: 850, inspect: 1300, nod: 900, shake: 1000, backflip: 1100, wave: 1100, excited: 900, hearteyes: 1400, lookaround: 1200, tiptoe: 1300, headstand: 1400, eat: 1300, pushups: 2400, moonwalk: 1500, slip: 1700, sign: 2100, idea: 1400, magic: 1900, peek: 1900, meditate: 3200, sip: 1900, sulk: 2100, goodbye: 1900, type: 2600, sneeze: 1500, clap: 1400, juggle: 1800, call: 2600, fingerheart: 1600, shrug: 1500, cover: 1700, draw: 2200, stretch: 2600, salute: 1700, dizzy: 1500 }
 
 // —— 音效：Kenney「Interface Sounds」CC0 音频文件（public/sounds/<音效名>.ogg，可换同音效名的文件）——
 // 播放失败（浏览器不支持 ogg / 文件缺失）时回退到 WebAudio 8-bit 合成；localStorage 可关

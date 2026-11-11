@@ -205,12 +205,26 @@ describe('吉祥物状态机', () => {
     expect(() => mascot.purr()).not.toThrow()
   })
 
-  it('拖拽开始会挣扎喊放开我', () => {
+  it('拖拽开始会挣扎喊"放开我"', () => {
+    // 台词是随机挑选的，断言落在候选集合里，避免锁死某一句话
+    const STRUGGLE = ['放开我！', '别拽我！', '我要生气了！', '放我下来嘛！', '哎哎哎，轻点…', '我自己会走！']
     mascot.beginDrag()
     vi.advanceTimersByTime(3000)   // 等打字机打完台词
     expect(mascot.state.dragging).toBe(true)
-    expect(mascot.state.speak).toBe('放开我！')
+    expect(STRUGGLE).toContain(mascot.state.speak)
     mascot.state.dragging = false
+  })
+
+  it('拖拽放下后进入眩晕动作并复位', () => {
+    vi.useFakeTimers()
+    mascot.beginDrag()
+    mascot.state.x = 600
+    mascot.endDrag()
+    expect(mascot.state.dragging).toBe(false)
+    expect(mascot.state.action).toBe('dizzy')
+    vi.advanceTimersByTime(1600)   // dizzy 时长 1500ms 后自动复位
+    expect(mascot.state.action).toBe('none')
+    vi.useRealTimers()
   })
 
   it('番茄钟：启动报时，到点拉庆祝；再点可取消', () => {

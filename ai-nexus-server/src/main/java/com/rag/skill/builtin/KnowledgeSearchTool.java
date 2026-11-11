@@ -143,6 +143,8 @@ public class KnowledgeSearchTool implements AgentTool {
         Set<Long> mergedIds = new HashSet<>();
         Map<Long, Float> vectorScores = new HashMap<>();
         Set<Long> keywordIds = new HashSet<>();
+        // 全文索引返回的原始相关度，用于把关键词分数细化为真实强弱
+        Map<Long, Double> keywordRelevance = new HashMap<>();
 
         // 向量召回：Qdrant 不可用时跳过
         if (embedding != null) {
@@ -165,6 +167,8 @@ public class KnowledgeSearchTool implements AgentTool {
                 if (chunk == null) {
                     continue;
                 }
+                keywordRelevance.merge(chunk.getId(),
+                        chunk.getRelevance() == null ? 0d : chunk.getRelevance(), Math::max);
                 if (mergedIds.contains(chunk.getId())) {
                     keywordIds.add(chunk.getId());
                 } else if (mergedIds.add(chunk.getId())) {
@@ -176,13 +180,17 @@ public class KnowledgeSearchTool implements AgentTool {
             // 关键词通道失败则本知识库无结果
         }
 
+        double maxKeywordRelevance = keywordRelevance.values().stream()
+                .mapToDouble(Double::doubleValue).max().orElse(0d);
+
         List<RetrievalCandidate> candidates = new ArrayList<>();
         for (KbChunk chunk : merged) {
             RetrievalCandidate candidate = new RetrievalCandidate(chunk);
             boolean keywordMatched = keywordIds.contains(chunk.getId());
             boolean vectorMatched = vectorScores.containsKey(chunk.getId());
             candidate.setVectorScore(vectorMatched ? vectorScores.get(chunk.getId()) : KEYWORD_BASE_SCORE);
-            candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+            candidate.setKeywordScore(RetrievalCandidate.normalizeKeywordScore(
+                    keywordMatched, keywordRelevance.get(chunk.getId()), maxKeywordRelevance));
             candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID"
                     : keywordMatched ? "KEYWORD" : "VECTOR");
             candidates.add(candidate);

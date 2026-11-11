@@ -26,9 +26,19 @@ public class QueryRewriter {
     private final ModelProviderService modelProviderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** 单轮改写：去掉口语化成分，只保留可检索的关键信息 */
     private static final String REWRITE_PROMPT =
             "You are a query rewriting assistant. Rewrite the user colloquial question into an independent, complete query suitable for vector search. "
             + "Rules: remove pronouns, add missing context, output only the rewritten query without explanation.\n\nUser question: ";
+
+    /**
+     * 多轮改写：结合对话历史，把「它的上限是多少」这类依赖上下文的追问补全成独立问题
+     */
+    private static final String MULTI_TURN_REWRITE_PROMPT =
+            "You are a query rewriting assistant for a retrieval system. "
+            + "Given the conversation history and the user's latest question, rewrite the latest question into an independent, self-contained query suitable for vector search. "
+            + "Rules: replace pronouns and omitted subjects with the concrete terms they refer to in the history, keep the original wording when possible, "
+            + "do not answer the question, output only the rewritten query without explanation.";
 
     public QueryRewriter(ModelProviderService modelProviderService) {
         this.modelProviderService = modelProviderService;
@@ -39,14 +49,37 @@ public class QueryRewriter {
      * 如果改写失败，返回原始查询
      */
     public String rewrite(String query) {
+        return callModel(REWRITE_PROMPT, query, query);
+    }
+
+    /**
+     * 结合对话历史改写用户查询，用于多轮追问
+     *
+     * @param question    用户本轮原始问题
+     * @param historyText 已经格式化好的历史对话（形如「用户：…\n助手：…」），为空时退化为单轮改写
+     * @return 补全后的独立查询；失败时返回原始问题
+     */
+    public String rewriteWithHistory(String question, String historyText) {
+        if (question == null || question.isBlank()) {
+            return question;
+        }
+        if (historyText == null || historyText.isBlank()) {
+            return rewrite(question);
+        }
+        // 第1步：把历史对话与本轮问题拼成一次模型请求的内容
+        String content = "Conversation history:\n" + historyText
+                + "\n\nLatest user question: " + question;
+        // 第2步：调用模型，失败时回落到原始问题
+        return callModel(MULTI_TURN_REWRITE_PROMPT, content, question);
+    }
+
+    /**
+     * 统一的模型调用：任何异常都返回 fallback，保证检索链路不因改写失败而中断
+     */
+    private String callModel(String prompt, String content, String fallback) {
         try {
             ModelProvider provider = modelProviderService.getActive();
-            /**
-             * 查询重写（Query Rewriting）方法，核心作用是：
-             * 调用大语言模型（LLM）将用户输入的模糊、口语化或不够精确的查询，改写成更清晰、
-             * 更适合检索的表述，从而提升搜索或RAG系统的召回效果
-             */
-            String requestBody = buildRequest(query, provider);
+            String requestBody = buildRequest(prompt, content, provider);
             //构建 LLM API 请求地址
             String endpoint = buildEndpoint(provider);
             HttpURLConnection conn = openConnection(endpoint, provider);
@@ -55,7 +88,7 @@ public class QueryRewriter {
             if (conn.getResponseCode() >= 400) {
                 log.warn("Query rewrite failed, using original query");
                 conn.disconnect();
-                return query;
+                return fallback;
             }
             StringBuilder response = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(
@@ -66,40 +99,37 @@ public class QueryRewriter {
             conn.disconnect();
             JsonNode result = objectMapper.readTree(response.toString());
             String rewritten = result.get("choices").get(0).get("message").get("content").asText().trim();
+            // 去掉模型可能加上的引号或换行
+            rewritten = rewritten.replaceAll("^[\"'`]+|[\"'`]+$", "").trim();
+            if (rewritten.isEmpty()) {
+                return fallback;
+            }
             if (rewritten.length() > 200) {
                 rewritten = rewritten.substring(0, 200);
             }
-            log.debug("Query rewritten: '{}' -> '{}'", query, rewritten);
+            log.debug("Query rewritten: '{}' -> '{}'", content, rewritten);
             return rewritten;
         } catch (Exception e) {
             log.warn("Query rewrite error: {}, using original", e.getMessage());
-            return query;
+            return fallback;
         }
     }
 
 
     /**
+     * 组装模型请求体
      * 查询重写（Query Rewriting）方法，核心作用是：调用大语言模型（LLM）将用户输入的模糊、
      * 口语化或不够精确的查询，改写成更清晰、更适合检索的表述，从而提升搜索或RAG系统的召回效果
-     * @param query
-     * @param provider
-     * @return
-     * @throws Exception
      */
-    private String buildRequest(String query, ModelProvider provider) throws Exception {
+    private String buildRequest(String prompt, String content, ModelProvider provider) throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", provider.getModel());
         body.put("temperature", 0.1);
-        body.put("max_tokens", 100);
+        body.put("max_tokens", 120);
         ArrayNode messages = body.putArray("messages");
         ObjectNode userMsg = messages.addObject();
         userMsg.put("role", "user");
-        /**
-         * 您是查询重写助手。将用户口语化的问句转换为适合向量搜索的独立完整查询，
-         * 需遵循以下规则：删除代词，补充缺失的背景信息，仅输出重写后的查询内容，无需解释。
-         * 用户问句：
-         */
-        userMsg.put("content", REWRITE_PROMPT + query);
+        userMsg.put("content", prompt + content);
         return objectMapper.writeValueAsString(body);
     }
 

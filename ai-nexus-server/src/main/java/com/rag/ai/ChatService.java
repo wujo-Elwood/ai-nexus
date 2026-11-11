@@ -70,8 +70,34 @@ public class ChatService {
     @Value("${rag.context-compression-enabled:false}")
     private boolean contextCompressionEnabled = false;
 
+    /**
+     * 多轮检索改写开关：追问（「它的上限是多少」）单靠当前这句话检索必然跑偏，
+     * 打开后会在检测到追问时结合历史把问题补全成独立查询再检索。
+     */
+    @Value("${rag.multi-turn-query-enabled:true}")
+    private boolean multiTurnQueryEnabled = true;
+
+    /** 多轮检索改写时携带的历史轮数（一问一答算一轮） */
+    @Value("${rag.multi-turn-history-turns:3}")
+    private int multiTurnHistoryTurns = 3;
+
     /** 多轮对话：最多加载的历史消息条数 */
     private static final int MAX_HISTORY_MESSAGES = 10;
+
+    /** 多轮改写时每条历史消息截断长度，避免把整段长回答塞进改写请求 */
+    private static final int HISTORY_MESSAGE_MAX_CHARS = 200;
+
+    /** 多轮改写时历史文本的总长度上限 */
+    private static final int HISTORY_TEXT_MAX_CHARS = 1200;
+
+    /** 追问特征词：出现这些词且句子很短时，判定为依赖上下文的追问 */
+    private static final List<String> FOLLOW_UP_MARKERS = List.of(
+            "它", "她", "这个", "那个", "这些", "那些", "该", "此", "上述", "上面", "刚才", "之前",
+            "还有", "另外", "那么", "同样", "继续", "再来", "详细", "展开", "呢", "吗");
+
+    /** 追问开头词：以这些词开头的短问句同样视为追问 */
+    private static final List<String> FOLLOW_UP_PREFIXES = List.of(
+            "那", "那么", "还有", "另外", "以及", "所以", "但是", "不过", "如果", "再", "接着");
 
     private final EmbeddingService embeddingService;
     private final QdrantService qdrantService;
@@ -100,6 +126,9 @@ public class ChatService {
     /** 知识库级检索策略读取器 */
     @org.springframework.beans.factory.annotation.Autowired
     private KnowledgeBaseMapper knowledgeBaseMapper;
+    /** 口径冲突读取器：检索命中冲突片段时给引用打标记；表未建或未注入时自动跳过 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.rag.kb.KbConflictMapper kbConflictMapper;
     /** 可信回答校验器：无状态，由构造器手动创建，避免与注入实例并存 */
     private TrustedAnswerGuard trustedAnswerGuard;
     /** SSE 结构化事件序列化器 */
@@ -161,8 +190,10 @@ public class ChatService {
         // 保存用户消息到数据库
         saveMessage(userId, sessionId, "user", message);
 
-        // 混合检索 + 重排序，构建带来源信息的知识库上下文
-        KnowledgeContext context = buildContextWithSources(message, kbId);
+        // 第1步：加载本会话历史（含刚保存的当前问题），供多轮检索改写判断是否追问
+        List<com.rag.entity.ChatMessage> history = loadSessionHistory(userId, sessionId);
+        // 第2步：混合检索 + 重排序，构建带来源信息的知识库上下文
+        KnowledgeContext context = buildContextWithSources(message, kbId, history);
         //知识库模式没有证据时直接拒答，不调用大模型
         if (kbId != null && !context.hasContext()) {
             String refusal = trustedAnswerGuard.validate("", context).getContent();
@@ -175,7 +206,7 @@ public class ChatService {
         }
         // 组装 system + 历史消息 + 当前问题的 LangChain4j 消息列表
         List<dev.langchain4j.data.message.ChatMessage> chatMessages =
-                buildChatMessages(userId, sessionId, message, context);
+                buildChatMessages(message, context, history);
 
         long startTime = System.currentTimeMillis();
         try {
@@ -257,8 +288,10 @@ public class ChatService {
         try {
             // 通知前端正在检索知识库
             safeSend(emitter, SseEmitter.event().name("status").data("正在检索知识库并生成内容..."));
-            // 混合检索 + 重排序，构建知识库上下文
-            KnowledgeContext context = buildContextWithSources(message, kbId);
+            // 第1步：加载本会话历史（含刚保存的当前问题），供多轮检索改写判断是否追问
+            List<com.rag.entity.ChatMessage> history = loadSessionHistory(userId, sessionId);
+            // 第2步：混合检索 + 重排序，构建知识库上下文
+            KnowledgeContext context = buildContextWithSources(message, kbId, history);
             if (kbId != null) {
                 //先发送引用元数据，前端可以在回答下方展示参考资料
                 safeSendJson(emitter, "citation", context.getCitations());
@@ -282,7 +315,7 @@ public class ChatService {
             }
             // 组装 LangChain4j 消息列表
             List<dev.langchain4j.data.message.ChatMessage> chatMessages =
-                    buildChatMessages(userId, sessionId, message, context);
+                    buildChatMessages(message, context, history);
             // 通知前端正在生成
             safeSend(emitter, SseEmitter.event().name("status").data("正在生成..."));
             // 使用 LangChain4j 流式调用大模型，逐段推送到前端
@@ -464,7 +497,7 @@ public class ChatService {
      * @return 消息数组，按 system → history → user 排列
      */
     private List<dev.langchain4j.data.message.ChatMessage> buildChatMessages(
-            Long userId, Long sessionId, String message, KnowledgeContext context) {
+            String message, KnowledgeContext context, List<com.rag.entity.ChatMessage> history) {
         List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
 
         // 第1步：构建系统提示词
@@ -480,9 +513,8 @@ public class ChatService {
         // 第3步：把系统提示词加入 LangChain4j 消息列表
         messages.add(SystemMessage.from(systemContent));
 
-        // 第4步：加载最近的历史消息
-        List<com.rag.entity.ChatMessage> history = chatMessageMapper.findByUserIdAndSessionId(userId, sessionId);
-        if (history.size() > 1) {
+        // 第4步：直接使用调用方已加载的历史消息（与检索用的是同一份，避免重复查库）
+        if (history != null && history.size() > 1) {
             // 第5步：去掉最后一条当前用户消息，避免重复发送
             List<com.rag.entity.ChatMessage> previousMessages = history.subList(0, history.size() - 1);
             // 第6步：只取最近若干条历史消息，避免上下文过长
@@ -512,9 +544,11 @@ public class ChatService {
      *
      * @param message 用户原始问题
      * @param kbId    知识库ID（为空时不检索，返回空结果）
+     * @param history 本会话历史消息（含当前这一条），用于追问补全
      * @return ContextResult 包含纯文本上下文和带来源标注的上下文
      */
-    private KnowledgeContext buildContextWithSources(String message, Long kbId) {
+    private KnowledgeContext buildContextWithSources(String message, Long kbId,
+                                                     List<com.rag.entity.ChatMessage> history) {
         if (kbId == null) {
             return KnowledgeContext.empty();
         }
@@ -525,48 +559,35 @@ public class ChatService {
             float threshold = strategy != null && strategy.getSimilarityThreshold() != null ? strategy.getSimilarityThreshold().floatValue() : 0.25f;
             float vectorWeight = strategy != null && strategy.getVectorWeight() != null ? strategy.getVectorWeight().floatValue() : 0.6f;
             float keywordWeight = strategy != null && strategy.getKeywordWeight() != null ? strategy.getKeywordWeight().floatValue() : 0.4f;
-            // 第2步：先用原问题查询缓存，命中时不再调用查询改写模型
-            String searchQuery = message == null ? "" : message.trim();
+            // 第2步：结合对话历史解析本轮真正用于检索的问题（追问会被补全成独立问题）
+            String rawQuery = message == null ? "" : message.trim();
+            String searchQuery = resolveRetrievalQuery(rawQuery, history);
+            // 第3步：读取本库已登记的口径冲突，命中的片段会在上下文与引用上带标记
+            Map<Long, com.rag.kb.KbConflict> chunkConflicts = loadChunkConflicts(kbId);
+            // 第4步：用最终检索问题查缓存，命中时不再调用向量与关键词检索
             List<Long> cachedIds = retrievalCache.get(kbId, searchQuery);
             if (cachedIds != null && !cachedIds.isEmpty()) {
                 // 根据缓存的文本块编号读取当前知识库中的有效文本块
                 List<KbChunk> cachedChunks = findKbChunks(cachedIds, kbId);
                 if (!cachedChunks.isEmpty()) {
                     // 返回缓存上下文，跳过后续模型和检索请求
-                    return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(), Collections.emptySet());
+                    return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(),
+                            Collections.emptySet(), chunkConflicts);
                 }
             }
 
-            // 第3步：只有打开开关时才调用查询改写模型
-            if (queryRewriteEnabled) {
-                String rewrittenQuery = queryRewriter.rewrite(message);
-                searchQuery = rewrittenQuery == null || rewrittenQuery.isBlank() ? searchQuery : rewrittenQuery.trim();
-            }
-
-            // 第4步：查询改写后再次检查缓存，兼容历史缓存键
-            if (!searchQuery.equals(message)) {
-                cachedIds = retrievalCache.get(kbId, searchQuery);
-                if (cachedIds != null && !cachedIds.isEmpty()) {
-                    // 根据缓存的文本块编号读取当前知识库中的有效文本块
-                    List<KbChunk> cachedChunks = findKbChunks(cachedIds, kbId);
-                    if (!cachedChunks.isEmpty()) {
-                        // 返回缓存上下文，跳过向量和关键词检索
-                        return buildKnowledgeContext(cachedChunks, searchQuery, Collections.emptyMap(), Collections.emptySet());
-                    }
-                }
-            }
-
-            // 第5步：生成查询向量，向量检索和关键词检索随后并行执行
-            float[] queryEmbedding = embeddingService.embed(searchQuery);
+            // 第5步：关键词检索与向量化互不依赖，先把关键词检索提交出去，再在本地算向量
             int effectiveCandidateK = Math.max(candidateK, effectiveTopK * 2);
             // 固定最终检索词，供并行任务安全读取
             String retrievalQuery = searchQuery;
-            // 启动向量检索任务，避免等待关键词数据库查询完成后才开始
-            CompletableFuture<List<SearchResult>> vectorFuture = CompletableFuture.supplyAsync(
-                    () -> qdrantService.searchWithScore(queryEmbedding, effectiveCandidateK, kbId));
-            // 启动关键词检索任务，与向量检索并行执行
+            // 关键词检索只需要文本，先交出去，避免它的数据库查询与 embedding 的网络往返串行等待
             CompletableFuture<List<KbChunk>> keywordFuture = CompletableFuture.supplyAsync(
                     () -> keywordSearchService.search(retrievalQuery, kbId, effectiveCandidateK));
+            // 本线程生成查询向量（一次 HTTP 调用），这段时间关键词检索已经在跑
+            float[] queryEmbedding = embeddingService.embed(searchQuery);
+            // 向量检索同样并行执行
+            CompletableFuture<List<SearchResult>> vectorFuture = CompletableFuture.supplyAsync(
+                    () -> qdrantService.searchWithScore(queryEmbedding, effectiveCandidateK, kbId));
             List<SearchResult> vectorResults;
             List<KbChunk> keywordChunks;
             try {
@@ -592,6 +613,12 @@ public class ChatService {
 
             // 第6步：整理关键词检索结果并合并去重
             Set<Long> keywordIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
+            // 全文索引的原始相关度：让关键词分数从"命中/未命中"细化为真实强弱
+            Map<Long, Double> keywordRelevance = new HashMap<>();
+            for (KbChunk chunk : keywordChunks) {
+                keywordRelevance.merge(chunk.getId(), chunk.getRelevance() == null ? 0d : chunk.getRelevance(), Math::max);
+            }
+            double maxKeywordRelevance = keywordRelevance.values().stream().mapToDouble(Double::doubleValue).max().orElse(0d);
 
             // 第7步：合并去重（向量结果 + 关键词结果，去掉重复的 chunk）
             Set<Long> allIds = new LinkedHashSet<>(vectorIds);
@@ -620,13 +647,16 @@ public class ChatService {
                 boolean vectorMatched = vectorIdSet.contains(chunk.getId());
                 RetrievalCandidate candidate = new RetrievalCandidate(chunk);
                 candidate.setVectorScore(vectorScoreById.getOrDefault(chunk.getId(), 0.3f));
-                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setKeywordScore(RetrievalCandidate.normalizeKeywordScore(
+                        keywordMatched, keywordRelevance.get(chunk.getId()), maxKeywordRelevance));
                 candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID"
                         : keywordMatched ? "KEYWORD" : "VECTOR");
                 candidates.add(candidate);
             }
+            // 第8步：冲突配对补齐——两版口径必须并排可见，配对的另一段没被召回时从库里补回来
+            Set<Long> conflictChunkIds = amplifyConflictCandidates(candidates, chunkConflicts, kbId);
             List<RetrievalCandidate> selected = retrievalSelector.select(candidates, effectiveTopK,
-                    threshold, vectorWeight, keywordWeight, 0.85f);
+                    threshold, vectorWeight, keywordWeight, 0.85f, conflictChunkIds);
             if (selected.isEmpty()) {
                 return KnowledgeContext.empty();
             }
@@ -635,7 +665,7 @@ public class ChatService {
             List<Long> selectedIds = selected.stream().map(candidate -> candidate.getChunk().getId()).collect(Collectors.toList());
             retrievalCache.put(kbId, searchQuery, selectedIds);
 
-            return buildKnowledgeContext(selected, searchQuery);
+            return buildKnowledgeContext(selected, searchQuery, chunkConflicts);
         } catch (BusinessException e) {
             //向量维度不匹配等业务异常原样抛出，保留可行动的错误提示
             throw e;
@@ -643,6 +673,115 @@ public class ChatService {
             log.error("Failed to build knowledge context", e);
             throw new RuntimeException("Knowledge retrieval failed", e);
         }
+    }
+
+    // ==================== 多轮检索改写 ====================
+
+    /** 加载会话历史（含当前这一条），供多轮检索改写与消息组装共用 */
+    private List<com.rag.entity.ChatMessage> loadSessionHistory(Long userId, Long sessionId) {
+        try {
+            List<com.rag.entity.ChatMessage> history =
+                    chatMessageMapper.findByUserIdAndSessionId(userId, sessionId);
+            return history == null ? Collections.emptyList() : history;
+        } catch (Exception e) {
+            log.warn("加载会话历史失败，本轮按单轮问题检索: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 解析本轮真正用于检索的问题
+     * 第1步：判断这句话是否依赖上下文（短句 + 含指代/追问词）；不是就直接用原句，不做额外模型调用
+     * 第2步：是追问且存在历史时，调用模型结合历史补全成独立问题
+     * 第3步：模型失败或返回空时退回原句；未开多轮开关时保留原有的单轮改写行为
+     */
+    private String resolveRetrievalQuery(String rawQuery, List<com.rag.entity.ChatMessage> history) {
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return rawQuery == null ? "" : rawQuery;
+        }
+        boolean hasHistory = history != null && history.size() > 1;
+        // 第1步：只有追问才补全，普通独立问题保持原样
+        if (multiTurnQueryEnabled && hasHistory && looksLikeFollowUp(rawQuery)) {
+            String historyText = formatHistory(history, multiTurnHistoryTurns);
+            String rewritten = queryRewriter.rewriteWithHistory(rawQuery, historyText);
+            if (rewritten != null && !rewritten.isBlank()) {
+                log.debug("多轮检索改写: '{}' -> '{}'", rawQuery, rewritten);
+                return rewritten.trim();
+            }
+            return rawQuery;
+        }
+        // 第2步：兼容原有的单轮改写开关
+        if (queryRewriteEnabled) {
+            String rewritten = queryRewriter.rewrite(rawQuery);
+            if (rewritten != null && !rewritten.isBlank()) {
+                return rewritten.trim();
+            }
+        }
+        return rawQuery;
+    }
+
+    /**
+     * 判断一句话是否依赖上下文（追问）
+     * 判据：句子不超过 30 字，且含指代词/承接词，或以「那/还有/另外」等词开头
+     */
+    static boolean looksLikeFollowUp(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String text = query.trim();
+        // 长句通常自带完整语义，不做改写，避免额外模型开销
+        if (text.length() > 30) {
+            return false;
+        }
+        for (String prefix : FOLLOW_UP_PREFIXES) {
+            if (text.startsWith(prefix)) {
+                return true;
+            }
+        }
+        // 句末语气词（呢/吗）且不超过 15 字，视为追问
+        if (text.length() <= 15 && (text.endsWith("呢") || text.endsWith("吗"))) {
+            return true;
+        }
+        for (String marker : FOLLOW_UP_MARKERS) {
+            if (text.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 把历史消息格式化成模型可读的对话文本
+     * 只取最近 turns 轮、跳过当前这一条用户消息，并对每条内容做长度截断
+     */
+    static String formatHistory(List<com.rag.entity.ChatMessage> history, int turns) {
+        if (history == null || history.size() <= 1) {
+            return "";
+        }
+        // 第1步：去掉最后一条（当前用户问题），只保留此前的对话
+        List<com.rag.entity.ChatMessage> previous = history.subList(0, history.size() - 1);
+        // 第2步：按轮数换算成消息条数（一问一答算两条）
+        int maxMessages = Math.max(1, turns) * 2;
+        int start = Math.max(0, previous.size() - maxMessages);
+        StringBuilder builder = new StringBuilder();
+        for (int i = start; i < previous.size(); i++) {
+            com.rag.entity.ChatMessage msg = previous.get(i);
+            String content = msg.getContent() == null ? "" : msg.getContent().trim();
+            if (content.isEmpty()) {
+                continue;
+            }
+            // 第3步：单条过长时截断，避免改写请求本身超长
+            if (content.length() > HISTORY_MESSAGE_MAX_CHARS) {
+                content = content.substring(0, HISTORY_MESSAGE_MAX_CHARS) + "…";
+            }
+            // 第4步：总量超限就停止追加，历史只需要够模型消解指代
+            if (builder.length() + content.length() > HISTORY_TEXT_MAX_CHARS) {
+                break;
+            }
+            String role = "assistant".equals(msg.getRole()) ? "助手" : "用户";
+            builder.append(role).append("：").append(content).append('\n');
+        }
+        return builder.toString().trim();
     }
 
     /**
@@ -653,7 +792,8 @@ public class ChatService {
      * @return ContextResult 包含两种格式的上下文文本
      */
     private KnowledgeContext buildKnowledgeContext(List<KbChunk> chunks, String rewrittenQuery,
-                                                   Map<Long, Float> vectorScores, Set<Long> keywordIds) {
+                                                   Map<Long, Float> vectorScores, Set<Long> keywordIds,
+                                                   Map<Long, com.rag.kb.KbConflict> conflicts) {
         StringBuilder contextText = new StringBuilder();
         StringBuilder contextWithSources = new StringBuilder();
         List<KnowledgeCitation> citations = new ArrayList<>();
@@ -668,6 +808,13 @@ public class ChatService {
             // 带来源标注的版本：[来源: 文件名, 第N段]
             String source = chunk.getSourceInfo() != null ? chunk.getSourceInfo() : "文档";
             contextWithSources.append("[来源: ").append(source).append("]\n").append(chunk.getContent());
+            // 口径冲突提示：命中已登记的冲突片段时，要求模型说明两种说法的差异，而不是挑一个当作唯一答案
+            String conflictNote = conflicts == null ? null : buildConflictNote(conflicts.get(chunk.getId()), chunk.getId());
+            if (conflictNote != null) {
+                contextWithSources.append("\n[注意: 本段与其他文档存在口径冲突——")
+                        .append(conflictNote)
+                        .append("。若引用本段，请明确说明两种口径的差异，不要只给出其中一个数值。]");
+            }
             KnowledgeCitation citation = new KnowledgeCitation();
             citation.setFileId(chunk.getFileId());
             citation.setFileName(chunk.getFileName() == null ? "文档" : chunk.getFileName());
@@ -678,6 +825,10 @@ public class ChatService {
             citation.setVectorScore(vectorScores.getOrDefault(chunk.getId(), 0f));
             citation.setKeywordScore(keywordIds.contains(chunk.getId()) ? 1f : 0f);
             citation.setMatchType(keywordIds.contains(chunk.getId()) ? "KEYWORD" : "VECTOR");
+            if (conflictNote != null) {
+                citation.setConflict(Boolean.TRUE);
+                citation.setConflictNote(conflictNote);
+            }
             citations.add(citation);
         }
         return new KnowledgeContext(contextText.toString(), contextWithSources.toString(), citations, rewrittenQuery);
@@ -686,7 +837,8 @@ public class ChatService {
     /**
      * 从带分数的检索候选构建知识库上下文
      */
-    private KnowledgeContext buildKnowledgeContext(List<RetrievalCandidate> candidates, String rewrittenQuery) {
+    private KnowledgeContext buildKnowledgeContext(List<RetrievalCandidate> candidates, String rewrittenQuery,
+                                                   Map<Long, com.rag.kb.KbConflict> conflicts) {
         List<KbChunk> chunks = candidates.stream().map(RetrievalCandidate::getChunk).toList();
         Map<Long, Float> vectorScores = new HashMap<>();
         Set<Long> keywordIds = new HashSet<>();
@@ -696,7 +848,7 @@ public class ChatService {
                 keywordIds.add(candidate.getChunk().getId());
             }
         }
-        KnowledgeContext context = buildKnowledgeContext(chunks, rewrittenQuery, vectorScores, keywordIds);
+        KnowledgeContext context = buildKnowledgeContext(chunks, rewrittenQuery, vectorScores, keywordIds, conflicts);
         for (int index = 0; index < candidates.size() && index < context.getCitations().size(); index++) {
             KnowledgeCitation citation = context.getCitations().get(index);
             RetrievalCandidate candidate = candidates.get(index);
@@ -716,6 +868,135 @@ public class ChatService {
         }
         String normalized = content.replace("\r", " ").replace("\n", " ").trim();
         return normalized.length() <= 160 ? normalized : normalized.substring(0, 160) + "...";
+    }
+
+    /**
+     * 读取本知识库已登记的口径冲突，整理成「片段编号 → 冲突」映射。
+     * 人工已忽略（DISMISSED）的冲突不参与，避免确认过的误报反复打扰；
+     * 同一片段命中多条冲突时优先取已确认的，其次取相似度更高的。
+     */
+    private Map<Long, com.rag.kb.KbConflict> loadChunkConflicts(Long kbId) {
+        if (kbConflictMapper == null || kbId == null) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<com.rag.kb.KbConflict> conflicts = kbConflictMapper.findByKb(kbId, null);
+            if (conflicts == null || conflicts.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            Map<Long, com.rag.kb.KbConflict> byChunk = new HashMap<>();
+            for (com.rag.kb.KbConflict conflict : conflicts) {
+                if (conflict == null || "DISMISSED".equalsIgnoreCase(conflict.getConflictStatus())) {
+                    continue;
+                }
+                mergeConflict(byChunk, conflict.getChunkAId(), conflict);
+                mergeConflict(byChunk, conflict.getChunkBId(), conflict);
+            }
+            return byChunk;
+        } catch (Exception e) {
+            // 冲突标记属于增强信息，读取失败只降级，不能影响正常问答
+            log.warn("读取口径冲突失败，本次回答不带冲突标记: {}", e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
+     * 冲突配对补齐：把已召回片段的对侧版本补进候选，并返回需要豁免去重的切片编号。
+     * 为什么需要：同一制度的两版文档往往高度相似（实测相似度 0.88），去重逻辑会把后一条
+     * 判为 DUPLICATE_CONTENT 直接丢掉，用户只能看到其中一版口径，而冲突恰恰要靠并排对比才成立。
+     *
+     * @param candidates     已构建的候选（会被追加补取的配对片段）
+     * @param chunkConflicts 片段编号到冲突记录的映射
+     * @param kbId           知识库ID，补取时用于归属校验
+     * @return 需要豁免「低分过滤」与「重复内容过滤」的切片编号集合
+     */
+    private Set<Long> amplifyConflictCandidates(List<RetrievalCandidate> candidates,
+                                                Map<Long, com.rag.kb.KbConflict> chunkConflicts,
+                                                Long kbId) {
+        if (chunkConflicts == null || chunkConflicts.isEmpty() || candidates.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> presentIds = candidates.stream()
+                .map(candidate -> candidate.getChunk().getId())
+                .collect(Collectors.toCollection(HashSet::new));
+        Set<Long> conflictChunkIds = new HashSet<>();
+        List<RetrievalCandidate> missing = new ArrayList<>();
+        for (RetrievalCandidate candidate : candidates) {
+            Long chunkId = candidate.getChunk().getId();
+            com.rag.kb.KbConflict conflict = chunkConflicts.get(chunkId);
+            if (conflict == null || conflict.getChunkAId() == null || conflict.getChunkBId() == null) {
+                continue;
+            }
+            Long partnerId = chunkId.equals(conflict.getChunkAId())
+                    ? conflict.getChunkBId() : conflict.getChunkAId();
+            // 两侧都要豁免：谁在前谁在后取决于分数，只有都保护才不会被去重干掉一个
+            conflictChunkIds.add(chunkId);
+            conflictChunkIds.add(partnerId);
+            if (presentIds.contains(partnerId)) {
+                continue;
+            }
+            List<KbChunk> fetched = findKbChunks(Collections.singletonList(partnerId), kbId);
+            if (fetched.isEmpty()) {
+                continue;
+            }
+            RetrievalCandidate extra = new RetrievalCandidate(fetched.get(0));
+            // 沿用对侧的向量分数，让配对片段紧挨着它出现，而不是排到最后
+            extra.setVectorScore(candidate.getVectorScore());
+            extra.setKeywordScore(0f);
+            extra.setMatchType("CONFLICT");
+            missing.add(extra);
+            presentIds.add(partnerId);
+        }
+        candidates.addAll(missing);
+        if (!missing.isEmpty()) {
+            log.info("口径冲突补齐：为 {} 个冲突片段补入 {} 个未召回的配对切片", conflictChunkIds.size(), missing.size());
+        }
+        return conflictChunkIds;
+    }
+
+    /** 同一片段命中多条冲突时保留优先级更高的一条 */
+    private void mergeConflict(Map<Long, com.rag.kb.KbConflict> byChunk, Long chunkId,
+                               com.rag.kb.KbConflict conflict) {        if (chunkId == null) {
+            return;
+        }
+        com.rag.kb.KbConflict existing = byChunk.get(chunkId);
+        if (existing == null || conflictPriority(conflict) > conflictPriority(existing)) {
+            byChunk.put(chunkId, conflict);
+        }
+    }
+
+    /** 冲突优先级：已确认的排在前，其次比相似度 */
+    private int conflictPriority(com.rag.kb.KbConflict conflict) {
+        int confirmed = "CONFIRMED".equalsIgnoreCase(conflict.getConflictStatus()) ? 1000 : 0;
+        float similarity = conflict.getSimilarity() == null ? 0f : conflict.getSimilarity();
+        return confirmed + Math.round(similarity * 100);
+    }
+
+    /**
+     * 把一条冲突记录翻译成一句人话，prompt 与前端引用共用同一段文案。
+     *
+     * @param conflict 冲突记录
+     * @param chunkId  当前片段编号，用于判断自己在冲突的哪一侧
+     * @return 冲突说明；无冲突时返回 null
+     */
+    static String buildConflictNote(com.rag.kb.KbConflict conflict, Long chunkId) {
+        if (conflict == null) {
+            return null;
+        }
+        boolean currentIsA = conflict.getChunkAId() != null && conflict.getChunkAId().equals(chunkId);
+        String otherFile = currentIsA ? conflict.getFileBName() : conflict.getFileAName();
+        Integer otherIndex = currentIsA ? conflict.getChunkBIndex() : conflict.getChunkAIndex();
+        String unit = conflict.getConflictUnit() == null ? "" : conflict.getConflictUnit();
+        String valueA = conflict.getValueA() == null ? "?" : conflict.getValueA();
+        String valueB = conflict.getValueB() == null ? "?" : conflict.getValueB();
+        StringBuilder note = new StringBuilder();
+        note.append("与《").append(otherFile == null ? "其他文档" : otherFile).append("》");
+        if (otherIndex != null) {
+            note.append("第").append(otherIndex + 1).append("段");
+        }
+        note.append("在「").append(unit).append("」上的取值不一致（")
+                .append(valueA).append(" 对 ").append(valueB).append("）");
+        return note.toString();
     }
 
     /**
@@ -748,6 +1029,23 @@ public class ChatService {
     }
 
     /**
+     * 生产链路的检索结果（供评测台使用）
+     * 直接复用 buildContextWithSources，保证评测口径与实际问答完全一致：
+     * 同样的知识库策略（topK/阈值/权重）、同样的向量 + 关键词召回、同样的去重规则。
+     *
+     * @param question 评测问题
+     * @param kbId     知识库ID
+     * @return 命中的引用列表（按得分排序），无命中时返回空列表
+     */
+    public List<KnowledgeCitation> retrieveCitations(String question, Long kbId) {
+        if (kbId == null || question == null || question.isBlank()) {
+            return Collections.emptyList();
+        }
+        KnowledgeContext context = buildContextWithSources(question, kbId, Collections.emptyList());
+        return context.getCitations() == null ? Collections.emptyList() : context.getCitations();
+    }
+
+    /**
      * 召回测试接口（供 ChatController 调用）
      * 输入问题和知识库ID，返回召回的 chunk 列表，用于调试检索质量
      * 每个 chunk 包含排名、chunkID、来源信息和内容
@@ -776,6 +1074,11 @@ public class ChatService {
             // 关键词检索
             List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, topK);
             Set<Long> keywordChunkIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
+            Map<Long, Double> recallRelevance = new HashMap<>();
+            for (KbChunk chunk : keywordChunks) {
+                recallRelevance.merge(chunk.getId(), chunk.getRelevance() == null ? 0d : chunk.getRelevance(), Math::max);
+            }
+            double recallMaxRelevance = recallRelevance.values().stream().mapToDouble(Double::doubleValue).max().orElse(0d);
 
             // 合并去重
             Set<Long> allIds = new LinkedHashSet<>(vectorIds);
@@ -795,7 +1098,8 @@ public class ChatService {
                 boolean keywordMatched = keywordChunkIds.contains(chunk.getId());
                 RetrievalCandidate candidate = new RetrievalCandidate(chunk);
                 candidate.setVectorScore(vectorScoreByChunkId.getOrDefault(chunk.getId(), 0.3f));
-                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setKeywordScore(RetrievalCandidate.normalizeKeywordScore(
+                        keywordMatched, recallRelevance.get(chunk.getId()), recallMaxRelevance));
                 candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID"
                         : keywordMatched ? "KEYWORD" : "VECTOR");
                 diagnostics.add(candidate);
@@ -856,6 +1160,11 @@ public class ChatService {
             Map<Long, Float> vectorScores = vectorResults.stream().collect(Collectors.toMap(result -> result.id, result -> result.score, Math::max));
             List<KbChunk> keywordChunks = keywordSearchService.search(searchQuery, kbId, debugCandidateK);
             Set<Long> keywordIds = keywordChunks.stream().map(KbChunk::getId).collect(Collectors.toSet());
+            Map<Long, Double> debugRelevance = new HashMap<>();
+            for (KbChunk chunk : keywordChunks) {
+                debugRelevance.merge(chunk.getId(), chunk.getRelevance() == null ? 0d : chunk.getRelevance(), Math::max);
+            }
+            double debugMaxRelevance = debugRelevance.values().stream().mapToDouble(Double::doubleValue).max().orElse(0d);
             LinkedHashMap<Long, KbChunk> chunks = new LinkedHashMap<>();
             for (KbChunk chunk : findKbChunks(vectorResults.stream().map(result -> result.id).toList(), kbId)) chunks.put(chunk.getId(), chunk);
             for (KbChunk chunk : keywordChunks) chunks.putIfAbsent(chunk.getId(), chunk);
@@ -865,7 +1174,8 @@ public class ChatService {
                 boolean vectorMatched = vectorScores.containsKey(chunk.getId());
                 boolean keywordMatched = keywordIds.contains(chunk.getId());
                 candidate.setVectorScore(vectorScores.getOrDefault(chunk.getId(), 0.3f));
-                candidate.setKeywordScore(keywordMatched ? 1f : 0f);
+                candidate.setKeywordScore(RetrievalCandidate.normalizeKeywordScore(
+                        keywordMatched, debugRelevance.get(chunk.getId()), debugMaxRelevance));
                 candidate.setMatchType(vectorMatched && keywordMatched ? "HYBRID" : keywordMatched ? "KEYWORD" : "VECTOR");
                 candidates.add(candidate);
             }

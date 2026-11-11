@@ -1,4 +1,11 @@
 -- RAG Knowledge Base System Database Schema
+--
+-- 本文件包含当前全部表结构（含智能体步骤编排 agent_step、文档口径冲突 kb_conflict、
+-- 评测指标 mrr/matched_rank、令牌版本 sys_user.token_version）。
+-- 全新部署：直接执行本文件即可。
+-- 已有库升级：按 README「历史数据库升级」的顺序执行 database 目录下的 *_upgrade.sql / *.sql。
+-- 注意：kb_chunk 的全文索引（ngram 分词）不在本文件内，需单独执行
+-- database/kb_fulltext_search_upgrade.sql，脚本会自行判断 ngram 支持性与索引是否已存在。
 
 CREATE DATABASE IF NOT EXISTS rag_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -536,6 +543,7 @@ CREATE TABLE IF NOT EXISTS kb_eval_run (
     hit_count INT NOT NULL DEFAULT 0,
     citation_hit_count INT NOT NULL DEFAULT 0,
     grounded_count INT NOT NULL DEFAULT 0,
+    mrr DECIMAL(8,4) NOT NULL DEFAULT 0 COMMENT '平均倒数排名 MRR：命中越靠前越接近 1',
     avg_latency_ms BIGINT NOT NULL DEFAULT 0,
     total_tokens INT NOT NULL DEFAULT 0,
     parameter_snapshot TEXT,
@@ -555,6 +563,7 @@ CREATE TABLE IF NOT EXISTS kb_eval_run_item (
     result_status VARCHAR(20) NOT NULL,
     answer TEXT,
     hit TINYINT NOT NULL DEFAULT 0,
+    matched_rank INT NOT NULL DEFAULT 0 COMMENT '首个命中期望来源的排名（1 起，0 表示未命中）',
     citation_hit TINYINT NOT NULL DEFAULT 0,
     grounded TINYINT NOT NULL DEFAULT 0,
     latency_ms BIGINT NOT NULL DEFAULT 0,
@@ -672,4 +681,30 @@ CREATE TABLE IF NOT EXISTS web_search_config (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='web_search 技能搜索源配置';
+
+CREATE TABLE IF NOT EXISTS kb_conflict (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kb_id BIGINT NOT NULL COMMENT '知识库编号',
+    chunk_a_id BIGINT NOT NULL COMMENT '冲突片段 A 的切片编号',
+    chunk_b_id BIGINT NOT NULL COMMENT '冲突片段 B 的切片编号',
+    file_a_id BIGINT DEFAULT NULL COMMENT '片段 A 所属文件编号',
+    file_a_name VARCHAR(255) DEFAULT NULL COMMENT '片段 A 所属文件名',
+    chunk_a_index INT DEFAULT NULL COMMENT '片段 A 在文件中的段落序号（从 0 开始）',
+    content_a TEXT COMMENT '片段 A 内容快照，便于直接比对',
+    file_b_id BIGINT DEFAULT NULL COMMENT '片段 B 所属文件编号',
+    file_b_name VARCHAR(255) DEFAULT NULL COMMENT '片段 B 所属文件名',
+    chunk_b_index INT DEFAULT NULL COMMENT '片段 B 在文件中的段落序号（从 0 开始）',
+    content_b TEXT COMMENT '片段 B 内容快照',
+    similarity FLOAT NOT NULL DEFAULT 0 COMMENT '两段文本的 Jaccard 相似度，越高越可能是同一话题',
+    conflict_unit VARCHAR(16) DEFAULT NULL COMMENT '产生冲突的计量单位（天/月/%/元…）',
+    value_a VARCHAR(64) DEFAULT NULL COMMENT '片段 A 在该单位上的取值',
+    value_b VARCHAR(64) DEFAULT NULL COMMENT '片段 B 在该单位上的取值',
+    reason VARCHAR(500) DEFAULT NULL COMMENT '自动生成的冲突说明',
+    conflict_status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING=待确认，CONFIRMED=确认冲突，DISMISSED=已忽略',
+    create_user BIGINT DEFAULT NULL COMMENT '触发检测的用户编号',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_kb_conflict_pair (kb_id, chunk_a_id, chunk_b_id),
+    KEY idx_kb_conflict_status (kb_id, conflict_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档口径冲突';
 

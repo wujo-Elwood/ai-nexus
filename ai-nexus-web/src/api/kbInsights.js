@@ -24,3 +24,18 @@ export function getKbSummary(kbId) {
 export function generateKbSummary(kbId) {
   return request.post(`/api/kb/${kbId}/summary`)
 }
+
+// 查询知识库口径冲突列表，status 为空返回全部
+export function getKbConflicts(kbId, status) {
+  return request.get(`/api/kb/${kbId}/conflicts`, { params: status ? { status } : {} })
+}
+
+// 触发一次口径冲突检测（全量替换旧结果）
+export function detectKbConflicts(kbId) {
+  return request.post(`/api/kb/${kbId}/conflicts/detect`)
+}
+
+// 确认或忽略一条冲突
+export function updateKbConflict(kbId, conflictId, status) {
+  return request.put(`/api/kb/${kbId}/conflicts/${conflictId}`, { status })
+}

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +52,20 @@ public class RetrievalSelector {
     public List<RetrievalCandidate> select(List<RetrievalCandidate> candidates, int topK,
                                            float threshold, float vectorRatio, float keywordRatio,
                                            float diversity) {
+        return select(candidates, topK, threshold, vectorRatio, keywordRatio, diversity, Collections.emptySet());
+    }
+
+    /**
+     * 按本次调试或知识库策略选择最终候选，并保护指定切片
+     *
+     * @param protectedIds 需要豁免「低分过滤」与「重复内容过滤」的切片编号，
+     *                     目前用于口径冲突的两个版本：它们内容天然高度相似，
+     *                     若按普通去重规则只会留下其中一版，用户就看不到冲突本身
+     */
+    public List<RetrievalCandidate> select(List<RetrievalCandidate> candidates, int topK,
+                                           float threshold, float vectorRatio, float keywordRatio,
+                                           float diversity, Set<Long> protectedIds) {
+        Set<Long> guarded = protectedIds == null ? Collections.emptySet() : protectedIds;
         List<RetrievalCandidate> eligible = new ArrayList<>();
         for (RetrievalCandidate candidate : candidates) {
             float vectorScore = candidate.getVectorScore();
@@ -58,7 +73,9 @@ public class RetrievalSelector {
             candidate.setFinalScore(vectorRatio * vectorScore + keywordRatio * keywordScore);
             boolean keywordMatched = keywordScore > 0 || "KEYWORD".equals(candidate.getMatchType())
                     || "HYBRID".equals(candidate.getMatchType());
-            if (!keywordMatched && vectorScore < threshold) {
+            // 冲突对照片段必须保住，否则用户只能看到其中一版口径
+            boolean guardedCandidate = guarded.contains(candidate.getChunk().getId());
+            if (!keywordMatched && !guardedCandidate && vectorScore < threshold) {
                 candidate.setFilterReason("BELOW_THRESHOLD");
                 continue;
             }
@@ -70,7 +87,11 @@ public class RetrievalSelector {
         for (RetrievalCandidate candidate : eligible) {
             boolean duplicate = false;
             for (RetrievalCandidate existing : selected) {
-                if (contentSimilarity(candidate.getChunk().getContent(), existing.getChunk().getContent()) >= diversity) {
+                // 冲突的两个版本要并排展示，彼此不算重复
+                boolean bothGuarded = guarded.contains(candidate.getChunk().getId())
+                        && guarded.contains(existing.getChunk().getId());
+                if (!bothGuarded
+                        && contentSimilarity(candidate.getChunk().getContent(), existing.getChunk().getContent()) >= diversity) {
                     duplicate = true;
                     break;
                 }
